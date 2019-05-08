@@ -312,7 +312,7 @@ class GenericCAE(NeuralNetwork):
 						strides=[1, 2, 2, 1], padding='SAME'), b))
 
 			else:
-				print(layer_i,'Inner layer softmax')
+				# print(layer_i,'Inner layer softmax')
 				output = tf.nn.softmax(tf.add(
 					tf.nn.conv2d_transpose(
 						current_input, W,

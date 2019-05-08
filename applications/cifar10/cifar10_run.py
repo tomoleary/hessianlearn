@@ -45,7 +45,7 @@ hess_batch_size = 1000
 testing_data_size = 10000
 
 batch_factor = [1, float(hess_batch_size)/float(batch_size)]
-data_func = load_mnist
+data_func = load_cifar10
 raw_data = data_func()
 
 data = Data(raw_data,training_data_size,\
@@ -54,8 +54,8 @@ data = Data(raw_data,training_data_size,\
 # Define network and instantiate problem and regularization
 architecture = {}
 architecture['input_shape'] = data._input_shape
-architecture['n_filters'] = [4, 4]
-architecture['filter_sizes'] = [8,4]
+architecture['n_filters'] = [4, 4, 4, 8]
+architecture['filter_sizes'] = [16,8,8,4]
 
 CAE = GenericCAE(architecture)
 problem = AutoencoderProblem(CAE,dtype=tf.float32)
@@ -148,7 +148,7 @@ print('{0:8} {1:11} {2:11} {3:11} {4:11}'.format(\
 x_test, y_test = next(iter(data.test))
 test_dict = {problem.x: x_test}
 # Iteration Loop
-max_sweeps = 100
+max_sweeps = 50
 train_data = iter(data.train)
 x_batch,y_batch = next(train_data)
 sweeps = 0
