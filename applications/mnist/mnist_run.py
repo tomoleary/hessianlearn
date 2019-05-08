@@ -95,7 +95,7 @@ if args.optimizer == 'adam':
 	batch_size = int(args.batch_ratio*training_data_size)
 	data = Data(raw_data,training_data_size,\
         batch_size,hessian_batch_size = hess_batch_size,test_data_size = testing_data_size)
-	print(('Using Adam optimizer, with'+str(100*args.batch_ratio)+'% mini-batches').center(80))
+	print(('Using Adam optimizer, with '+str(100*args.batch_ratio)+'% mini-batches').center(80))
 	print(('Batch size = '+str(batch_size)).center(80))
 	optimizer = Adam(problem,regularization,sess)
 	optimizer.parameters['alpha'] = args.alpha
@@ -128,7 +128,7 @@ elif args.optimizer == 'sgd':
 	batch_size = int(args.batch_ratio*training_data_size)
 	data = Data(raw_data,training_data_size,\
         batch_size,hessian_batch_size = hess_batch_size,test_data_size = testing_data_size)
-	print(('Using stochastic gradient descent optimizer, with'+str(100*args.batch_ratio)+'% mini-batches').center(80))
+	print(('Using stochastic gradient descent optimizer, with '+str(100*args.batch_ratio)+'% mini-batches').center(80))
 	print(('Batch size = '+str(batch_size)).center(80))
 	optimizer = GradientDescent(problem,regularization,sess)
 	optimizer.parameters['alpha'] = 1e-2
