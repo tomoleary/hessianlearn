@@ -16,6 +16,6 @@ from .inexactNewtonCG import InexactNewtonCG, ParametersInexactNewtonCG
 
 from .inexactNewtonGMRES import InexactNewtonGMRES, ParametersInexactNewtonGMRES
 
-from .saddleFreeNewton import SaddleFreeNewton, ParametersSaddleFreeNewton
+from .lowRankSaddleFreeNewton import LowRankSaddleFreeNewton, ParametersLowRankSaddleFreeNewton
 
 

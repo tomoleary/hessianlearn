@@ -15,7 +15,7 @@ from ..modeling import L2Regularization
 
 
 
-def ParametersSaddleFreeNewton(parameters = {}):
+def ParametersLowRankSaddleFreeNewton(parameters = {}):
 	parameters['alpha']                         = [1e0, "Initial steplength, or learning rate"]
 	parameters['rel_tolerance']                 = [1e-3, "Relative convergence when sqrt(g,g)/sqrt(g_0,g_0) <= rel_tolerance"]
 	parameters['abs_tolerance']                 = [1e-4,"Absolute converge when sqrt(g,g) <= abs_tolerance"]
@@ -34,13 +34,13 @@ def ParametersSaddleFreeNewton(parameters = {}):
 	return ParameterList(parameters)
 
 
-class SaddleFreeNewton(Optimizer):
-	def __init__(self,problem,regularization = None,sess = None,feed_dict = None,parameters = ParametersSaddleFreeNewton(),preconditioner = None):
+class LowRankSaddleFreeNewton(Optimizer):
+	def __init__(self,problem,regularization = None,sess = None,feed_dict = None,parameters = ParametersLowRankSaddleFreeNewton(),preconditioner = None):
 		if regularization is None:
 			_regularization = ZeroRegularization(problem)
 		else:
 			_regularization = regularization
-		super(SaddleFreeNewton,self).__init__(problem,_regularization,sess,parameters)
+		super(LowRankSaddleFreeNewton,self).__init__(problem,_regularization,sess,parameters)
 		self.grad = self.problem.gradient + self.regularization.gradient
 		if self.parameters['globalization'] == 'trust_region':
 			self.trust_region = TrustRegion()
@@ -107,7 +107,7 @@ class SaddleFreeNewton(Optimizer):
 			return self.problem._update_w(update)
 
 		elif self.parameters['globalization'] == 'line_search':
-			w_dir_inner_g = np.inner(self.p,self.gradient)
+			w_dir_inner_g = np.inner(self.p,gradient)
 			initial_cost = self.sess.run(self.problem.loss,feed_dict = feed_dict)
 			cost_at_candidate = lambda p : self._loss_at_candidate(p,feed_dict = feed_dict)
 			self.alpha, line_search, line_search_iter = ArmijoLineSearch(self.p,w_dir_inner_g,\

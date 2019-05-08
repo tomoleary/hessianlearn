@@ -120,7 +120,7 @@ elif args.optimizer == 'lrsfn':
 	print('Using low rank SFN optimizer with line search'.center(80))
 	print(('Batch size = '+str(batch_size)).center(80))
 	print(('Hessian batch size = '+str(hess_batch_size)).center(80))
-	optimizer = SaddleFreeNewton(problem,regularization,sess)
+	optimizer = LowRankSaddleFreeNewton(problem,regularization,sess)
 	optimizer.parameters['globalization'] = 'line_search'
 	optimizer.parameters['hessian_low_rank'] = args.sfn_lr
 elif args.optimizer == 'sgd':
