@@ -66,6 +66,7 @@ print(80*'#')
 
 # Initialize Logging 
 logger = {}
+logger['dimension'] = problem.dimension
 logger['loss'] = {}
 logger['loss_test'] = {}
 logger['||g||'] ={}
