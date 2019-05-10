@@ -16,8 +16,8 @@ parser = ArgumentParser(add_help=True, description="-b batch size (int) \
 														-p population_size (int) -alpha (float)")
 # parser.add_argument('-hl',dest = 'path_to_hl',required=True, help="path to hippylearn, required!",type=str)
 parser.add_argument("-optimizer", dest='optimizer',required=False, default = 'incg', help="optimizer type",type=str)
-parser.add_argument('-alpha',dest = 'alpha',required = False,default = 1e-3,help= 'learning rate alpha',type=float)
-parser.add_argument('-sfn_lr',dest = 'sfn_lr',required= False,default = 40,help='low rank for sfn',type = int)
+parser.add_argument('-alpha',dest = 'alpha',required = False,default = 5e-2,help= 'learning rate alpha',type=float)
+parser.add_argument('-sfn_lr',dest = 'sfn_lr',required= False,default = 20,help='low rank for sfn',type = int)
 parser.add_argument('-record_spectrum',dest = 'record_spectrum',\
 					required= False,default = 0,help='boolean for recording spectrum',type = int)
 parser.add_argument('-weight_burn_in',dest = 'weight_burn_in',\
@@ -88,7 +88,7 @@ for _ in range(args.weight_burn_in):
 w_0 = random_state.randn(problem.dimension)
 sess.run(problem._assign_to_w(w_0))
 
-
+name_appendage = ''
 
 # Optimizer selection
 if args.optimizer == 'adam':
@@ -118,14 +118,23 @@ elif args.optimizer == 'ingmres':
 	optimizer = InexactNewtonGMRES(problem,regularization,sess)
 	optimizer.parameters['globalization'] = 'line_search'
 elif args.optimizer == 'lrsfn':
-	print('Using low rank SFN optimizer with line search'.center(80))
-	print(('Batch size = '+str(batch_size)).center(80))
-	print(('Hessian batch size = '+str(hess_batch_size)).center(80))
-	print(('Hessian low rank = '+str(args.sfn_lr)).center(80))
-	optimizer = LowRankSaddleFreeNewton(problem,regularization,sess)
-	optimizer.parameters['globalization'] = 'line_search'
-	optimizer.parameters['hessian_low_rank'] = args.sfn_lr
-
+	if False:
+		print('Using low rank SFN optimizer with line search'.center(80))
+		print(('Batch size = '+str(batch_size)).center(80))
+		print(('Hessian batch size = '+str(hess_batch_size)).center(80))
+		print(('Hessian low rank = '+str(args.sfn_lr)).center(80))
+		optimizer = LowRankSaddleFreeNewton(problem,regularization,sess)
+		optimizer.parameters['globalization'] = 'line_search'
+		optimizer.parameters['hessian_low_rank'] = args.sfn_lr
+	if True:
+		print('Using low rank SFN optimizer with fixed step'.center(80))
+		print(('Batch size = '+str(batch_size)).center(80))
+		print(('Hessian batch size = '+str(hess_batch_size)).center(80))
+		print(('Hessian low rank = '+str(args.sfn_lr)).center(80))
+		optimizer = LowRankSaddleFreeNewton(problem,regularization,sess)
+		optimizer.parameters['globalization'] = 'line_search'
+		optimizer.parameters['hessian_low_rank'] = args.sfn_lr
+		name_appendage += 'fixed_step'
 elif args.optimizer == 'sgd':
 	batch_size = int(args.batch_ratio*training_data_size)
 	data = Data(raw_data,training_data_size,\
@@ -133,7 +142,7 @@ elif args.optimizer == 'sgd':
 	print(('Using stochastic gradient descent optimizer, with '+str(100*args.batch_ratio)+'% mini-batches').center(80))
 	print(('Batch size = '+str(batch_size)).center(80))
 	optimizer = GradientDescent(problem,regularization,sess)
-	optimizer.parameters['alpha'] = 1e-2
+	optimizer.parameters['alpha'] = args.alpha
 	batch_factor = [args.batch_ratio,0]
 	
 
@@ -192,6 +201,7 @@ for i, (data_g,data_H) in enumerate(zip(data.train,data.hess_train)):
 outname =  str(data_func.__name__)+\
 	str(optimizer.__class__.__name__)+str(alpha)+'_'+str(training_data_size)+\
 				'_'+str(batch_factor[-1])+'_burn'+str(args.weight_burn_in)
+outname += name_appendage
 try:
 	os.makedirs('results/')
 except:
