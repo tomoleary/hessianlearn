@@ -99,6 +99,7 @@ if args.optimizer == 'adam':
 	print(('Batch size = '+str(batch_size)).center(80))
 	optimizer = Adam(problem,regularization,sess)
 	optimizer.parameters['alpha'] = args.alpha
+	optimizer.alpha = args.alpha
 	batch_factor = [args.batch_ratio,0]
 elif args.optimizer == 'gd':
 	print('Using gradient descent optimizer with line search'.center(80))

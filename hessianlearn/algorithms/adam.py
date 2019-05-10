@@ -47,7 +47,7 @@ class Adam(Optimizer):
 		self._iter = 0
 		self._sweeps = np.zeros(2)
 
-		self.alpha = parameters['alpha']
+		self.alpha = self.parameters['alpha']
 
 	def minimize(self,feed_dict = None):
 		r"""
@@ -56,9 +56,9 @@ class Adam(Optimizer):
 		assert self.sess is not None
 		assert feed_dict is not None
 		self._iter += 1
-
+		
 		alpha = self.parameters['alpha']* np.sqrt(1 - self.parameters['beta_2']**self.iter)/(1 - self.parameters['beta_1']**self.iter)
-
+		
 		gradient = self.sess.run(self.grad,feed_dict = feed_dict)
 		
 		self.m = self.parameters['beta_1']*self.m + (1-self.parameters['beta_1'])*gradient 
