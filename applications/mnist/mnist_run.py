@@ -17,7 +17,7 @@ parser = ArgumentParser(add_help=True, description="-b batch size (int) \
 # parser.add_argument('-hl',dest = 'path_to_hl',required=True, help="path to hippylearn, required!",type=str)
 parser.add_argument("-optimizer", dest='optimizer',required=False, default = 'incg', help="optimizer type",type=str)
 parser.add_argument('-alpha',dest = 'alpha',required = False,default = 1e-3,help= 'learning rate alpha',type=float)
-parser.add_argument('-sfn_lr',dest = 'sfn_lr',required= False,default = 20,help='low rank for sfn',type = int)
+parser.add_argument('-sfn_lr',dest = 'sfn_lr',required= False,default = 40,help='low rank for sfn',type = int)
 parser.add_argument('-record_spectrum',dest = 'record_spectrum',\
                     required= False,default = 0,help='boolean for recording spectrum',type = int)
 parser.add_argument('-weight_burn_in',dest = 'weight_burn_in',\
@@ -121,9 +121,11 @@ elif args.optimizer == 'lrsfn':
 	print('Using low rank SFN optimizer with line search'.center(80))
 	print(('Batch size = '+str(batch_size)).center(80))
 	print(('Hessian batch size = '+str(hess_batch_size)).center(80))
+    print(('Hessian low rank = '+str(args.sfn_lr)).center(80))
 	optimizer = LowRankSaddleFreeNewton(problem,regularization,sess)
 	optimizer.parameters['globalization'] = 'line_search'
 	optimizer.parameters['hessian_low_rank'] = args.sfn_lr
+
 elif args.optimizer == 'sgd':
 	batch_size = int(args.batch_ratio*training_data_size)
 	data = Data(raw_data,training_data_size,\
