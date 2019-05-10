@@ -133,8 +133,9 @@ elif args.optimizer == 'lrsfn':
 		print(('Hessian batch size = '+str(hess_batch_size)).center(80))
 		print(('Hessian low rank = '+str(args.sfn_lr)).center(80))
 		optimizer = LowRankSaddleFreeNewton(problem,regularization,sess)
-		optimizer.parameters['globalization'] = 'line_search'
 		optimizer.parameters['hessian_low_rank'] = args.sfn_lr
+		optimizer.parameters['alpha'] = args.alpha
+		optimizer.alpha = args.alpha
 		name_appendage += 'fixed_step'
 elif args.optimizer == 'sgd':
 	batch_size = int(args.batch_ratio*training_data_size)
