@@ -162,7 +162,7 @@ print('{0:8} {1:11} {2:11} {3:11} {4:11}'.format(\
 x_test, y_test = next(iter(data.test))
 test_dict = {problem.x: x_test}
 # Iteration Loop
-max_sweeps = 100
+max_sweeps = 50
 train_data = iter(data.train)
 x_batch,y_batch = next(train_data)
 sweeps = 0
