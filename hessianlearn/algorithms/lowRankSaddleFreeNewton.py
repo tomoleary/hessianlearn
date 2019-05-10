@@ -26,7 +26,7 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 
 
 	parameters['globalization']					= ['None', 'Choose from trust_region, line_search or none']
-	parameters['max_backtracking']				= [5, 'Max backtracking iterations for armijo line search']
+	parameters['max_backtracking']				= [4, 'Max backtracking iterations for armijo line search']
 
 	# Reasons for convergence failure
 	parameters['reasons'] = [[], 'list of reasons for termination']
