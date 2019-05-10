@@ -145,6 +145,7 @@ elif args.optimizer == 'sgd':
 	print(('Batch size = '+str(batch_size)).center(80))
 	optimizer = GradientDescent(problem,regularization,sess)
 	optimizer.parameters['alpha'] = args.alpha
+	optimizer.alpha = args.alpha
 	batch_factor = [args.batch_ratio,0]
 	
 
