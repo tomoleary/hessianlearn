@@ -16,7 +16,7 @@ parser = ArgumentParser(add_help=True, description="-b batch size (int) \
 														-p population_size (int) -alpha (float)")
 # parser.add_argument('-hl',dest = 'path_to_hl',required=True, help="path to hippylearn, required!",type=str)
 parser.add_argument("-optimizer", dest='optimizer',required=False, default = 'incg', help="optimizer type",type=str)
-parser.add_argument('-alpha',dest = 'alpha',required = False,default = 5e-2,help= 'learning rate alpha',type=float)
+parser.add_argument('-alpha',dest = 'alpha',required = False,default = 1e-2,help= 'learning rate alpha',type=float)
 parser.add_argument('-sfn_lr',dest = 'sfn_lr',required= False,default = 50,help='low rank for sfn',type = int)
 parser.add_argument('-record_spectrum',dest = 'record_spectrum',\
 					required= False,default = 0,help='boolean for recording spectrum',type = int)
@@ -162,7 +162,7 @@ print('{0:8} {1:11} {2:11} {3:11} {4:11}'.format(\
 x_test, y_test = next(iter(data.test))
 test_dict = {problem.x: x_test}
 # Iteration Loop
-max_sweeps = 50
+max_sweeps = 100
 train_data = iter(data.train)
 x_batch,y_batch = next(train_data)
 sweeps = 0
