@@ -119,7 +119,7 @@ elif args.optimizer == 'ingmres':
 	optimizer = InexactNewtonGMRES(problem,regularization,sess)
 	optimizer.parameters['globalization'] = 'line_search'
 elif args.optimizer == 'lrsfn':
-	if True:
+	if False:
 		hess_batch_size = 500
 		print('Using low rank SFN optimizer with line search'.center(80))
 		print(('Batch size = '+str(batch_size)).center(80))
@@ -128,7 +128,7 @@ elif args.optimizer == 'lrsfn':
 		optimizer = LowRankSaddleFreeNewton(problem,regularization,sess)
 		optimizer.parameters['globalization'] = 'line_search'
 		optimizer.parameters['hessian_low_rank'] = args.sfn_lr
-	if False:
+	if True:
 		hess_batch_size = 500
 		print('Using low rank SFN optimizer with fixed step'.center(80))
 		print(('Batch size = '+str(batch_size)).center(80))
