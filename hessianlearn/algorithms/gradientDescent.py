@@ -84,8 +84,9 @@ class GradientDescent(Optimizer):
 
 		elif self.parameters['globalization'] == 'None':
 			p = -self.parameters['alpha']*g
+			self._sweeps += [1,0]
 
 		self.p = p
-		self._sweeps += [1,0]
+		
 		return self.problem._update_w(p)
 		
