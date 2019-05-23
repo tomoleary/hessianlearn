@@ -112,12 +112,16 @@ elif args.optimizer == 'incg':
 	print(('Hessian batch size = '+str(hess_batch_size)).center(80))
 	optimizer = InexactNewtonCG(problem,regularization,sess)
 	optimizer.parameters['globalization'] = 'line_search'
+
+
 elif args.optimizer == 'ingmres':
 	print('Using inexact Newton GMRES optimizer with line search'.center(80))
 	print(('Batch size = '+str(batch_size)).center(80))
 	print(('Hessian batch size = '+str(hess_batch_size)).center(80))
 	optimizer = InexactNewtonGMRES(problem,regularization,sess)
 	optimizer.parameters['globalization'] = 'line_search'
+
+	
 elif args.optimizer == 'lrsfn':
 	if False:
 		hess_batch_size = 500

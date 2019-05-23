@@ -40,7 +40,7 @@ def ParametersInexactNewtonCG(parameters = {}):
 	parameters['cg_parameters']					= [ ParametersCGSolver(),'CG Parameters']
 	# CG solver parameters
 	parameters['cg_coarse_tol']					= [0.5,'CG coarse solve tolerance']
-	parameters['cg_max_iter']					= [1000,'CG maximum iterations']
+	parameters['cg_max_iter']					= [10,'CG maximum iterations']
 	parameters['eta_mode']						= [0, 'eta mode for E-W conditions:0,1,2']
 	parameters['globalization']					= ['None', 'Choose from trust_region, line_search or none']
 
