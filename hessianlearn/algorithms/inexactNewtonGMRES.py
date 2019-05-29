@@ -43,6 +43,8 @@ def ParametersInexactNewtonGMRES(parameters = {}):
 	parameters['cg_max_iter']					= [1000,'CG maximum iterations']
 	parameters['eta_mode']						= [0, 'eta mode for E-W conditions:0,1,2']
 	parameters['globalization']					= ['None', 'Choose from trust_region, line_search or none']
+	parameters['max_backtracking_iter']			= [10, 'max backtracking iterations for line search']
+
 
 	# Reasons for convergence failure
 	parameters['reasons'] = [[], 'list of reasons for termination']
@@ -83,7 +85,8 @@ class InexactNewtonGMRES(Optimizer):
 			initial_cost = self.sess.run(self.problem.loss,feed_dict = feed_dict)
 			cost_at_candidate = lambda p : self._loss_at_candidate(p,feed_dict = feed_dict)
 			self.alpha, line_search, line_search_iter = ArmijoLineSearch(w_dir,w_dir_inner_g,\
-																			cost_at_candidate, initial_cost)
+																cost_at_candidate, initial_cost,\
+											max_backtracking_iter = self.parameters['max_backtracking_iter'])
 			update = self.alpha*w_dir
 			self._sweeps += [1+0.5*line_search_iter,2*self.gmres_solver.iter]
 			return self.problem._update_w(update)
