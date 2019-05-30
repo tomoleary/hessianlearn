@@ -106,6 +106,7 @@ elif args.optimizer == 'gd':
 	print(('Batch size = '+str(batch_size)).center(80))
 	optimizer = GradientDescent(problem,regularization,sess)
 	optimizer.parameters['globalization'] = 'line_search'
+	optimizer.parameters['max_backtracking_iter'] = 6
 elif args.optimizer == 'incg':
 	print('Using inexact Newton CG optimizer with line search'.center(80))
 	print(('Batch size = '+str(batch_size)).center(80))
