@@ -88,7 +88,7 @@ random_state = np.random.RandomState(seed = 0)
 for _ in range(args.weight_burn_in):
 	__ = random_state.randn(problem.dimension)
 w_0 = random_state.randn(problem.dimension)
-sess.run(problem._assign_to_w(w_0))
+sess.run(problem._assignment_ops,feed_dict = {problem._assignment_placeholder:w_0})
 
 name_appendage = ''
 
