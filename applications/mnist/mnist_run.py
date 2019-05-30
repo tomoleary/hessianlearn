@@ -38,11 +38,12 @@ assert args.optimizer in optimizers,\
 #     exit()
 #     pass
 
-# Instantiate data
+Instantiate data
 training_data_size = 10000
 batch_size = 10000
 hess_batch_size = 1000
 testing_data_size = 10000
+
 
 batch_factor = [1, float(hess_batch_size)/float(batch_size)]
 data_func = load_mnist
@@ -86,7 +87,9 @@ random_state = np.random.RandomState(seed = 0)
 for _ in range(args.weight_burn_in):
 	__ = random_state.randn(problem.dimension)
 w_0 = random_state.randn(problem.dimension)
-sess.run(problem._assign_to_w(w_0))
+# sess.run(problem._assign_to_w(w_0))
+
+sess.run(problem._assignment_ops,feed_dict = {problem._assignment_placeholder:w_0})
 
 name_appendage = ''
 
@@ -193,9 +196,9 @@ for i, (data_g,data_H) in enumerate(zip(data.train,data.hess_train)):
 			print(' {0:^8.2f} {1:1.4e} {2:1.4e} {3:1.4e} {4:11}'.format(\
 				sweeps, loss_train,norm_g,loss_test,optimizer.alpha))
 		try:
-			sess.run(optimizer.minimize(feed_dict,hessian_feed_dict=hess_dict))
+			optimizer.minimize(feed_dict,hessian_feed_dict=hess_dict)
 		except:
-			sess.run(optimizer.minimize(feed_dict))
+			optimizer.minimize(feed_dict)
 		if args.record_spectrum:
 			k = 100
 			d,_ = low_rank_hessian(optimizer,hess_dict,k)

@@ -103,7 +103,7 @@ class InexactNewtonCG(Optimizer):
 			self._sweeps += [1,2*self.cg_solver.iter]
 			self.p = p
 			update = alpha*p
-			return self.problem._update_w(update)
+			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 
 		if self.parameters['globalization'] == 'line_search':
 			w_dir,on_boundary = self.cg_solver.solve(-self.gradient,hessian_feed_dict)
@@ -115,7 +115,7 @@ class InexactNewtonCG(Optimizer):
 														max_backtracking_iter = self.parameters['max_backtracking_iter'])
 			update = self.alpha*w_dir
 			self._sweeps += [1+0.5*line_search_iter,2*self.cg_solver.iter]
-			return self.problem._update_w(update)
+			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 
 		elif self.parameters['globalization'] == 'trust_region':
 			if not self.trust_region_initialized:
@@ -138,7 +138,7 @@ class InexactNewtonCG(Optimizer):
 								feed_dict = feed_dict)
 			cost = misfit + reg
 			w_copy = self.sess.run(self.problem.w)
-			self.sess.run(self.problem._update_w(p))
+			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:p})
 
 			misfit,reg = self.sess.run((self.problem.loss,self.regularization.cost),\
 								feed_dict = feed_dict)
@@ -149,9 +149,9 @@ class InexactNewtonCG(Optimizer):
 			accept_step = self.trust_region.evaluate_step(actual_reduction = actual_reduction,\
 				predicted_reduction = predicted_reduction,on_boundary = on_boundary)
 			if accept_step:
-				return self.problem._update_w(zeros_like(w_copy))
+				pass
 			else:
-				return self.problem._assign_to_w(w_copy)
+				self.sess.run(self.problem._assignment_ops,feed_dict = {self.problem._assignment_placeholder:p})
 				
 
 

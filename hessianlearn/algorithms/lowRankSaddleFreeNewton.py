@@ -122,7 +122,8 @@ class LowRankSaddleFreeNewton(Optimizer):
 			alpha = self.parameters['alpha']
 			self._sweeps += [1,2*rank]
 			update = alpha*self.p
-			return self.problem._update_w(update)
+			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
+
 
 		elif self.parameters['globalization'] == 'line_search':
 			w_dir_inner_g = np.inner(self.p,gradient)
@@ -133,7 +134,7 @@ class LowRankSaddleFreeNewton(Optimizer):
 														max_backtracking_iter = self.parameters['max_backtracking'])
 			update = self.alpha*self.p
 			self._sweeps += [1+0.5*line_search_iter,2*rank]
-			return self.problem._update_w(update)
+			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 
 
 

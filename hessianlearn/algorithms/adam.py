@@ -89,6 +89,6 @@ class Adam(Optimizer):
 		update = -alpha*self.m/(v_root +self.parameters['epsilon'])
 		self.p = update
 		self._sweeps += [1,0]
-		return self.problem._update_w(update)
+		self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 		
 

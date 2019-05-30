@@ -94,9 +94,11 @@ class Optimizer(ABC):
 
 
 	def _loss_at_candidate(self,p,feed_dict):
-		self.sess.run(self.problem._update_w(p))
+		self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:p})
+		# self.sess.run(self.problem._update_w(p))
 		misfit = self.sess.run((self.problem.loss),feed_dict)
-		self.sess.run(self.problem._update_w(-p))
+		self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:-p})
+		# self.sess.run(self.problem._update_w(-p))
 		return misfit
 
 

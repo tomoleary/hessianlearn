@@ -87,6 +87,6 @@ class GradientDescent(Optimizer):
 			self._sweeps += [1,0]
 
 		self.p = p
-		
-		return self.problem._update_w(p)
+
+		self.sess.run(self.problem._update_ops,feed_dict = {problem._update_placeholder:p})
 		

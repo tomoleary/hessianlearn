@@ -117,7 +117,36 @@ class Problem(ABC):
 		# self.g_inner_w_hat = [tf.reduce_sum(g * w_hat) for g, w_hat in zip(self.gradient, self.w_hat)]
 		# Define Hessian action Hdw
 		self._H_w_hat = my_flatten(tf.gradients(self._g_inner_w_hat,self._w,stop_gradients = self._w_hat,name = 'hessian_action'))
-		pass
+		
+		self._update_placeholder = tf.placeholder(self.dtype,[self._dimension],name = 'update_placeholder')
+		self._assignment_placeholder = tf.placeholder(self.dtype,[self._dimension],name = 'assignment_placeholder')
+		split_indices = []
+		index0 = 0
+		for index in self._indices:
+			split_indices.append(index - index0)
+			index0 = index
+
+		unpacked_update = tf.split(self._update_placeholder,split_indices,axis = 0)
+		unpacked_assignment = tf.split(self._assignment_placeholder,split_indices,axis = 0)
+		update = [tf.reshape(update_,shape) for update_,shape in zip(unpacked_update,self.shapes)]
+		assignment = [tf.reshape(assignment_,shape) for assignment_,shape in zip(unpacked_assignment,self.shapes)]
+
+		update_ops = []
+		update_and_w = list(zip(update,self._w))
+		for v, w in reversed(update_and_w):
+			with tf.control_dependencies(update_ops):
+				update_ops.append(tf.assign_add(w,v))
+		self._update_ops = tf.group(*update_ops)
+
+		assignment_ops = []
+		assignment_and_w = list(zip(assignment,self._w))
+		for v, w in reversed(assignment_and_w):
+			with tf.control_dependencies(assignment_ops):
+				assignment_ops.append(tf.assign(w,v))
+		self._assignment_ops = tf.group(*assignment_ops)
+
+
+
 
 	@property
 	def dtype(self):
@@ -209,28 +238,6 @@ class Problem(ABC):
 		for shape in self.shapes:
 			placeholder.append(tf.placeholder(self.dtype,shape,name=name))
 		return placeholder
-
-	def _assign_to_w(self,v):
-		if type(v) == np.ndarray:
-			v = vec_to_tensor(v,self.shapes,self.indices)
-		update_ops = []
-		v_and_w = list(zip(v,self._w))
-		for v, w in reversed(v_and_w):
-			with tf.control_dependencies(update_ops):
-				update_ops.append(tf.assign(w, v))
-		training_op = tf.group(*update_ops)
-		return(training_op)
-
-	def _update_w(self,v):
-		if type(v) == np.ndarray:
-			v = vec_to_tensor(v,self.shapes,self.indices)
-		update_ops = []
-		v_and_w = list(zip(v,self._w))
-		for v, w in reversed(v_and_w):
-			with tf.control_dependencies(update_ops):
-				update_ops.append(tf.assign(w, w + v))
-		training_op = tf.group(*update_ops)
-		return(training_op)
 
 
 

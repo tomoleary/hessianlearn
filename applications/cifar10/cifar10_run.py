@@ -193,9 +193,9 @@ for i, (data_g,data_H) in enumerate(zip(data.train,data.hess_train)):
 			print(' {0:^8.2f} {1:1.4e} {2:1.4e} {3:1.4e} {4:11}'.format(\
 				sweeps, loss_train,norm_g,loss_test,optimizer.alpha))
 		try:
-			sess.run(optimizer.minimize(feed_dict,hessian_feed_dict=hess_dict))
+			optimizer.minimize(feed_dict,hessian_feed_dict=hess_dict)
 		except:
-			sess.run(optimizer.minimize(feed_dict))
+			optimizer.minimize(feed_dict)
 		if args.record_spectrum:
 			k = 100
 			d,_ = low_rank_hessian(optimizer,hess_dict,k)

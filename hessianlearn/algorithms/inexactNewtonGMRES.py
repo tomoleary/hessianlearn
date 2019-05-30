@@ -89,7 +89,7 @@ class InexactNewtonGMRES(Optimizer):
 											max_backtracking_iter = self.parameters['max_backtracking_iter'])
 			update = self.alpha*w_dir
 			self._sweeps += [1+0.5*line_search_iter,2*self.gmres_solver.iter]
-			return self.problem._update_w(update)
+			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 		elif self.parameters['globalization'] == 'None':
 			alpha = self.parameters['alpha']
 			p,converged = self.gmres_solver.solve(-self.gradient,hessian_feed_dict)
@@ -101,7 +101,7 @@ class InexactNewtonGMRES(Optimizer):
 			self._sweeps += [1, 2*self.gmres_solver.iter]
 			self.p = p
 			update = alpha*p
-			return self.problem._update_w(update)
+			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 
 				
 
