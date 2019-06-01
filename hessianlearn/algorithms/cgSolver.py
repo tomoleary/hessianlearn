@@ -326,7 +326,7 @@ class CGSolver_scipy(ABC):
 		def update_iters(rk):
 			self.iter +=1
 
-		return scipy.sparse.linalg.gmres(A, b, tol=tol, maxiter=self.parameters["max_iter"],callback = update_iters)
+		return scipy.sparse.linalg.cg(A, b, tol=tol, maxiter=self.parameters["max_iter"],callback = update_iters)
 
 
 

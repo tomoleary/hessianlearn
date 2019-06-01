@@ -91,16 +91,16 @@ class InexactNewtonGMRES(Optimizer):
 			self._sweeps += [1+0.5*line_search_iter,2*self.gmres_solver.iter]
 			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 		elif self.parameters['globalization'] == 'None':
-			alpha = self.parameters['alpha']
+			self.alpha = self.parameters['alpha']
 			p,converged = self.gmres_solver.solve(-self.gradient,hessian_feed_dict)
-			print(converged)
+			# print(converged)
 			# if converged:
 			# 	print('Converged!')
 			# else:
 			# 	print('NOT CONVERGED!!!!!')
 			self._sweeps += [1, 2*self.gmres_solver.iter]
 			self.p = p
-			update = alpha*p
+			update = self.alpha*p
 			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 
 				
