@@ -122,6 +122,14 @@ elif args.optimizer == 'ingmres':
 	optimizer = InexactNewtonGMRES(problem,regularization,sess)
 	optimizer.parameters['globalization'] = 'line_search'
 	optimizer.parameters['max_backtracking_iter'] = 6
+
+elif args.optimizer == 'inminres':
+	print('Using inexact Newton MINRES optimizer with line search'.center(80))
+	print(('Batch size = '+str(batch_size)).center(80))
+	print(('Hessian batch size = '+str(hess_batch_size)).center(80))
+	optimizer = InexactNewtonMINRES(problem,regularization,sess)
+	optimizer.parameters['globalization'] = 'line_search'
+	optimizer.parameters['max_backtracking_iter'] = 6
 	
 elif args.optimizer == 'lrsfn':
 	if False:
