@@ -27,7 +27,7 @@ parser.add_argument('-batch_ratio',dest = 'batch_ratio',required= False,default 
 
 args = parser.parse_args() #
 # Check command line arguments
-optimizers = ['adam','gd','incg','ingmres','lrsfn','sgd']
+optimizers = ['adam','gd','incg','ingmres','inminres','lrsfn','sgd']
 assert args.optimizer in optimizers,\
  '+\n'+80*'#'+'\n'+'Error: choose optimizer from adam, gd, incg, ingmres, lrsfn'.center(80)+'\n'+80*'#'+'\n'
 # try:
@@ -121,6 +121,13 @@ elif args.optimizer == 'ingmres':
 	optimizer = InexactNewtonGMRES(problem,regularization,sess)
 	optimizer.parameters['globalization'] = 'line_search'
 	optimizer.parameters['max_backtracking_iter'] = 6
+elif args.optimizer == 'inminres':
+	print('Using inexact Newton MINRES optimizer with line search'.center(80))
+	print(('Batch size = '+str(batch_size)).center(80))
+	print(('Hessian batch size = '+str(hess_batch_size)).center(80))
+	optimizer = InexactNewtonMINRES(problem,regularization,sess)
+	optimizer.parameters['globalization'] = 'line_search'
+	
 elif args.optimizer == 'lrsfn':
 	if False:
 		print('Using low rank SFN optimizer with line search'.center(80))
