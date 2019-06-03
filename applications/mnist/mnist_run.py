@@ -15,7 +15,7 @@ from argparse import ArgumentParser
 parser = ArgumentParser(add_help=True, description="-b batch size (int) \
 														-p population_size (int) -alpha (float)")
 # parser.add_argument('-hl',dest = 'path_to_hl',required=True, help="path to hippylearn, required!",type=str)
-parser.add_argument("-optimizer", dest='optimizer',required=False, default = 'incg', help="optimizer type",type=str)
+parser.add_argument("-optimizer", dest='optimizer',required=False, default = 'inminres', help="optimizer type",type=str)
 parser.add_argument('-alpha',dest = 'alpha',required = False,default = 5e-2,help= 'learning rate alpha',type=float)
 parser.add_argument('-sfn_lr',dest = 'sfn_lr',required= False,default = 20,help='low rank for sfn',type = int)
 parser.add_argument('-record_spectrum',dest = 'record_spectrum',\
@@ -27,7 +27,7 @@ parser.add_argument('-batch_ratio',dest = 'batch_ratio',required= False,default 
 
 args = parser.parse_args() #
 # Check command line arguments
-optimizers = ['adam','gd','incg','ingmres','lrsfn','sgd']
+optimizers = ['adam','gd','incg','ingmres','inminres','lrsfn','sgd']
 assert args.optimizer in optimizers,\
  '+\n'+80*'#'+'\n'+'Error: choose optimizer from adam, gd, incg, ingmres, lrsfn'.center(80)+'\n'+80*'#'+'\n'
 # try:
@@ -38,7 +38,7 @@ assert args.optimizer in optimizers,\
 #     exit()
 #     pass
 
-Instantiate data
+# Instantiate data
 training_data_size = 10000
 batch_size = 10000
 hess_batch_size = 1000
@@ -120,6 +120,14 @@ elif args.optimizer == 'ingmres':
 	print(('Hessian batch size = '+str(hess_batch_size)).center(80))
 	optimizer = InexactNewtonGMRES(problem,regularization,sess)
 	optimizer.parameters['globalization'] = 'line_search'
+
+elif args.optimizer == 'inminres':
+	print('Using inexact Newton MINRES optimizer with line search'.center(80))
+	print(('Batch size = '+str(batch_size)).center(80))
+	print(('Hessian batch size = '+str(hess_batch_size)).center(80))
+	optimizer = InexactNewtonMINRES(problem,regularization,sess)
+	optimizer.parameters['globalization'] = 'line_search'
+
 elif args.optimizer == 'lrsfn':
 	if True:
 		print('Using low rank SFN optimizer with line search'.center(80))
