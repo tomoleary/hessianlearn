@@ -27,7 +27,7 @@ parser.add_argument('-batch_ratio',dest = 'batch_ratio',required= False,default 
 
 args = parser.parse_args() #
 # Check command line arguments
-optimizers = ['adam','gd','incg','ingmres','lrsfn','sgd']
+optimizers = ['adam','gd','incg','ingmres','inminres','lrsfn','sgd']
 assert args.optimizer in optimizers,\
  '+\n'+80*'#'+'\n'+'Error: choose optimizer from adam, gd, incg, ingmres, lrsfn'.center(80)+'\n'+80*'#'+'\n'
 # try:
