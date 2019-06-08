@@ -24,6 +24,7 @@ parser.add_argument('-weight_burn_in',dest = 'weight_burn_in',\
 					required= False,default = 0,help='',type = int)
 parser.add_argument('-n_threads',dest = 'n_threads',required= False,default = 2,help='threads',type = int)
 parser.add_argument('-batch_ratio',dest = 'batch_ratio',required= False,default = 0.1,help='threads',type = float)
+parser.add_argument('-hess_batch',dest = 'hess_batch',required= False,default = 0,help='threads',type = int)
 
 args = parser.parse_args() #
 # Check command line arguments
@@ -41,7 +42,10 @@ assert args.optimizer in optimizers,\
 # Instantiate data
 training_data_size = 10000
 batch_size = 10000
-hess_batch_size = 1000
+if args.hess_batch ==0:
+	hess_batch_size = 1000
+else:
+	hess_batch_size = 1000
 testing_data_size = 10000
 
 batch_factor = [1, float(hess_batch_size)/float(batch_size)]
