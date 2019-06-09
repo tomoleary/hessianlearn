@@ -125,6 +125,7 @@ elif args.optimizer == 'ingmres':
 	optimizer = InexactNewtonGMRES(problem,regularization,sess)
 	optimizer.parameters['globalization'] = 'line_search'
 	optimizer.parameters['max_backtracking_iter'] = 8
+	optimizer.parameters['gmres_parameters']["max_iter"] = 40
 elif args.optimizer == 'inminres':
 	print('Using inexact Newton MINRES optimizer with line search'.center(80))
 	print(('Batch size = '+str(batch_size)).center(80))
@@ -132,6 +133,7 @@ elif args.optimizer == 'inminres':
 	optimizer = InexactNewtonMINRES(problem,regularization,sess)
 	optimizer.parameters['globalization'] = 'line_search'
 	optimizer.parameters['max_backtracking_iter'] = 8
+	optimizer.parameters['minres_parameters']["max_iter"] = 40
 	
 elif args.optimizer == 'lrsfn':
 	if False:
