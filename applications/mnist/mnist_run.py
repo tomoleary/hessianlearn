@@ -113,21 +113,21 @@ elif args.optimizer == 'gd':
 	print(('Batch size = '+str(batch_size)).center(80))
 	optimizer = GradientDescent(problem,regularization,sess)
 	optimizer.parameters['globalization'] = 'line_search'
-	optimizer.parameters['max_backtracking_iter'] = 6
+	optimizer.parameters['max_backtracking_iter'] = 8
 elif args.optimizer == 'incg':
 	print('Using inexact Newton CG optimizer with line search'.center(80))
 	print(('Batch size = '+str(batch_size)).center(80))
 	print(('Hessian batch size = '+str(hess_batch_size)).center(80))
 	optimizer = InexactNewtonCG(problem,regularization,sess)
 	optimizer.parameters['globalization'] = 'line_search'
-	optimizer.parameters['max_backtracking_iter'] = 6
+	optimizer.parameters['max_backtracking_iter'] = 8
 elif args.optimizer == 'ingmres':
 	print('Using inexact Newton GMRES optimizer with line search'.center(80))
 	print(('Batch size = '+str(batch_size)).center(80))
 	print(('Hessian batch size = '+str(hess_batch_size)).center(80))
 	optimizer = InexactNewtonGMRES(problem,regularization,sess)
 	optimizer.parameters['globalization'] = 'line_search'
-	optimizer.parameters['max_backtracking_iter'] = 6
+	optimizer.parameters['max_backtracking_iter'] = 8
 
 elif args.optimizer == 'inminres':
 	print('Using inexact Newton MINRES optimizer with line search'.center(80))
@@ -135,7 +135,7 @@ elif args.optimizer == 'inminres':
 	print(('Hessian batch size = '+str(hess_batch_size)).center(80))
 	optimizer = InexactNewtonMINRES(problem,regularization,sess)
 	optimizer.parameters['globalization'] = 'line_search'
-	optimizer.parameters['max_backtracking_iter'] = 6
+	optimizer.parameters['max_backtracking_iter'] = 8
 
 elif args.optimizer == 'lrsfn':
 	if True:
