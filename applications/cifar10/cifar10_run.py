@@ -45,7 +45,7 @@ batch_size = 10000
 if args.hess_batch ==0:
 	hess_batch_size = 1000
 else:
-	hess_batch_size = 1000
+	hess_batch_size = args.hess_batch
 testing_data_size = 10000
 
 batch_factor = [1, float(hess_batch_size)/float(batch_size)]
