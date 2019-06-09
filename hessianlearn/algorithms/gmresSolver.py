@@ -42,7 +42,7 @@ def ParametersGMRESSolver(dictionary = {}):
 	parameters = dictionary
 	parameters["rel_tolerance"] = [1e-9, "the relative tolerance for the stopping criterion"]
 	parameters["abs_tolerance"] = [1e-12, "the absolute tolerance for the stopping criterion"]
-	parameters["max_iter"]      = [10, "the maximum number of iterations"]
+	parameters["max_iter"]      = [20, "the maximum number of iterations"]
 	parameters["zero_initial_guess"] = [True, "if True we start with a 0\
 						 initial guess; if False we use the x as initial guess."]
 	parameters["print_level"] = [-1, "verbosity level: -1 --> no output on \
