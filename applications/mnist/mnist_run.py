@@ -229,6 +229,9 @@ outname =  str(data_func.__name__)+\
 				'_'+str(batch_factor[-1])+'_burn'+str(args.weight_burn_in)
 outname += name_appendage
 
+if args.optimizer == 'lrsfn':
+	outname += 'low_rank_'+str(args.sfn_lr)
+
 
 try:
 	os.makedirs('results/')
