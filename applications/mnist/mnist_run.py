@@ -23,8 +23,12 @@ parser.add_argument('-record_spectrum',dest = 'record_spectrum',\
 parser.add_argument('-weight_burn_in',dest = 'weight_burn_in',\
 					required= False,default = 0,help='',type = int)
 parser.add_argument('-n_threads',dest = 'n_threads',required= False,default = 2,help='threads',type = int)
+parser.add_argument('-batch_size',dest = 'batch_size',required= False,default = 10000,help='batch size',type = int)
+parser.add_argument('-hess_batch_size',dest = 'hess_batch_size',required= False,default = 1000,help='hess batch size',type = int)
+
+
+
 parser.add_argument('-batch_ratio',dest = 'batch_ratio',required= False,default = 0.1,help='threads',type = float)
-parser.add_argument('-hess_batch',dest = 'hess_batch',required= False,default = 0,help='threads',type = int)
 
 
 args = parser.parse_args() #
@@ -42,11 +46,8 @@ assert args.optimizer in optimizers,\
 
 # Instantiate data
 training_data_size = 10000
-batch_size = 10000
-if args.hess_batch ==0:
-	hess_batch_size = 1000
-else:
-	hess_batch_size = args.hess_batch
+batch_size = args.batch_size
+hess_batch_size = args.hess_batch_size
 testing_data_size = 10000
 
 
