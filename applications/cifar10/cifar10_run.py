@@ -48,9 +48,9 @@ batch_size = args.batch_size
 hess_batch_size = args.hess_batch_size
 testing_data_size = 10000
 
-batch_factor = [float(batch_size)/float(training_data_size,\
+batch_factor = [float(batch_size)/float(training_data_size),\
 					 float(hess_batch_size)/float(training_data_size)]
-					 
+
 data_func = load_cifar10
 raw_data = data_func()
 
