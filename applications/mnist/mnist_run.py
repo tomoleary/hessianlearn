@@ -25,7 +25,7 @@ parser.add_argument('-weight_burn_in',dest = 'weight_burn_in',\
 parser.add_argument('-n_threads',dest = 'n_threads',required= False,default = 2,help='threads',type = int)
 parser.add_argument('-batch_size',dest = 'batch_size',required= False,default = 10000,help='batch size',type = int)
 parser.add_argument('-hess_batch_size',dest = 'hess_batch_size',required= False,default = 1000,help='hess batch size',type = int)
-
+parser.add_argument('-max_sweeps',dest = 'max_sweeps',required= False,default = 100,help='max sweeps',type = int)
 
 
 parser.add_argument('-batch_ratio',dest = 'batch_ratio',required= False,default = 0.1,help='threads',type = float)
@@ -184,7 +184,7 @@ print('{0:8} {1:11} {2:11} {3:11} {4:11}'.format(\
 x_test, y_test = next(iter(data.test))
 test_dict = {problem.x: x_test}
 # Iteration Loop
-max_sweeps = 100
+max_sweeps = args.max_sweeps
 train_data = iter(data.train)
 x_batch,y_batch = next(train_data)
 sweeps = 0
