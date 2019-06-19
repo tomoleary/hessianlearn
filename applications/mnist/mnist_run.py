@@ -141,7 +141,7 @@ elif args.optimizer == 'inminres':
 	optimizer.parameters['max_backtracking_iter'] = 8
 
 elif args.optimizer == 'lrsfn':
-	if True:
+	if False:
 		print('Using low rank SFN optimizer with line search'.center(80))
 		print(('Batch size = '+str(batch_size)).center(80))
 		print(('Hessian batch size = '+str(hess_batch_size)).center(80))
@@ -149,15 +149,11 @@ elif args.optimizer == 'lrsfn':
 		optimizer = LowRankSaddleFreeNewton(problem,regularization,sess)
 		optimizer.parameters['globalization'] = 'line_search'
 		optimizer.parameters['hessian_low_rank'] = args.sfn_lr
-	if False:
-		hess_batch_size = 500
+	if True:
 		print('Using low rank SFN optimizer with fixed step'.center(80))
 		print(('Batch size = '+str(batch_size)).center(80))
 		print(('Hessian batch size = '+str(hess_batch_size)).center(80))
 		print(('Hessian low rank = '+str(args.sfn_lr)).center(80))
-		data = Data(raw_data,training_data_size,\
-		batch_size,hessian_batch_size = hess_batch_size,test_data_size = testing_data_size)
-		batch_factor = [1, float(hess_batch_size)/float(batch_size)]
 		optimizer = LowRankSaddleFreeNewton(problem,regularization,sess)
 		optimizer.parameters['hessian_low_rank'] = args.sfn_lr
 		optimizer.parameters['alpha'] = args.alpha

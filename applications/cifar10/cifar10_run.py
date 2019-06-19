@@ -29,6 +29,7 @@ parser.add_argument('-hess_batch_size',dest = 'hess_batch_size',required= False,
 
 parser.add_argument('-batch_ratio',dest = 'batch_ratio',required= False,default = 0.1,help='threads',type = float)
 
+
 args = parser.parse_args() #
 # Check command line arguments
 optimizers = ['adam','gd','incg','ingmres','inminres','lrsfn','sgd']
@@ -144,17 +145,14 @@ elif args.optimizer == 'lrsfn':
 		print(('Hessian batch size = '+str(hess_batch_size)).center(80))
 		print(('Hessian low rank = '+str(args.sfn_lr)).center(80))
 		optimizer = LowRankSaddleFreeNewton(problem,regularization,sess)
+
 		optimizer.parameters['globalization'] = 'line_search'
 		optimizer.parameters['hessian_low_rank'] = args.sfn_lr
 	if True:
-		hess_batch_size = 500
 		print('Using low rank SFN optimizer with fixed step'.center(80))
 		print(('Batch size = '+str(batch_size)).center(80))
 		print(('Hessian batch size = '+str(hess_batch_size)).center(80))
 		print(('Hessian low rank = '+str(args.sfn_lr)).center(80))
-		data = Data(raw_data,training_data_size,\
-		batch_size,hessian_batch_size = hess_batch_size,test_data_size = testing_data_size)
-		batch_factor = [1, float(hess_batch_size)/float(batch_size)]
 		optimizer = LowRankSaddleFreeNewton(problem,regularization,sess)
 		optimizer.parameters['hessian_low_rank'] = args.sfn_lr
 		optimizer.parameters['alpha'] = args.alpha
