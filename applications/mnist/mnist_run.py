@@ -225,9 +225,12 @@ for i, (data_g,data_H) in enumerate(zip(data.train,data.hess_train)):
 	if sweeps > max_sweeps:
 		break
 
+import datetime
+
 outname =  str(data_func.__name__)+\
 	str(optimizer.__class__.__name__)+str(alpha)+'_'+str(training_data_size)+\
-				'_'+str(batch_factor[-1])+'_burn'+str(args.weight_burn_in)
+				'_'+str(batch_factor[-1])+'_burn'+str(args.weight_burn_in)+ '_' + str(datetime.date.today())
+				
 outname += name_appendage
 
 if args.optimizer == 'lrsfn':
