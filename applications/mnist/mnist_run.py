@@ -51,7 +51,9 @@ hess_batch_size = args.hess_batch_size
 testing_data_size = 10000
 
 
-batch_factor = [1, float(hess_batch_size)/float(batch_size)]
+batch_factor = [float(batch_size)/float(training_data_size,\
+					 float(hess_batch_size)/float(training_data_size)]
+					 
 data_func = load_mnist
 raw_data = data_func()
 
@@ -230,7 +232,7 @@ import datetime
 outname =  str(data_func.__name__)+\
 	str(optimizer.__class__.__name__)+str(alpha)+'_'+str(training_data_size)+\
 				'_'+str(batch_factor[-1])+'_burn'+str(args.weight_burn_in)+ '_' + str(datetime.date.today())
-				
+
 outname += name_appendage
 
 if args.optimizer == 'lrsfn':
