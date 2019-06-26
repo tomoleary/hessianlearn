@@ -231,7 +231,7 @@ import datetime
 outname = args.name_prefix
 outname +=  str(data_func.__name__)+\
 	str(optimizer.__class__.__name__)+str(alpha)+'_'+str(training_data_size)+\
-				'_'+str(batch_factor[-1])+'_burn'+str(args.weight_burn_in)+ '_' + str(datetime.date.today())
+				'_'+str(batch_factor[-1])+'_burn'+str(args.weight_burn_in)+ '_' + str(datetime.date.today())+'_'+str(problem.dimension)
 
 outname += name_appendage
 
