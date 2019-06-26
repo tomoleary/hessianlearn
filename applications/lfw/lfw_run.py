@@ -23,10 +23,15 @@ parser.add_argument('-record_spectrum',dest = 'record_spectrum',\
 parser.add_argument('-weight_burn_in',dest = 'weight_burn_in',\
 					required= False,default = 0,help='',type = int)
 parser.add_argument('-n_threads',dest = 'n_threads',required= False,default = 2,help='threads',type = int)
+parser.add_argument('-training_data_size',dest = 'batch_size',required= False,default = 10000,help='batch size',type = int)
 parser.add_argument('-batch_size',dest = 'batch_size',required= False,default = 10000,help='batch size',type = int)
 parser.add_argument('-hess_batch_size',dest = 'hess_batch_size',required= False,default = 1000,help='hess batch size',type = int)
 parser.add_argument('-max_sweeps',dest = 'max_sweeps',required= False,default = 50,help='max sweeps',type = int)
 parser.add_argument('-batch_ratio',dest = 'batch_ratio',required= False,default = 0.1,help='threads',type = float)
+parser.add_argument("-n_filters", dest='n_filters',nargs='+',\
+                                default = [4,4,4,8], required=False, help="n filters for conv",type=int)
+parser.add_argument("-filter_sizes", dest='filter_sizes',nargs='+',default = [16,8,8,4], \
+                                        required=False, help="filter sizes for conv",type=int)
 
 args = parser.parse_args() #
 # Check command line arguments
@@ -42,7 +47,7 @@ assert args.optimizer in optimizers,\
 #     pass
 
 # Instantiate data
-training_data_size = 10000
+training_data_size = args.training_data_size
 batch_size = args.batch_size
 hess_batch_size = args.hess_batch_size
 testing_data_size = 1000
@@ -58,8 +63,8 @@ data = Data(raw_data,training_data_size,\
 # Define network and instantiate problem and regularization
 architecture = {}
 architecture['input_shape'] = data._input_shape
-architecture['n_filters'] = [4, 4, 4, 8]
-architecture['filter_sizes'] = [16,8,8,4]
+architecture['n_filters'] = args.n_filters
+architecture['filter_sizes'] = args.filter_sizes
 
 CAE = GenericCAE(architecture)
 problem = AutoencoderProblem(CAE,dtype=tf.float32)
