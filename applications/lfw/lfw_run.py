@@ -23,7 +23,7 @@ parser.add_argument('-record_spectrum',dest = 'record_spectrum',\
 parser.add_argument('-weight_burn_in',dest = 'weight_burn_in',\
 					required= False,default = 0,help='',type = int)
 parser.add_argument('-n_threads',dest = 'n_threads',required= False,default = 2,help='threads',type = int)
-parser.add_argument('-training_data_size',dest = 'batch_size',required= False,default = 10000,help='batch size',type = int)
+parser.add_argument('-training_data_size',dest = 'training_data_size',required= False,default = 10000,help='batch size',type = int)
 parser.add_argument('-batch_size',dest = 'batch_size',required= False,default = 10000,help='batch size',type = int)
 parser.add_argument('-hess_batch_size',dest = 'hess_batch_size',required= False,default = 1000,help='hess batch size',type = int)
 parser.add_argument('-max_sweeps',dest = 'max_sweeps',required= False,default = 50,help='max sweeps',type = int)
