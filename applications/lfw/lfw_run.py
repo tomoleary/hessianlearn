@@ -33,6 +33,8 @@ parser.add_argument("-n_filters", dest='n_filters',nargs='+',\
 parser.add_argument("-filter_sizes", dest='filter_sizes',nargs='+',default = [16,8,8,4], \
                                         required=False, help="filter sizes for conv",type=int)
 
+parser.add_argument("-name_prefix", dest='name_prefix',required=False, default = '', help="file outname prefix",type=str)
+
 args = parser.parse_args() #
 # Check command line arguments
 optimizers = ['adam','gd','incg','ingmres','inminres','lrsfn','sgd']
@@ -226,7 +228,8 @@ for i, (data_g,data_H) in enumerate(zip(data.train,data.hess_train)):
 
 import datetime
 
-outname =  str(data_func.__name__)+\
+outname = args.name_prefix
+outname +=  str(data_func.__name__)+\
 	str(optimizer.__class__.__name__)+str(alpha)+'_'+str(training_data_size)+\
 				'_'+str(batch_factor[-1])+'_burn'+str(args.weight_burn_in)+ '_' + str(datetime.date.today())
 
