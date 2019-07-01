@@ -79,10 +79,13 @@ logger['loss_test'] = {}
 logger['||g||'] ={}
 logger['sweeps'] = {}
 
+name_appendage = ''
+
 if args.record_spectrum:
 	logger['lambdases'] = {}
 	logger['lambdases_full'] = {}
 	logger['lambdases_test'] = {}
+	name_appendage += 'spectrum'
 
 # Instantiate session, initialize variables
 sess = tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=args.n_threads))
@@ -96,7 +99,7 @@ for _ in range(args.weight_burn_in):
 w_0 = random_state.randn(problem.dimension)
 sess.run(problem._assignment_ops,feed_dict = {problem._assignment_placeholder:w_0})
 
-name_appendage = ''
+
 
 # Optimizer selection
 if args.optimizer == 'adam':
