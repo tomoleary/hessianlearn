@@ -83,6 +83,7 @@ logger['sweeps'] = {}
 
 if args.record_spectrum:
 	logger['lambdases'] = {}
+	logger['lambdases_full'] = {}
 	logger['lambdases_test'] = {}
 
 # Instantiate session, initialize variables
@@ -214,10 +215,12 @@ for i, (data_g,data_H) in enumerate(zip(data.train,data.hess_train)):
 			optimizer.minimize(feed_dict,hessian_feed_dict=hess_dict)
 		except:
 			optimizer.minimize(feed_dict)
-		if args.record_spectrum:
+		if args.record_spectrum and i%10 ==0:
 			k = 100
 			d,_ = low_rank_hessian(optimizer,hess_dict,k)
 			logger['lambdases'][i] = d
+			d_full,_ = low_rank_hessian(optimizer,feed_dict,k)
+			logger['lambdases_full'][i] = d_full
 			d_test,_ = low_rank_hessian(optimizer,test_dict,k)
 			logger['lambdases_test'][i] = d_test
 	if sweeps > max_sweeps:
