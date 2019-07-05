@@ -235,13 +235,12 @@ outname =  str(data_func.__name__)+\
 	str(optimizer.__class__.__name__)+str(alpha)+'_'+str(training_data_size)+\
 				'_'+str(batch_factor[-1])+'_burn'+str(args.weight_burn_in)+ '_' + str(datetime.date.today())
 
-if args.optimizer == 'lrsfn':
-	outname += 'low_rank'+str(args.sfn_lr)
+
 
 outname += name_appendage
 
-if args.optimizer == 'lrsfn':
-	outname += 'low_rank_'+str(args.sfn_lr)
+
+outname += 'low_rank_'+str(args.sfn_lr)
 
 
 try:
