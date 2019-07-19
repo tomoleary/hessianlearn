@@ -1,6 +1,6 @@
 <!-- # hessianlearn -->
 
-	<center>Hessian based neural network training in tensorflow </center>
+<center>Hessian based neural network training in tensorflow </center>
 
 	      ___          ___          ___          ___                     ___          ___     
 	     /__/\        /  /\        /  /\        /  /\       ___         /  /\        /__/\    
@@ -30,4 +30,4 @@
 
 
 
-	<center>https://arxiv.org/abs/1905.06738</center>
+<center>https://arxiv.org/abs/1905.06738</center>
