@@ -47,6 +47,7 @@ def load_mnist():
 		print('Did not load'.center(80))
 		print(80*'#')
 		from tensorflow.examples.tutorials.mnist import input_data
+		# Can I access mnist data from tf v2 using compat??
 		mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 
 		all_data = mnist.train.next_batch(60000)
