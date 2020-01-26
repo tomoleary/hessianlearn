@@ -28,6 +28,10 @@ from ..data.data import *
 import math
 import time
 
+import struct
+
+import gzip
+
 # from statsmodels import robust
 
 def dir_check(dir):
@@ -35,6 +39,13 @@ def dir_check(dir):
 		os.stat(dir)
 	except:
 		os.mkdir(dir)
+
+def read_idx(filename):
+	with gzip.open(filename, 'rb') as f:
+		zero, data_type, dims = struct.unpack('>HBB', f.read(4))
+		shape = tuple(struct.unpack('>I', f.read(4))[0] for d in range(dims))
+		return np.fromstring(f.read(), dtype=np.uint8).reshape(shape)
+
 
 def load_mnist():
 	try: 
@@ -44,20 +55,33 @@ def load_mnist():
 	except:
 		# write to file
 		print(80*'#')
-		print('Did not load'.center(80))
+		print('Did not load locally'.center(80))
 		print(80*'#')
-		from tensorflow.examples.tutorials.mnist import input_data
-		# Can I access mnist data from tf v2 using compat??
-		mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 
-		all_data = mnist.train.next_batch(60000)
-		images, labels = all_data
+		tarballs = ['train-images-idx3-ubyte.gz', 'train-labels-idx1-ubyte.gz',\
+						't10k-images-idx3-ubyte.gz', 't10k-labels-idx1-ubyte.gz']
+		for tarball in tarballs:
+			try:
+				os.stat(tarball)
+			except:
+				print('Downloading '+tarball+' from source, and saving to disk.')
 
-		images = np.array(images)
-		for i in range(2):
+				import urllib.request
+				urllib.request.urlretrieve("http://yann.lecun.com/exdb/mnist/"+tarball,\
+									  tarball)
+		print(80*'#')
+
+		test_images = read_idx('t10k-images-idx3-ubyte.gz')
+		test_labels = read_idx('t10k-labels-idx1-ubyte.gz')
+		train_images = read_idx('train-images-idx3-ubyte.gz')
+		train_labels = read_idx('train-labels-idx1-ubyte.gz')
+
+		images = np.concatenate((test_images,train_images))
+		labels = np.concatenate((test_labels,train_labels))
+
+		for i in range(1):
 			images = np.expand_dims(images,axis = -1)
 		np.save('mnist_all_images.npy',images)
-		labels = np.array(labels)
 		np.save('mnist_all_labels.npy',labels)
 	return [images,labels]
 
