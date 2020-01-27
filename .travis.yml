@@ -16,7 +16,5 @@ install:
   - conda create -n hessianlearn2 python=$TRAVIS_PYTHON_VERSION tensorflow
   - conda activate hessianlearn2
   # - python setup.py install
-jobs:
-	include:
-		- stage: unittest
-			script: ./ci/run_unittest.sh
+script: 
+	- ./ci/run_unittest.sh
