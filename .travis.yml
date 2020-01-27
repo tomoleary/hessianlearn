@@ -18,4 +18,4 @@ install:
 jobs:
 	include:
 		- stage: unittest
-		  script: ./ci/naive_test.sh
+			script: ./ci/naive_test.sh
