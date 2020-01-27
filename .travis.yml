@@ -18,6 +18,9 @@ install:
   - conda activate hessianlearn2
   # # - python setup.py install
 script:
-  - ls -l
-  - ls applications/mnist
-  - python applications/mnist/mnist_run.py
+  # - ls -l
+  # - ls applications/mnist
+  # - python applications/mnist/mnist_run.py
+  - ls -l 
+  - ls ci/
+  - bash ci/naive_test.sh
