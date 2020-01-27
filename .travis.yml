@@ -17,4 +17,4 @@ install:
   - conda activate hessianlearn2
   # - python setup.py install
 script: 
-	- ./ci/run_unittest.sh
+	- ls
