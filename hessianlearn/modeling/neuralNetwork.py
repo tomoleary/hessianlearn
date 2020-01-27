@@ -20,6 +20,9 @@ import numpy as np
 import math
 import sys
 import tensorflow as tf
+if int(tf.__version__[0]) > 1:
+	import tensorflow.compat.v1 as tf
+	tf.disable_v2_behavior()
 
 
 class NeuralNetwork(object):

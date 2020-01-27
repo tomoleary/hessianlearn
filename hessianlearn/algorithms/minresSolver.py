@@ -21,6 +21,9 @@ from __future__ import print_function
 import math
 import numpy as np
 import tensorflow as tf
+if int(tf.__version__[0]) > 1:
+	import tensorflow.compat.v1 as tf
+	tf.disable_v2_behavior()
 
 from ..utilities.parameterList import ParameterList
 from ..algorithms import Optimizer

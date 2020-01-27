@@ -18,6 +18,9 @@
 from __future__ import absolute_import, division, print_function
 import numpy as np
 import tensorflow as tf
+if int(tf.__version__[0]) > 1:
+	import tensorflow.compat.v1 as tf
+	tf.disable_v2_behavior()
 from  ..utilities import ParameterList
 from abc import ABC, abstractmethod
 
