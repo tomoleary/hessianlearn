@@ -14,7 +14,7 @@ install:
   # # Useful for debugging any issues with conda
   # - conda info -a
   # Replace dep1 dep2 ... with your dependencies
-  - conda create -n hessianlearn2 python=$TRAVIS_PYTHON_VERSION tensorflow
+  - conda create -n hessianlearn2 python=$TRAVIS_PYTHON_VERSION tensorflow scipy
   - conda activate hessianlearn2
   # # - python setup.py install
 script:
