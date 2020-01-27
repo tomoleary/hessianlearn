@@ -1,10 +1,6 @@
 #!/bin/bash
 
-pwd
-
-which conda
-
-conda env list
+python applications/mnist/mnist_run.py -max_sweeps 1
 
 
 
