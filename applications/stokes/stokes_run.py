@@ -2,6 +2,7 @@ import numpy as np
 import os
 import tensorflow as tf
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
 import sys
 sys.path.append('../../')
 from hessianlearn import *
