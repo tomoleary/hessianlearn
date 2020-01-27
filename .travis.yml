@@ -15,7 +15,6 @@ install:
 	# Replace dep1 dep2 ... with your dependencies
 	- conda create -n hessianlearn2 python=$TRAVIS_PYTHON_VERSION tensorflow
 	- conda activate hessianlearn2
-	# - python setup.py install
 jobs:
 	include:
 		- stage: unittest
