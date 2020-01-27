@@ -16,7 +16,7 @@ from argparse import ArgumentParser
 parser = ArgumentParser(add_help=True, description="-b batch size (int) \
 														-p population_size (int) -alpha (float)")
 # parser.add_argument('-hl',dest = 'path_to_hl',required=True, help="path to hippylearn, required!",type=str)
-parser.add_argument("-optimizer", dest='optimizer',required=False, default = 'inminres', help="optimizer type",type=str)
+parser.add_argument("-optimizer", dest='optimizer',required=False, default = 'incg', help="optimizer type",type=str)
 parser.add_argument('-alpha',dest = 'alpha',required = False,default = 5e-2,help= 'learning rate alpha',type=float)
 parser.add_argument('-sfn_lr',dest = 'sfn_lr',required= False,default = 20,help='low rank for sfn',type = int)
 parser.add_argument('-record_spectrum',dest = 'record_spectrum',\
