@@ -16,5 +16,5 @@ install:
   # - conda create -n hessianlearn2 python=$TRAVIS_PYTHON_VERSION tensorflow
   # - conda activate hessianlearn2
   # # - python setup.py install
-script: 
-	- ls
+script:
+  - ls -l
