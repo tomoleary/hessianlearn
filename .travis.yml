@@ -20,7 +20,7 @@ install:
 script:
   # - ls -l
   # - ls applications/mnist
-  # - python applications/mnist/mnist_run.py
+  # - python applications/mnist/mnist_run.py -max_sweeps 1
   - ls -l 
   - ls ci/
   - bash ci/naive_test.sh
