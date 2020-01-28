@@ -1,5 +1,5 @@
 <!-- # hessianlearn -->
-[![Build Status](https://travis-ci.org/tomoleary/hessianlearn.svg?branch=master)](https://travis-ci.org/tomoleary/hessianlearn)
+[![Build Status](https://travis-ci.com/tomoleary/hessianlearn.svg?branch=master)](https://travis-ci.com/tomoleary/hessianlearn)
 
 				Hessian based neural network training in tensorflow
 
