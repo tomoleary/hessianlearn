@@ -34,6 +34,7 @@ def ParametersGradientDescent(parameters = {}):
 	parameters['abs_tolerance']                 = [1e-4,"Absolute converge when sqrt(g,g) <= abs_tolerance"]
 	parameters['max_NN_evals_per_batch']        = [10000, "Scale constant for maximum neural network evaluations per datum"]
 	parameters['max_NN_evals']                  = [None, "Maximum number of neural network evaluations"]
+	parameters['max_backtracking_iter']			= [10, 'max backtracking iterations for line search']
 
 	parameters['globalization']					= ['None', 'Choose from trust_region, line_search or none']
 	# Reasons for convergence failure
