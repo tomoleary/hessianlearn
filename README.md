@@ -34,4 +34,4 @@
 					https://arxiv.org/abs/1905.06738
 
 
-						[![Build Status](https://travis-ci.com/tomoleary/hessianlearn.svg?branch=master)](https://travis-ci.com/tomoleary/hessianlearn)
+[![Build Status](https://travis-ci.com/tomoleary/hessianlearn.svg?branch=master)](https://travis-ci.com/tomoleary/hessianlearn)
