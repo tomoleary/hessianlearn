@@ -30,8 +30,8 @@ from abc import ABC, abstractmethod
 class Data(ABC):
 	# Must pass in data = [x,y] where x and y are numpy arrays of the same length (but possibly different shapes)
 
-	def __init__(self,data,train_data_size, batch_size,validation_data_size = 500,\
-					test_data_size = 500,total_population_size = None,max_epochs = 1000,\
+	def __init__(self,data,train_data_size, batch_size,test_data_size = 500,\
+					 validation_data_size = 0,total_population_size = None,max_epochs = 1000,\
 					variable_batch = False,hessian_batch_size = -1,batch_increment = None,
 					shuffle = True,verbose = False):
 		self._train_data_size = train_data_size
