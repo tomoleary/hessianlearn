@@ -57,9 +57,9 @@ class Adam(Optimizer):
 
 		self.grad = self.problem.gradient + self.regularization.gradient
 
-		self.m = np.zeros_like(self.grad)
-		self.v = np.zeros_like(self.grad)
-		self.p = np.zeros_like(self.grad)
+		self.m = np.zeros(self.problem.dimension)
+		self.v = np.zeros(self.problem.dimension)
+		self.p = np.zeros(self.problem.dimension)
 
 		self._iter = 0
 		self._sweeps = np.zeros(2)
