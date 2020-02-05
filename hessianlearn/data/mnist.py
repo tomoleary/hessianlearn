@@ -79,7 +79,7 @@ def load_mnist():
 		images = np.concatenate((test_images,train_images))
 		labels_temp = np.concatenate((test_labels,train_labels))
 
-		labels = np.zeros((labels.shape[0],10))
+		labels = np.zeros((labels_temp.shape[0],10))
 		for i,label in enumerate(labels_temp):
 			labels[i,label] = 1
 
