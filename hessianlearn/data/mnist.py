@@ -77,7 +77,12 @@ def load_mnist():
 		train_labels = read_idx('train-labels-idx1-ubyte.gz')
 
 		images = np.concatenate((test_images,train_images))
-		labels = np.concatenate((test_labels,train_labels))
+		labels_temp = np.concatenate((test_labels,train_labels))
+
+		labels = np.zeros((labels.shape[0],10))
+		for i,label in enumerate(labels_temp):
+			labels[i,label] = 1
+
 
 		for i in range(1):
 			images = np.expand_dims(images,axis = -1)
