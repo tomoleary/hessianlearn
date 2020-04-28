@@ -414,10 +414,6 @@ class ProjectedGenericDNN(NeuralNetwork):
             self._C = tf.cast(C,self.dtype)
         else:
             self._C = None
-        
-
-
-
 
         self._input_shape = [-1] + self.input_shape[1:]
         self._output_shape = [-1] + self.output_shape[1:]
@@ -482,48 +478,73 @@ class ProjectedGenericDNN(NeuralNetwork):
         return h
 
 
+class ProjectedDenseAutoencoder(NeuralNetwork):
+	def __init__(self, architecture, V, U, seed = 0,dtype = tf.float32):
+		super(ProjectedDenseAutoencoder,self).__init__(architecture,seed,dtype)
+		# input output Jacobian is J = USV', V is heuristically input subspace, U output subspace
+		# input projector is V
+		self._V = tf.cast(V,self.dtype)
+		self._U = tf.cast(U,self.dtype)
+
+		self._input_shape = [-1] + self.input_shape[1:]
+		self._output_shape = [-1] + self.output_shape[1:]
+
+		assert self._input_shape[-1] == self._V.shape[0], 'Input dimension and input projector do not agree'
+		assert self._output_shape[-1] == self._U.shape[0], 'Output dimension and output projector do not agree'
 
 
-	
-class MNISTDNN(NeuralNetwork):
-	def __init__(self,architecture = None,dtype = tf.float32):
-		super(MNISTDNN,self).__init__(architecture,dtype)
-		self.n_inputs = 28*28
-		self.n_hidden1 = 300
-		self.n_hidden2 = 100
-		self.n_outputs = 10
+		self.n_inputs = np.prod(self.input_shape[1:])
+
+		self.n_outputs = np.prod(self.output_shape[1:])
+		
+		
+		first_index = [V.shape[1]]+ list(architecture['layer_dimensions'])
+
+		second_index = list(architecture['layer_dimensions'])+[U.shape[-1]]
+
+		self.shapes = list(zip(first_index,second_index))
+
 		self.reshaped_input = [-1,self.n_inputs]
-		pass
+
+		self.reshaped_output = [-1,self.n_outputs]
 
 	def __call__(self,x):
 		with tf.name_scope('reshape'):
 			x = tf.reshape(x,self.reshaped_input)
-		""" Constructing simple neural network """
-		with tf.name_scope('dnn'):
-			with tf.name_scope('layer_1'):
-				init_1 = tf.random_uniform((self.n_inputs, self.n_hidden1), -1.0, 1.0, dtype=self.dtype)
-				w_1 = tf.Variable(init_1, name='weights_layer_1', dtype=self.dtype)
-				b_1 = tf.Variable(tf.zeros([self.n_hidden1], dtype=self.dtype), name='bias_1', dtype=self.dtype)
-				y_1 = tf.nn.softmax(tf.matmul(x, w_1) + b_1)
+		############################################################################################################
+		# Encoding layer
+		init_ws = []
+		e_ws = []
+		e_bs = []
 
-			with tf.name_scope('layer_2'):
-				n_inputs_2 = int(y_1.get_shape()[1])
-				init_2 = tf.random_uniform((n_inputs_2, self.n_hidden2), -1.0, 1.0, dtype=self.dtype)
-				w_2 = tf.Variable(init_2, name='weights_layer_2', dtype=self.dtype)
-				b_2 = tf.Variable(tf.zeros([self.n_hidden2], dtype=self.dtype), name='bias_2', dtype=self.dtype)
-				y_2 = tf.nn.softmax(tf.matmul(y_1, w_2) + b_2)
+		x = tf.tensordot(x,self._V, axes = [[1],[0]] )
 
-			with tf.name_scope('out_layer'):
-				n_inputs_out = int(y_2.get_shape()[1])
-				init_out = tf.random_uniform((n_inputs_out, self.n_outputs), -1.0, 1.0, dtype=self.dtype)
-				w_out = tf.Variable(init_out, name='weights_layer_out', dtype=self.dtype)
-				b_out = tf.Variable(tf.zeros([self.n_outputs], dtype=self.dtype), name='bias_out', dtype=self.dtype)
-				y_out = tf.matmul(y_2, w_out) + b_out
-				y_out_sm = tf.nn.softmax(y_out)
-				# y_out = tf.nn.sigmoid(y_out1)
+		for k, shape in enumerate(self.shapes):
+			init = tf.random_normal(shape,stddev=0.35,seed = self.seed)
+			init_ws.append(init)
+			e_ws.append(tf.Variable(init,name='encoder_weights%d'%k))
+			e_bs.append(tf.Variable(tf.zeros(shape[1]), name='encoder_bias%d'%k))
 
-		return y_out
 
+		ws = e_ws 
+		bs = e_bs 
+
+		try:
+			activation_functions = architecture['activation_functions']
+			assert len(activation_functions) is len(ws)
+		except:
+			self.activation_functions = [tf.nn.softmax for w in ws[:-1]] + [tf.identity]
+			# self.activation_functions = [tf.nn.softmax for w in ws]
+
+		h = x
+		for i, (w,b,activation) in enumerate(zip(ws,bs,self.activation_functions)):
+			hw = tf.tensordot(h,w,axes = [[1],[0]])
+			h = activation(hw+b)
+
+
+		h = tf.tensordot(self._U,h,axes = [[1],[1]])
+		h = tf.reshape(h,self._output_shape)
+		return h
 
 
 
