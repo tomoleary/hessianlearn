@@ -99,6 +99,15 @@ class Problem(ABC):
 
 		self._shapes = [tuple(int(wii) for wii in wi.shape) for wi in self._w]
 
+		# If weight name has 'bias' in it we record this so as to initialize the bias to zero.
+		bias_indicators = []
+		for wi in self._w:
+			if 'bias' in wi.name:
+				bias_indicators.append(1)
+			else:
+				bias_indicators.append(0)
+		self._bias_indicators = bias_indicators
+
 		dims = [np.prod(shape) for shape in self.shapes]
 
 		self._indices = initialize_indices(self.shapes)
@@ -242,7 +251,14 @@ class Problem(ABC):
 			placeholder.append(tf.placeholder(self.dtype,shape,name=name))
 		return placeholder
 
-
+	def _zero_biases(self,array_like_w):
+		assert array_like_w.shape == self._flat_w.shape
+		assert hasattr(self,'_bias_indicators')
+		indices = [0] + self._indices
+		for i,bias_indicator in enumerate(self._bias_indicators):
+			if bias_indicator == 1:
+				array_like_w[indices[i]:indices[i+1]] = np.zeros(indices[i+1]-indices[i])
+		return array_like_w
 
 
 class ClassificationProblem(Problem):

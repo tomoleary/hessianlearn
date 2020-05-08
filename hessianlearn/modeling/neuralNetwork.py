@@ -479,12 +479,16 @@ class ProjectedGenericDNN(NeuralNetwork):
 
 
 class ProjectedDenseAutoencoder(NeuralNetwork):
-	def __init__(self, architecture, V, U, seed = 0,dtype = tf.float32):
+	def __init__(self, architecture, V, U, train_projectors = True, seed = 0,dtype = tf.float32):
 		super(ProjectedDenseAutoencoder,self).__init__(architecture,seed,dtype)
 		# input output Jacobian is J = USV', V is heuristically input subspace, U output subspace
 		# input projector is V
+
 		self._V = tf.cast(V,self.dtype)
 		self._U = tf.cast(U,self.dtype)
+		if train_projectors:
+			self._V = tf.Variable(self._V, name = 'input_projector')
+			self._U = tf.Variable(self._U, name = 'output_projector')
 
 		self._input_shape = [-1] + self.input_shape[1:]
 		self._output_shape = [-1] + self.output_shape[1:]
@@ -544,6 +548,8 @@ class ProjectedDenseAutoencoder(NeuralNetwork):
 
 		h = tf.tensordot(self._U,h,axes = [[1],[1]])
 		h = tf.reshape(h,self._output_shape)
+		last_bias = tf.Variable(tf.zeros(self._output_shape[-1]),name = 'last_bias')
+		h += last_bias
 		return h
 
 
