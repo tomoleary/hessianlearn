@@ -35,6 +35,8 @@ class NeuralNetwork(object):
 			pass
 		self.seed = 0
 		self.dtype = dtype
+		self.x = None
+		self.y_prediction = None
 		pass
 
 	def __call__(self,x):
@@ -67,6 +69,9 @@ class GenericDNN(NeuralNetwork):
 
 		self.reshaped_input = [-1,self.n_inputs]
 		self.reshaped_output = [-1,self.n_outputs]
+
+		self.x = tf.placeholder(self.dtype,self.input_shape,name = 'image_placeholder')
+		self.y_prediction = self(self.x)
 
 	def __call__(self,x):
 		with tf.name_scope('reshape'):
@@ -113,8 +118,10 @@ class GenericCDNN(NeuralNetwork):
 		self.n_outputs = np.prod(self.output_shape[1:])
 		self._output_shape = [-1] + self.output_shape[1:]
 
-
 		self.reshaped_output = [-1,self.n_outputs]
+
+		self.x = tf.placeholder(self.dtype,self.input_shape,name = 'image_placeholder')
+		self.y_prediction = self(self.x)
 
 
 	def __call__(self,x):
@@ -204,6 +211,9 @@ class GenericCED(NeuralNetwork):
 		self.n_filters = architecture['n_filters']
 		self.filter_sizes = architecture['filter_sizes']
 
+		self.x = tf.placeholder(self.dtype,self.input_shape,name = 'image_placeholder')
+		self.y_prediction = self(self.x)
+
 	def __call__(self,x):
 		# x = tf.placeholder(
 		#     tf.float32, input_shape, name='x')
@@ -282,6 +292,9 @@ class GenericCAE(NeuralNetwork):
 		self.n_filters = architecture['n_filters']
 		self.filter_sizes = architecture['filter_sizes']
 
+		self.x = tf.placeholder(self.dtype,self.input_shape,name = 'image_placeholder')
+		self.y_prediction = self(self.x)
+
 	def __call__(self,x ):
 		# x = tf.placeholder(
 		#     tf.float32, input_shape, name='x')
@@ -358,7 +371,9 @@ class GenericDAE(NeuralNetwork):
 		self.shapes = list(zip(first_index,second_index))
 
 		self.reshaped_input = [-1,self.n_inputs]
-		pass
+		
+		self.x = tf.placeholder(self.dtype,self.input_shape,name = 'image_placeholder')
+		self.y_prediction = self(self.x)
 
 	def __call__(self,x):
 		with tf.name_scope('reshape'):
@@ -406,111 +421,39 @@ class GenericDAE(NeuralNetwork):
 
 
 class ProjectedGenericDNN(NeuralNetwork):
-    def __init__(self,architecture = None,V = None,C = None,seed = 0,dtype = tf.float32):
-        super(ProjectedGenericDNN,self).__init__(architecture,seed,dtype)
-        self._V = tf.cast(V,self.dtype)
-        if C is not None:
-            pass
-            self._C = tf.cast(C,self.dtype)
-        else:
-            self._C = None
-
-        self._input_shape = [-1] + self.input_shape[1:]
-        self._output_shape = [-1] + self.output_shape[1:]
-
-        self.n_inputs = np.prod(self.input_shape[1:])
-
-        self.n_outputs = np.prod(self.output_shape[1:])
-        
-       
-        
-        if V is None:
-            print('V is None')
-            first_index = [self.n_inputs]+ list(architecture['layer_dimensions'])
-        else:
-            first_index = [V.shape[0]]+ list(architecture['layer_dimensions'])
-        second_index = list(architecture['layer_dimensions'])+[self.n_outputs]
-        self.shapes = list(zip(first_index,second_index))
-
-        self.reshaped_input = [-1,self.n_inputs]
-        print('reshaped input = ', self.reshaped_input)
-        print('V shape = ', self._V.shape)
-        self.reshaped_output = [-1,self.n_outputs]
-
-    def __call__(self,x):
-        with tf.name_scope('reshape'):
-            x = tf.reshape(x,self.reshaped_input)
-        ############################################################################################################
-        # Encoding layer
-        init_ws = []
-        e_ws = []
-        e_bs = []
-        print('x shape before divide = ', x.shape)
-        if not (self._C is None):
-            x /= self._C
-        print('x shape after divide = ', x.shape)
-        x = tf.tensordot(self._V,x, axes = [[1],[1]] )
-        print('x shape after projection  = ', x.shape)
-        
-        for k, shape in enumerate(self.shapes):
-            print('shape',shape)
-            init = tf.random_normal(shape,stddev=0.35,seed = self.seed)
-            init_ws.append(init)
-            e_ws.append(tf.Variable(init,name='encoder_weights%d'%k))
-            e_bs.append(tf.Variable(tf.zeros(shape[1]), name='encoder_bias%d'%k))
-
-
-        ws = e_ws 
-        bs = e_bs 
-
-        try:
-            activation_functions = architecture['activation_functions']
-            assert len(activation_functions) is len(ws)
-        except:
-            self.activation_functions = [tf.nn.softmax for w in ws[:-1]] + [tf.identity]
-            # self.activation_functions = [tf.nn.softmax for w in ws]
-
-        h = x
-        for w,b,activation in zip(ws,bs,self.activation_functions):
-            h = activation(tf.matmul(h,w)+b)
-            print(type(h))
-        h = tf.reshape(h,self._output_shape)
-        return h
-
-
-class ProjectedDenseAutoencoder(NeuralNetwork):
-	def __init__(self, architecture, V, U, train_projectors = True, seed = 0,dtype = tf.float32):
-		super(ProjectedDenseAutoencoder,self).__init__(architecture,seed,dtype)
-		# input output Jacobian is J = USV', V is heuristically input subspace, U output subspace
-		# input projector is V
-
+	def __init__(self,architecture = None,V = None,C = None,seed = 0,dtype = tf.float32):
+		super(ProjectedGenericDNN,self).__init__(architecture,seed,dtype)
 		self._V = tf.cast(V,self.dtype)
-		self._U = tf.cast(U,self.dtype)
-		if train_projectors:
-			self._V = tf.Variable(self._V, name = 'input_projector')
-			self._U = tf.Variable(self._U, name = 'output_projector')
+		if C is not None:
+			pass
+			self._C = tf.cast(C,self.dtype)
+		else:
+			self._C = None
 
 		self._input_shape = [-1] + self.input_shape[1:]
 		self._output_shape = [-1] + self.output_shape[1:]
-
-		assert self._input_shape[-1] == self._V.shape[0], 'Input dimension and input projector do not agree'
-		assert self._output_shape[-1] == self._U.shape[0], 'Output dimension and output projector do not agree'
-
 
 		self.n_inputs = np.prod(self.input_shape[1:])
 
 		self.n_outputs = np.prod(self.output_shape[1:])
 		
+	   
 		
-		first_index = [V.shape[1]]+ list(architecture['layer_dimensions'])
-
-		second_index = list(architecture['layer_dimensions'])+[U.shape[-1]]
-
+		if V is None:
+			print('V is None')
+			first_index = [self.n_inputs]+ list(architecture['layer_dimensions'])
+		else:
+			first_index = [V.shape[0]]+ list(architecture['layer_dimensions'])
+		second_index = list(architecture['layer_dimensions'])+[self.n_outputs]
 		self.shapes = list(zip(first_index,second_index))
 
 		self.reshaped_input = [-1,self.n_inputs]
-
+		print('reshaped input = ', self.reshaped_input)
+		print('V shape = ', self._V.shape)
 		self.reshaped_output = [-1,self.n_outputs]
+
+		self.x = tf.placeholder(self.dtype,self.input_shape,name = 'image_placeholder')
+		self.y_prediction = self(self.x)
 
 	def __call__(self,x):
 		with tf.name_scope('reshape'):
@@ -520,10 +463,15 @@ class ProjectedDenseAutoencoder(NeuralNetwork):
 		init_ws = []
 		e_ws = []
 		e_bs = []
-
-		x = tf.tensordot(x,self._V, axes = [[1],[0]] )
-
+		print('x shape before divide = ', x.shape)
+		if not (self._C is None):
+			x /= self._C
+		print('x shape after divide = ', x.shape)
+		x = tf.tensordot(self._V,x, axes = [[1],[1]] )
+		print('x shape after projection  = ', x.shape)
+		
 		for k, shape in enumerate(self.shapes):
+			print('shape',shape)
 			init = tf.random_normal(shape,stddev=0.35,seed = self.seed)
 			init_ws.append(init)
 			e_ws.append(tf.Variable(init,name='encoder_weights%d'%k))
@@ -541,16 +489,94 @@ class ProjectedDenseAutoencoder(NeuralNetwork):
 			# self.activation_functions = [tf.nn.softmax for w in ws]
 
 		h = x
-		for i, (w,b,activation) in enumerate(zip(ws,bs,self.activation_functions)):
-			hw = tf.tensordot(h,w,axes = [[1],[0]])
-			h = activation(hw+b)
-
-
-		h = tf.tensordot(self._U,h,axes = [[1],[1]])
+		for w,b,activation in zip(ws,bs,self.activation_functions):
+			h = activation(tf.matmul(h,w)+b)
+			print(type(h))
 		h = tf.reshape(h,self._output_shape)
-		last_bias = tf.Variable(tf.zeros(self._output_shape[-1]),name = 'last_bias')
-		h += last_bias
 		return h
+
+
+class ProjectedDenseEncoderDecoder(NeuralNetwork):
+	def __init__(self, architecture, V, U, seed = 0,dtype = tf.float32):
+		super(ProjectedDenseEncoderDecoder,self).__init__(architecture,seed,dtype)
+		# input output Jacobian is J = USV', V is heuristically input subspace, U output subspace
+		# input projector is V
+
+		self._V = tf.cast(V,self.dtype)
+		self._U = tf.cast(U,self.dtype)
+
+
+
+		# Setup shapes for neural network construction
+		self._input_shape = [-1] + self.input_shape[1:]
+		self._output_shape = [-1] + self.output_shape[1:]
+
+		assert self._input_shape[-1] == self._V.shape[0], 'Input dimension and input projector do not agree'
+		assert self._output_shape[-1] == self._U.shape[0], 'Output dimension and output projector do not agree'
+
+		self.n_inputs = np.prod(self.input_shape[1:])
+		self.n_outputs = np.prod(self.output_shape[1:])
+	
+		first_index = [V.shape[1]]+ list(architecture['layer_dimensions'])
+		second_index = list(architecture['layer_dimensions'])+[U.shape[-1]]
+
+		self.shapes = list(zip(first_index,second_index))
+
+		self.reshaped_input = [-1,self.n_inputs]
+		self.reshaped_output = [-1,self.n_outputs]
+
+		self.x = tf.placeholder(self.dtype,self.input_shape,name = 'image_placeholder')
+		with tf.name_scope('reshape'):
+			x = tf.reshape(self.x,self.reshaped_input)
+		############################################################################################################
+
+		# Initialize weights and activation functions
+		if architecture['train_projectors']:
+			self._V = tf.Variable(self._V, name = 'input_projector')
+
+		# Inner dense NN
+		init_ws = []
+		inner_weights = []
+		inner_biases = []
+
+		for k, shape in enumerate(self.shapes):
+			init = tf.random_normal(shape,stddev=0.35,seed = self.seed)
+			init_ws.append(init)
+			inner_weights.append(tf.Variable(init,name='inner_weights%d'%k))
+			inner_biases.append(tf.Variable(tf.zeros(shape[1]), name='inner_bias%d'%k))
+
+		try:
+			activation_functions = architecture['activation_functions']
+			assert len(activation_functions) is len(inner_weights)+2
+			activation_functions[-1] = tf.identity
+		except:
+			# Need one activation function for the first projection, one for each 
+			# subsequent "inner layer" and then identity for the output
+			self.activation_functions = [tf.nn.softmax for w in inner_weights] + [tf.nn.softmax] + [tf.identity]
+
+		h = self.activation_functions[0](tf.tensordot(x,self._V, axes = [[1],[0]] ))
+		print('self._V.shape = ',self._V.shape)
+		print('self._input_shape = ', self._input_shape)
+		input_bias = tf.Variable(tf.zeros(self._V.shape[-1]),name = 'input_bias')
+		print('input_bias_shape = ', input_bias.shape)
+		h += input_bias
+
+		for i, (w,b,activation) in enumerate(zip(inner_weights,inner_biases,self.activation_functions[1:-1])):
+			hw = tf.tensordot(h,w,axes = [[1],[0]])
+			h = activation(hw)+b
+
+		if architecture['train_projectors']:
+			self._U = tf.Variable(self._U, name = 'output_projector')
+
+		h = self.activation_functions[-1](tf.tensordot(self._U,h,axes = [[1],[1]]))
+		h = tf.reshape(h,self._output_shape)
+		output_bias = tf.Variable(tf.zeros(self._output_shape[-1]),name = 'output_bias')
+		h += output_bias
+		self.y_prediction = h
+
+
+
+		
 
 
 

@@ -21,7 +21,7 @@ from .problem import Problem, ClassificationProblem, RegressionProblem, Autoenco
 
 from .neuralNetwork import NeuralNetwork, GenericDNN, GenericCDNN, GenericCAE,\
 							 GenericDAE, GenericCED, ProjectedGenericDNN, \
-							 ProjectedDenseAutoencoder
+							 ProjectedDenseEncoderDecoder
 
 from .preconditioner import Preconditioner, IdentityPreconditioner
 

@@ -72,12 +72,10 @@ class Problem(ABC):
 	def __init__(self,NeuralNetwork = None,dtype = tf.float32):
 		self._dtype = dtype
 		# placeholder for input
-		# self.x = tf.placeholder(self.dtype, [None, NeuralNetwork.n_inputs],name = 'image_placeholder')
-		input_shape = NeuralNetwork.input_shape
-		# if input_shape[0] == -1:
-		# 	input_shape[0] = None
-		# print(input_shape)
-		self.x = tf.placeholder(self.dtype,input_shape,name = 'image_placeholder')
+		# input_shape = NeuralNetwork.input_shape
+
+		# self.x = tf.placeholder(self.dtype,input_shape,name = 'image_placeholder')
+		self.x = NeuralNetwork.x
 		# self.x_shape = NeuralNetwork.input_shape
 		# placeholder for true output
 		try:
@@ -90,7 +88,7 @@ class Problem(ABC):
 			pass
 
 
-		self.y_prediction = NeuralNetwork(self.x)
+		self.y_prediction = NeuralNetwork.y_prediction
 		# self.y_shape = y_prediction.shape
 		# Assign trainable variables to member variable w "weights"
 		self._w = tf.trainable_variables()
@@ -99,18 +97,22 @@ class Problem(ABC):
 
 		self._shapes = [tuple(int(wii) for wii in wi.shape) for wi in self._w]
 
-		# If weight name has 'bias' in it we record this so as to initialize the bias to zero.
-		bias_indicators = []
-		for wi in self._w:
-			if 'bias' in wi.name:
-				bias_indicators.append(1)
-			else:
-				bias_indicators.append(0)
-		self._bias_indicators = bias_indicators
+		self._indices = initialize_indices(self.shapes)
+
+		layer_descriptors = {}
+		first_indices = [0]+self.indices[:-1]
+		for wi,shape,first_index,second_index in zip(self._w,self._shapes,first_indices,self._indices):
+			layer_dict = {}
+			layer_dict['shape'] = shape
+			layer_dict['indices'] = (first_index,second_index)
+			layer_descriptors[wi.name] = layer_dict
+
+		self.layer_descriptors = layer_descriptors
+
 
 		dims = [np.prod(shape) for shape in self.shapes]
 
-		self._indices = initialize_indices(self.shapes)
+		
 
 		self._dimension = np.sum(dims)
 		# Define loss function and accuracy in initialize_loss
@@ -251,14 +253,27 @@ class Problem(ABC):
 			placeholder.append(tf.placeholder(self.dtype,shape,name=name))
 		return placeholder
 
-	def _zero_biases(self,array_like_w):
+	def _zero_layers(self,array_like_w,list_of_layer_names):
 		assert array_like_w.shape == self._flat_w.shape
-		assert hasattr(self,'_bias_indicators')
-		indices = [0] + self._indices
-		for i,bias_indicator in enumerate(self._bias_indicators):
-			if bias_indicator == 1:
-				array_like_w[indices[i]:indices[i+1]] = np.zeros(indices[i+1]-indices[i])
+		# Make sure that each layer name is in the layer_descriptors dictionary
+		for layer_name in list_of_layer_names:
+			assert layer_name in self.layer_descriptors.keys()
+
+		for layer_name in list_of_layer_names:
+			indices = self.layer_descriptors[layer_name]['indices']
+			array_like_w[indices[0]:indices[1]] = np.zeros(indices[1] - indices[0])
+
 		return array_like_w
+
+	def _set_layer(self,array_like_w,array_like_layer,layer_name):
+		assert array_like_w.shape == self._flat_w.shape
+		assert layer_name in self.layer_descriptors.keys()
+		indices = self.layer_descriptors[layer_name]['indices']
+		assert len(array_like_layer) == indices[1] - indices[0]
+		array_like_w[indices[0]:indices[1]] = array_like_layer
+		return array_like_w
+
+
 
 
 class ClassificationProblem(Problem):
@@ -285,7 +300,11 @@ class RegressionProblem(Problem):
 	def _initialize_loss(self):
 		with tf.name_scope('loss'):
 			#self.loss = tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))
-                        self.loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
+			self.loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
+		with tf.name_scope('y_true_square'):
+			self.y_true_square = tf.reduce_mean(tf.pow(self.y_true,2)) 
+		with tf.name_scope('y_pred_square'):
+			self.y_pred_square = tf.reduce_mean(tf.pow(self.y_prediction,2)) 
 
 class AutoencoderProblem(Problem):
 	def __init__(self,NeuralNetwork,dtype = tf.float32):
@@ -295,6 +314,10 @@ class AutoencoderProblem(Problem):
 	def _initialize_loss(self):
 		with tf.name_scope('loss'): # 
 			self.loss = tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)) 
+		with tf.name_scope('y_true_square'):
+			self.y_true_square = tf.reduce_mean(tf.pow(self.x,2)) 
+		with tf.name_scope('y_pred_square'):
+			self.y_pred_square = tf.reduce_mean(tf.pow(self.y_prediction,2)) 
 
 
 
