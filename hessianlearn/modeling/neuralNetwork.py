@@ -495,6 +495,9 @@ class ProjectedGenericDNN(NeuralNetwork):
 		h = tf.reshape(h,self._output_shape)
 		return h
 
+def ProjectedDenseEncoderDecoderLayerDescriptor():
+	layer_descriptors = {}
+	return layer_descriptors
 
 class ProjectedDenseEncoderDecoder(NeuralNetwork):
 	def __init__(self, architecture, V, U, seed = 0,dtype = tf.float32):
@@ -528,11 +531,18 @@ class ProjectedDenseEncoderDecoder(NeuralNetwork):
 		self.x = tf.placeholder(self.dtype,self.input_shape,name = 'image_placeholder')
 		with tf.name_scope('reshape'):
 			x = tf.reshape(self.x,self.reshaped_input)
+
+
 		############################################################################################################
 
 		# Initialize weights and activation functions
+		# Variables are instantiated in the order they appear in the NN
+		# Check to see if some layers should not be trained
+		# if 'trainable_bools' in architecture.keys():
+		# 	assert len(architecture['trainable_bools']) = 4 + 2*len(architecture['layer_dimensions'])
 		if architecture['train_projectors']:
-			self._V = tf.Variable(self._V, name = 'input_projector')
+			self._V = tf.Variable(self._V, name = 'input_projector',trainable = False)
+		input_bias = tf.Variable(tf.zeros(self._V.shape[-1]),name = 'input_bias',trainable = True)
 
 		# Inner dense NN
 		init_ws = []
@@ -542,8 +552,8 @@ class ProjectedDenseEncoderDecoder(NeuralNetwork):
 		for k, shape in enumerate(self.shapes):
 			init = tf.random_normal(shape,stddev=0.35,seed = self.seed)
 			init_ws.append(init)
-			inner_weights.append(tf.Variable(init,name='inner_weights%d'%k))
-			inner_biases.append(tf.Variable(tf.zeros(shape[1]), name='inner_bias%d'%k))
+			inner_weights.append(tf.Variable(init,name='inner_weights%d'%k,trainable = False))
+			inner_biases.append(tf.Variable(tf.zeros(shape[1]), name='inner_bias%d'%k,trainable = True))
 
 		try:
 			activation_functions = architecture['activation_functions']
@@ -554,11 +564,10 @@ class ProjectedDenseEncoderDecoder(NeuralNetwork):
 			# subsequent "inner layer" and then identity for the output
 			self.activation_functions = [tf.nn.softmax for w in inner_weights] + [tf.nn.softmax] + [tf.identity]
 
+
+		# Build the neural network
 		h = self.activation_functions[0](tf.tensordot(x,self._V, axes = [[1],[0]] ))
-		print('self._V.shape = ',self._V.shape)
-		print('self._input_shape = ', self._input_shape)
-		input_bias = tf.Variable(tf.zeros(self._V.shape[-1]),name = 'input_bias')
-		print('input_bias_shape = ', input_bias.shape)
+		
 		h += input_bias
 
 		for i, (w,b,activation) in enumerate(zip(inner_weights,inner_biases,self.activation_functions[1:-1])):
@@ -566,11 +575,11 @@ class ProjectedDenseEncoderDecoder(NeuralNetwork):
 			h = activation(hw)+b
 
 		if architecture['train_projectors']:
-			self._U = tf.Variable(self._U, name = 'output_projector')
+			self._U = tf.Variable(self._U, name = 'output_projector',trainable = False)
 
 		h = self.activation_functions[-1](tf.tensordot(self._U,h,axes = [[1],[1]]))
 		h = tf.reshape(h,self._output_shape)
-		output_bias = tf.Variable(tf.zeros(self._output_shape[-1]),name = 'output_bias')
+		output_bias = tf.Variable(tf.zeros(self._output_shape[-1]),name = 'output_bias',trainable = True)
 		h += output_bias
 		self.y_prediction = h
 

@@ -43,7 +43,7 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 
 
 	parameters['globalization']					= ['None', 'Choose from trust_region, line_search or none']
-	parameters['max_backtracking']				= [5, 'Max backtracking iterations for armijo line search']
+	parameters['max_backtracking_iter']			= [5, 'Max backtracking iterations for armijo line search']
 
 	# Reasons for convergence failure
 	parameters['reasons'] = [[], 'list of reasons for termination']
@@ -131,7 +131,7 @@ class LowRankSaddleFreeNewton(Optimizer):
 			cost_at_candidate = lambda p : self._loss_at_candidate(p,feed_dict = feed_dict)
 			self.alpha, line_search, line_search_iter = ArmijoLineSearch(self.p,w_dir_inner_g,\
 														cost_at_candidate, initial_cost,
-														max_backtracking_iter = self.parameters['max_backtracking'])
+														max_backtracking_iter = self.parameters['max_backtracking_iter'])
 			update = self.alpha*self.p
 			self._sweeps += [1+0.5*line_search_iter,2*rank]
 			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
