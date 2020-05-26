@@ -495,9 +495,6 @@ class ProjectedGenericDNN(NeuralNetwork):
 		h = tf.reshape(h,self._output_shape)
 		return h
 
-def ProjectedDenseEncoderDecoderLayerDescriptor():
-	layer_descriptors = {}
-	return layer_descriptors
 
 class ProjectedDenseEncoderDecoder(NeuralNetwork):
 	def __init__(self, architecture, V, U, seed = 0,dtype = tf.float32):
