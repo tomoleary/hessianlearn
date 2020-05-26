@@ -525,6 +525,7 @@ class ProjectedDenseEncoderDecoder(NeuralNetwork):
 
 		self.shapes = list(zip(first_index,second_index))
 
+
 		self.reshaped_input = [-1,self.n_inputs]
 		self.reshaped_output = [-1,self.n_outputs]
 
@@ -538,11 +539,15 @@ class ProjectedDenseEncoderDecoder(NeuralNetwork):
 		# Initialize weights and activation functions
 		# Variables are instantiated in the order they appear in the NN
 		# Check to see if some layers should not be trained
-		# if 'trainable_bools' in architecture.keys():
-		# 	assert len(architecture['trainable_bools']) = 4 + 2*len(architecture['layer_dimensions'])
-		if architecture['train_projectors']:
-			self._V = tf.Variable(self._V, name = 'input_projector',trainable = False)
-		input_bias = tf.Variable(tf.zeros(self._V.shape[-1]),name = 'input_bias',trainable = True)
+		if 'trainable_bools' in architecture.keys():
+			assert len(architecture['trainable_bools']) == 6 + 2*len(architecture['layer_dimensions'])
+			trainable_bools = architecture['trainable_bools']
+		else:
+			trainable_bools = (6 + 2*len(architecture['layer_dimensions']))*[True]
+
+		self._V = tf.Variable(self._V, name = 'input_projector',trainable = trainable_bools[0])
+		input_bias = tf.Variable(tf.zeros(self._V.shape[-1]),\
+									name = 'input_bias',trainable = trainable_bools[1])
 
 		# Inner dense NN
 		init_ws = []
@@ -552,8 +557,9 @@ class ProjectedDenseEncoderDecoder(NeuralNetwork):
 		for k, shape in enumerate(self.shapes):
 			init = tf.random_normal(shape,stddev=0.35,seed = self.seed)
 			init_ws.append(init)
-			inner_weights.append(tf.Variable(init,name='inner_weights%d'%k,trainable = False))
-			inner_biases.append(tf.Variable(tf.zeros(shape[1]), name='inner_bias%d'%k,trainable = True))
+			inner_weights.append(tf.Variable(init,name='inner_weights%d'%k,trainable = trainable_bools[2+k]))
+			inner_biases.append(tf.Variable(tf.zeros(shape[1]),\
+							 name='inner_bias%d'%k,trainable = trainable_bools[3+k]))
 
 		try:
 			activation_functions = architecture['activation_functions']
@@ -574,12 +580,13 @@ class ProjectedDenseEncoderDecoder(NeuralNetwork):
 			hw = tf.tensordot(h,w,axes = [[1],[0]])
 			h = activation(hw)+b
 
-		if architecture['train_projectors']:
-			self._U = tf.Variable(self._U, name = 'output_projector',trainable = False)
+		self._U = tf.Variable(self._U, name = 'output_projector',trainable = trainable_bools[4+k])
+		output_bias = tf.Variable(tf.zeros(self._output_shape[-1]),\
+									name = 'output_bias',trainable = trainable_bools[5+k])
 
 		h = self.activation_functions[-1](tf.tensordot(self._U,h,axes = [[1],[1]]))
 		h = tf.reshape(h,self._output_shape)
-		output_bias = tf.Variable(tf.zeros(self._output_shape[-1]),name = 'output_bias',trainable = True)
+		
 		h += output_bias
 		self.y_prediction = h
 

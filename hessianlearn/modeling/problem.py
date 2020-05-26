@@ -301,6 +301,14 @@ class RegressionProblem(Problem):
 		with tf.name_scope('loss'):
 			#self.loss = tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))
 			self.loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
+			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
+							/tf.reduce_mean(tf.pow(self.y_true,2)))
+			try:
+				import tensorflow_probability as tfp
+				absolute_deviation = tf.math.abs(self.y_true - self.y_prediction)
+				self.mad = tfp.stats.percentile(absolute_deviation,50.0,interpolation = 'midpoint')
+			except:
+				self.mad = None
 		with tf.name_scope('y_true_square'):
 			self.y_true_square = tf.reduce_mean(tf.pow(self.y_true,2)) 
 		with tf.name_scope('y_pred_square'):
@@ -314,6 +322,7 @@ class AutoencoderProblem(Problem):
 	def _initialize_loss(self):
 		with tf.name_scope('loss'): # 
 			self.loss = tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)) 
+			# self.rel_error = tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)/tf.pow(self.x,2))
 		with tf.name_scope('y_true_square'):
 			self.y_true_square = tf.reduce_mean(tf.pow(self.x,2)) 
 		with tf.name_scope('y_pred_square'):
