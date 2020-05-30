@@ -231,7 +231,7 @@ class VariableBatchIterator(object):
 
 class StaticIterator(object):
 	def __init__(self,data):
-		self.data = data
+		self._data = data
 		self.index = 0
 
 	def __iter__(self):
@@ -240,8 +240,8 @@ class StaticIterator(object):
 	def __next__(self):
 		if self.index > 0:
 			raise StopIteration
-		next_x = self.data.x
-		next_y = self.data.y
+		next_x = self._data.x
+		next_y = self._data.y
 		self.index += 1
 		return next_x,next_y
 

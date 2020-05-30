@@ -550,9 +550,13 @@ class ProjectedDenseEncoderDecoder(NeuralNetwork):
 
 		for k, shape in enumerate(self.shapes):
 			init = tf.random_normal(shape,stddev=0.35,seed = self.seed)
-			inner_weights.append(tf.Variable(init,name='inner_weights%d'%k,trainable = trainable_bools[2+k]))
+			inner_weights.append(tf.Variable(init,name='inner_weights%d'%k,trainable = trainable_bools[2+2*k]))
 			inner_biases.append(tf.Variable(tf.zeros(shape[1]),\
-							 name='inner_bias%d'%k,trainable = trainable_bools[3+k]))
+							 name='inner_bias%d'%k,trainable = trainable_bools[3+2*k]))
+
+		self._U = tf.Variable(self._U, name = 'output_projector',trainable = trainable_bools[4+2*k])
+		output_bias = tf.Variable(tf.zeros(self._output_shape[-1]),\
+									name = 'output_bias',trainable = trainable_bools[5+2*k])
 
 		try:
 			activation_functions = architecture['activation_functions']
@@ -573,9 +577,7 @@ class ProjectedDenseEncoderDecoder(NeuralNetwork):
 			hw = tf.tensordot(h,w,axes = [[1],[0]])
 			h = activation(hw)+b
 
-		self._U = tf.Variable(self._U, name = 'output_projector',trainable = trainable_bools[4+k])
-		output_bias = tf.Variable(tf.zeros(self._output_shape[-1]),\
-									name = 'output_bias',trainable = trainable_bools[5+k])
+		
 
 		h = self.activation_functions[-1](tf.tensordot(self._U,h,axes = [[1],[1]]))
 		h = tf.reshape(h,self._output_shape)
@@ -607,6 +609,10 @@ class ProjectedLowRankResidualEncoderDecoder(NeuralNetwork):
 		self.reshaped_output = [-1,self.n_outputs]
 
 		assert len(architecture['layer_ranks']) == len(architecture['layer_dimensions']) + 1
+		assert V.shape[1] == U.shape[-1]
+		if len(architecture['layer_dimensions']) > 0:
+			assert architecture['layer_dimensions'][0] == V.shape[1]
+			assert (np.array(architecture['layer_dimensions']) == architecture['layer_dimensions'][0]).all()
 	
 		right_indices = [V.shape[1]]+ list(architecture['layer_dimensions'])
 		left_indices = list(architecture['layer_dimensions'])+[U.shape[-1]]
@@ -638,15 +644,15 @@ class ProjectedLowRankResidualEncoderDecoder(NeuralNetwork):
 
 		for k, (left_shape, right_shape) in enumerate(zip(self.left_shapes,self.right_shapes)):
 			left_init = tf.random_normal(left_shape,stddev=0.35,seed = self.seed)
-			inner_left_weights.append(tf.Variable(left_init,name='inner_left_weights%d'%k,trainable = trainable_bools[2+k]))
+			inner_left_weights.append(tf.Variable(left_init,name='inner_left_weights%d'%k,trainable = trainable_bools[2+3*k]))
 			right_init = tf.random_normal(right_shape,stddev=0.35,seed = self.seed)
-			inner_right_weights.append(tf.Variable(right_init,name='inner_right_weights%d'%k,trainable = trainable_bools[3+k]))
+			inner_right_weights.append(tf.Variable(right_init,name='inner_right_weights%d'%k,trainable = trainable_bools[3+3*k]))
 			inner_biases.append(tf.Variable(tf.zeros(left_shape[0]),\
-							 name='inner_bias%d'%k,trainable = trainable_bools[4+k]))
+							 name='inner_bias%d'%k,trainable = trainable_bools[4+3*k]))
 
-		self._U = tf.Variable(self._U, name = 'output_projector',trainable = trainable_bools[5+k])
+		self._U = tf.Variable(self._U, name = 'output_projector',trainable = trainable_bools[5+3*k])
 		output_bias = tf.Variable(tf.zeros(self._output_shape[-1]),\
-									name = 'output_bias',trainable = trainable_bools[6+k])
+									name = 'output_bias',trainable = trainable_bools[6+3*k])
 
 		try:
 			activation_functions = architecture['activation_functions']
@@ -663,14 +669,9 @@ class ProjectedLowRankResidualEncoderDecoder(NeuralNetwork):
 		h += input_bias
 
 		for i, (w_left,w_right,b,activation) in enumerate(zip(inner_left_weights,inner_right_weights,\
-																		inner_biases,self.activation_functions[1:-1])):
-			print('w_left_shape = ',w_left.shape)
-			print('w_right_shape = ',w_right.shape)
-			print('h.shape = ',h.shape)
+															inner_biases,self.activation_functions[1:-1])):
 			h_wright = tf.tensordot(h,w_right,axes = [[1],[0]])
-			print('h_wright.shape = ',h_wright.shape)
 			h += b + tf.tensordot(activation(h_wright),w_left,axes = [[1],[1]])
-			print('at layer i the shape of h is',h.shape)
 		
 		h = self.activation_functions[-1](tf.tensordot(self._U,h,axes = [[1],[1]]))
 		h = tf.reshape(h,self._output_shape)
