@@ -309,10 +309,6 @@ class RegressionProblem(Problem):
 				self.mad = tfp.stats.percentile(absolute_deviation,50.0,interpolation = 'midpoint')
 			except:
 				self.mad = None
-		with tf.name_scope('y_true_square'):
-			self.y_true_square = tf.reduce_mean(tf.pow(self.y_true,2)) 
-		with tf.name_scope('y_pred_square'):
-			self.y_pred_square = tf.reduce_mean(tf.pow(self.y_prediction,2)) 
 
 class AutoencoderProblem(Problem):
 	def __init__(self,NeuralNetwork,dtype = tf.float32):
@@ -323,10 +319,7 @@ class AutoencoderProblem(Problem):
 		with tf.name_scope('loss'): # 
 			self.loss = tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)) 
 			# self.rel_error = tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)/tf.pow(self.x,2))
-		with tf.name_scope('y_true_square'):
-			self.y_true_square = tf.reduce_mean(tf.pow(self.x,2)) 
-		with tf.name_scope('y_pred_square'):
-			self.y_pred_square = tf.reduce_mean(tf.pow(self.y_prediction,2)) 
+
 
 
 
