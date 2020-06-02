@@ -782,11 +782,14 @@ class ConvResNet(NeuralNetwork):
 		self.n_filters = architecture['n_filters']
 		self.filter_sizes = architecture['filter_sizes']
 
+		if 'down_size' not in self.architecture.keys():
+			self.architecture['down_size'] = True
+
 		self.n_layers = architecture['n_layers']
 
 		self.x = tf.placeholder(self.dtype,self.input_shape,name = 'image_placeholder')
 
-		def bottleneck_layer(x,name='None',filter_sizes = 3, n_output = 3):
+		def bottleneck_layer(x,name='None',filter_sizes = 3, n_output = 16):
 			retrieve_shape = tf.shape(x)
 			batch_size = tf.shape(x)[0]
 			n_input = x.get_shape().as_list()[3]
@@ -817,10 +820,46 @@ class ConvResNet(NeuralNetwork):
 
 			return output
 
-		h = self.x	
+		h = self.x
+
+
+		if self.architecture['down_size']:
+					# Initial layer downsample
+			final_retrieve_shape = tf.shape(self.x)
+			batch_size = tf.shape(self.x)[0]
+			n_input = self.x.get_shape().as_list()[3]
+			n_output = 16
+
+			filter_sizes = 3
+			W_in0 = tf.Variable(
+					tf.random_uniform([
+						filter_sizes,
+						filter_sizes,
+						n_input, n_output],
+						-1.0 / math.sqrt(n_input),
+						1.0 / math.sqrt(n_input),seed = self.seed),name = 'first_layer_weight_in')
+
+			b_in = tf.Variable(tf.zeros([n_output]),name = 'first_layer_bias_in')
+			h = tf.nn.softmax(tf.add(tf.nn.conv2d(h, W_in0, strides=[1, 2, 2, 1], padding='SAME'), b_in))
+
 
 		for i in range(self.n_layers):
-			h+= bottleneck_layer(h,name='layer_'+str(i))
+			h+= bottleneck_layer(h,name='bottle_layer_'+str(i))
+
+
+		if self.architecture['down_size']:
+			shape = h.get_shape().as_list()
+			n_input = shape[3]
+			W_outfinal = tf.Variable(
+				tf.random_uniform(tf.shape(W_in0),
+					-1.0 / math.sqrt(n_input),
+					1.0 / math.sqrt(n_input),seed = self.seed),name = 'last_layer_weight_out')
+
+			b_outfinal = tf.Variable(tf.zeros([W_outfinal.get_shape().as_list()[2]]),name = 'last_layer_bias_out')
+			convt_outfinal = tf.nn.conv2d_transpose(h, W_outfinal,final_retrieve_shape,\
+								 strides=[1, 2, 2, 1], padding='SAME')
+			h = tf.identity(
+					tf.add(convt_outfinal, b_outfinal))
 
 		self.y_prediction = h
 
