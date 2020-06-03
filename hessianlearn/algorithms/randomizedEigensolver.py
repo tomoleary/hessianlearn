@@ -26,10 +26,10 @@ from scipy.linalg import cholesky, eigh, solve_triangular, qr, rq
 import time
 
 
-def low_rank_hessian(optimizer,feed_dict,k,verbose = False):
+def low_rank_hessian(optimizer,feed_dict,k,p=None,verbose = False):
     H = lambda x: optimizer.H_w_hat(x,feed_dict)
     n = optimizer.problem.dimension
-    return randomized_eigensolver(H, n, k,verbose = verbose)
+    return randomized_eigensolver(H, n, k,p = p,verbose = verbose)
 
 
 
