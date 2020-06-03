@@ -22,7 +22,6 @@ from __future__ import print_function
 import numpy as np
 
 from ..utilities.parameterList import ParameterList
-from ..utilities.utilityFunctions import *
 from ..algorithms import Optimizer, MINRESSolver, ParametersMINRESSolver
 from ..algorithms.globalization import ArmijoLineSearch, TrustRegion
 from ..modeling import L2Regularization
