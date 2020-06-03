@@ -318,7 +318,9 @@ class AutoencoderProblem(Problem):
 	def _initialize_loss(self):
 		with tf.name_scope('loss'): # 
 			self.loss = tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)) 
-			# self.rel_error = tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)/tf.pow(self.x,2))
+			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
+							/tf.reduce_mean(tf.pow(self.x,2)))
+
 
 
 
