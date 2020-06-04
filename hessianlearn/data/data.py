@@ -49,8 +49,6 @@ class Data(ABC):
 		self._output_shape = [None] + list(data[1][0].shape)
 
 
-		print(list(data[1][0].shape))
-		print('output shape = ',self._output_shape)
 		if len(self._input_shape) == 3:
 			self._input_shape += [1]
 		if len(self._output_shape) == 3:
