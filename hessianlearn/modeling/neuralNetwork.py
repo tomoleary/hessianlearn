@@ -866,7 +866,7 @@ class ConvResNet(NeuralNetwork):
 
 class ConvResNetClassifier(NeuralNetwork):
 	def __init__(self,architecture, seed = 0, dtype = tf.float32):
-		super(ConvResNet,self).__init__(architecture,seed,dtype)
+		super(ConvResNetClassifier,self).__init__(architecture,seed,dtype)
 		self.n_filters = architecture['n_filters']
 		self.filter_sizes = architecture['filter_sizes']
 
@@ -874,7 +874,9 @@ class ConvResNetClassifier(NeuralNetwork):
 			self.architecture['down_size'] = True
 
 		self.n_layers = architecture['n_layers']
+		self._output_shape = [-1] + self.output_shape[1:]
 
+		self.n_outputs = np.prod(self.output_shape[1:])
 		self.x = tf.placeholder(self.dtype,self.input_shape,name = 'image_placeholder')
 
 		def bottleneck_layer(x,name='None',filter_sizes = 3, n_output = 16):
@@ -935,60 +937,22 @@ class ConvResNetClassifier(NeuralNetwork):
 			h+= bottleneck_layer(h,name='bottle_layer_'+str(i))
 
 
-		if self.architecture['down_size']:
-			shape = h.get_shape().as_list()
-			n_input = shape[3]
-			W_outfinal = tf.Variable(
-				tf.random_uniform(tf.shape(W_in0),
-					-1.0 / math.sqrt(n_input),
-					1.0 / math.sqrt(n_input),seed = self.seed),name = 'last_layer_weight_out')
-
-			b_outfinal = tf.Variable(tf.zeros([W_outfinal.get_shape().as_list()[2]]),name = 'last_layer_bias_out')
-			convt_outfinal = tf.nn.conv2d_transpose(h, W_outfinal,final_retrieve_shape,\
-								 strides=[1, 2, 2, 1], padding='SAME')
-			h = tf.identity(
-					tf.add(convt_outfinal, b_outfinal))
-
-
-		conv_output_shape = current_input.shape
+		conv_output_shape = h.shape
 		# print(latent_shape)
 		# print(type(latent_shape))
 		conv_output_dimension = int(np.prod(conv_output_shape[1:]))
-		reshaped_latent = [-1, latent_dimension]
-		if self.architecture['layer_dimensions'] ==[]:
-			self.DNN_shapes = [(latent_dimension,self.n_outputs)]
-		else:
-			first_index = [latent_dimension]+ list(self.architecture['layer_dimensions'])
-			second_index = list(self.architecture['layer_dimensions'])+[self.n_outputs]
-			self.DNN_shapes = list(zip(first_index,second_index))
+		reshaped_conv_output = [-1, conv_output_dimension]
 
 		with tf.name_scope('reshape_latent'):
-			current_input = tf.reshape(current_input,reshaped_latent)
-		############################################################################################################
-		# Encoding layer
-		init_ws = []
-		e_ws = []
-		e_bs = []
-		for k, shape in enumerate(self.DNN_shapes):
-			print('shape',shape)
-			init = tf.random_normal(shape,stddev=0.35,seed = self.seed)
-			init_ws.append(init)
-			e_ws.append(tf.Variable(init,name='encoder_weights%d'%k))
-			e_bs.append(tf.Variable(tf.zeros(shape[1]), name='encoder_bias%d'%k))
+			h = tf.reshape(h,reshaped_conv_output)
 
-			
-		ws = e_ws 
-		bs = e_bs 
+		final_layer_shape = (conv_output_dimension,self.n_outputs)
 
-		try:
-			activation_functions = self.architecture['activation_functions']
-			assert len(activation_functions) is len(ws)
-		except:
-			self.activation_functions = [tf.nn.softmax for w in ws[:-1]] + [tf.identity]
+		final_layer_w = tf.Variable(tf.random_normal(final_layer_shape,stddev=0.35,seed = self.seed),\
+									name = 'final_layer_weight')
+		final_layer_bias = tf.Variable(tf.zeros(final_layer_shape[1]),name = 'final_layer_bias')
 
-		h = current_input
-		for w,b,activation in zip(ws,bs,self.activation_functions):
-			h = activation(tf.matmul(h,w)+b)
+		h = tf.nn.softmax(tf.matmul(h,final_layer_w)+final_layer_bias)
 		h = tf.reshape(h,self._output_shape)
 
 		self.y_prediction = h

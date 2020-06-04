@@ -23,7 +23,7 @@ from .neuralNetwork import NeuralNetwork, GenericDNN, GenericCDNN, GenericCAE,\
 							 GenericDAE, GenericCED, ProjectedGenericDNN, \
 							 ProjectedDenseEncoderDecoder, ProjectedResidualEncoderDecoder,\
 							 ProjectedLowRankResidualEncoderDecoder,\
-							 ConvResNet
+							 ConvResNet, ConvResNetClassifier
 
 from .preconditioner import Preconditioner, IdentityPreconditioner
 
