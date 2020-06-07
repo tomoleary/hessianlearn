@@ -875,11 +875,9 @@ class ConvResNetClassifier(NeuralNetwork):
 
 		self.n_layers = architecture['n_layers']
 		self.output_shape = architecture['output_shape']
-		print('self.output_shape = ',self.output_shape)
-		
-		self._output_shape = [-1] + self.output_shape[1:]
+		print('self.output_shape = ',self.output_shape, 'it should not be none')
 
-		
+		self._output_shape = [-1] + self.output_shape[1:]
 
 		self.n_outputs = np.prod(self.output_shape[1:])
 		self.x = tf.placeholder(self.dtype,self.input_shape,name = 'image_placeholder')
