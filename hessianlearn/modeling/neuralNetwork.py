@@ -877,6 +877,7 @@ class ConvResNetClassifier(NeuralNetwork):
 		self._output_shape = [-1] + self.output_shape[1:]
 
 		self.n_outputs = np.prod(self.output_shape[1:])
+		print('self.n_outputs = ',self.n_outputs)
 		self.x = tf.placeholder(self.dtype,self.input_shape,name = 'image_placeholder')
 
 		def bottleneck_layer(x,name='None',filter_sizes = 3, n_output = 16):
