@@ -875,7 +875,6 @@ class ConvResNetClassifier(NeuralNetwork):
 
 		self.n_layers = architecture['n_layers']
 		self.output_shape = architecture['output_shape']
-		print('self.output_shape = ',self.output_shape, 'it should not be none')
 
 		self._output_shape = [-1] + self.output_shape[1:]
 
@@ -950,8 +949,6 @@ class ConvResNetClassifier(NeuralNetwork):
 			h = tf.reshape(h,reshaped_conv_output)
 
 		final_layer_shape = (int(conv_output_dimension),int(self.n_outputs))
-
-		print('final_layer_shape = ',final_layer_shape)
 
 
 		final_layer_w = tf.Variable(tf.random_normal(final_layer_shape,stddev=0.35,seed = self.seed),\
