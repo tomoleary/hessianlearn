@@ -946,7 +946,8 @@ class ConvResNetClassifier(NeuralNetwork):
 		with tf.name_scope('reshape_latent'):
 			h = tf.reshape(h,reshaped_conv_output)
 
-		final_layer_shape = (conv_output_dimension,self.n_outputs)
+		final_layer_shape = (int(conv_output_dimension),int(self.n_outputs))
+
 
 		final_layer_w = tf.Variable(tf.random_normal(final_layer_shape,stddev=0.35,seed = self.seed),\
 									name = 'final_layer_weight')
