@@ -541,7 +541,7 @@ class ProjectedDenseEncoderDecoder(NeuralNetwork):
 			trainable_bools = (4 + 2*(len(architecture['layer_dimensions'])+1))*[True]
 
 		self._V = tf.Variable(self._V, name = 'input_projector',trainable = trainable_bools[0])
-		input_bias = tf.Variable(tf.zeros(self._V.shape[-1]),\
+		input_bias = tf.Variable(tf.zeros(self._V.shape[-1],dtype = self.dtype),\
 									name = 'input_bias',trainable = trainable_bools[1])
 
 		# Inner dense NN
@@ -549,13 +549,13 @@ class ProjectedDenseEncoderDecoder(NeuralNetwork):
 		inner_biases = []
 
 		for k, shape in enumerate(self.shapes):
-			init = tf.random_normal(shape,stddev=0.35,seed = self.seed)
+			init = tf.random_normal(shape,stddev=0.35,seed = self.seed,dtype = self.dtype)
 			inner_weights.append(tf.Variable(init,name='inner_weights%d'%k,trainable = trainable_bools[2+2*k]))
-			inner_biases.append(tf.Variable(tf.zeros(shape[1]),\
+			inner_biases.append(tf.Variable(tf.zeros(shape[1],dtype = self.dtype),\
 							 name='inner_bias%d'%k,trainable = trainable_bools[3+2*k]))
 
 		self._U = tf.Variable(self._U, name = 'output_projector',trainable = trainable_bools[4+2*k])
-		output_bias = tf.Variable(tf.zeros(self._output_shape[-1]),\
+		output_bias = tf.Variable(tf.zeros(self._output_shape[-1],dtype = self.dtype),\
 									name = 'output_bias',trainable = trainable_bools[5+2*k])
 
 		try:
@@ -635,7 +635,7 @@ class ProjectedLowRankResidualEncoderDecoder(NeuralNetwork):
 			trainable_bools = (4 + 3*(len(architecture['layer_dimensions'])+1))*[True]
 
 		self._V = tf.Variable(self._V, name = 'input_projector',trainable = trainable_bools[0])
-		input_bias = tf.Variable(tf.zeros(self._V.shape[-1]),\
+		input_bias = tf.Variable(tf.zeros(self._V.shape[-1],dtype = self.dtype),\
 									name = 'input_bias',trainable = trainable_bools[1])
 		# Inner dense NN
 		inner_left_weights = []
@@ -643,15 +643,15 @@ class ProjectedLowRankResidualEncoderDecoder(NeuralNetwork):
 		inner_biases = []
 
 		for k, (left_shape, right_shape) in enumerate(zip(self.left_shapes,self.right_shapes)):
-			left_init = tf.random_normal(left_shape,stddev=0.35,seed = self.seed)
+			left_init = tf.random_normal(left_shape,stddev=0.35,seed = self.seed,dtype = self.dtype)
 			inner_left_weights.append(tf.Variable(left_init,name='inner_left_weights%d'%k,trainable = trainable_bools[2+3*k]))
-			right_init = tf.random_normal(right_shape,stddev=0.35,seed = self.seed)
+			right_init = tf.random_normal(right_shape,stddev=0.35,seed = self.seed,dtype = self.dtype)
 			inner_right_weights.append(tf.Variable(right_init,name='inner_right_weights%d'%k,trainable = trainable_bools[3+3*k]))
-			inner_biases.append(tf.Variable(tf.zeros(left_shape[0]),\
+			inner_biases.append(tf.Variable(tf.zeros(left_shape[0],dtype = self.dtype),\
 							 name='inner_bias%d'%k,trainable = trainable_bools[4+3*k]))
 
 		self._U = tf.Variable(self._U, name = 'output_projector',trainable = trainable_bools[5+3*k])
-		output_bias = tf.Variable(tf.zeros(self._output_shape[-1]),\
+		output_bias = tf.Variable(tf.zeros(self._output_shape[-1],dtype = self.dtype),\
 									name = 'output_bias',trainable = trainable_bools[6+3*k])
 
 		try:
@@ -731,7 +731,7 @@ class ProjectedResidualEncoderDecoder(NeuralNetwork):
 			trainable_bools = (6 + 2*len(architecture['layer_dimensions']))*[True]
 
 		self._V = tf.Variable(self._V, name = 'input_projector',trainable = trainable_bools[0])
-		input_bias = tf.Variable(tf.zeros(self._V.shape[-1]),\
+		input_bias = tf.Variable(tf.zeros(self._V.shape[-1],dtype = self.dtype),\
 									name = 'input_bias',trainable = trainable_bools[1])
 
 		# Inner dense NN
@@ -740,10 +740,10 @@ class ProjectedResidualEncoderDecoder(NeuralNetwork):
 		inner_biases = []
 
 		for k, shape in enumerate(self.shapes):
-			init = tf.random_normal(shape,stddev=0.35,seed = self.seed)
+			init = tf.random_normal(shape,stddev=0.35,seed = self.seed,dtype = self.dtype)
 			init_ws.append(init)
-			inner_weights.append(tf.Variable(init,name='inner_weights%d'%k,trainable = trainable_bools[2+k]))
-			inner_biases.append(tf.Variable(tf.zeros(shape[1]),\
+			inner_weights.append(tf.Variable(init,name='inner_weights%d'%k,trainable = trainable_bools[2+k],dtype = self.dtype))
+			inner_biases.append(tf.Variable(tf.zeros(shape[1],dtype = self.dtype),\
 							 name='inner_bias%d'%k,trainable = trainable_bools[3+k]))
 
 		try:
@@ -766,7 +766,7 @@ class ProjectedResidualEncoderDecoder(NeuralNetwork):
 			h += activation(hw)+b
 
 		self._U = tf.Variable(self._U, name = 'output_projector',trainable = trainable_bools[4+k])
-		output_bias = tf.Variable(tf.zeros(self._output_shape[-1]),\
+		output_bias = tf.Variable(tf.zeros(self._output_shape[-1],dtype = self.dtype),\
 									name = 'output_bias',trainable = trainable_bools[5+k])
 
 		h = self.activation_functions[-1](tf.tensordot(self._U,h,axes = [[1],[1]]))
@@ -952,7 +952,7 @@ class ConvResNetClassifier(NeuralNetwork):
 									name = 'final_layer_weight')
 		final_layer_bias = tf.Variable(tf.zeros(final_layer_shape[1]),name = 'final_layer_bias')
 
-		h = tf.nn.softmax(tf.matmul(h,final_layer_w)+final_layer_bias)
+		h = tf.identity(tf.matmul(h,final_layer_w)+final_layer_bias)
 		h = tf.reshape(h,self._output_shape)
 
 		self.y_prediction = h

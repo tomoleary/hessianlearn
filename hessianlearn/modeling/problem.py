@@ -293,22 +293,32 @@ class ClassificationProblem(Problem):
 
 
 class RegressionProblem(Problem):
-	def __init__(self,NeuralNetwork,dtype = tf.float32):
+	def __init__(self,NeuralNetwork,y_mean = None,dtype = tf.float32):
+		if y_mean is not None:
+			self.y_mean = tf.constant(y_mean,dtype = dtype)
+		else:
+			self.y_mean = None
 		super(RegressionProblem,self).__init__(NeuralNetwork,dtype)
-
+		
 
 	def _initialize_loss(self):
 		with tf.name_scope('loss'):
-			#self.loss = tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))
 			self.loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
+		with tf.name_scope('rel_error'):
 			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
 							/tf.reduce_mean(tf.pow(self.y_true,2)))
+		with tf.name_scope('improvement'):
+			assert self.y_mean is not None
+			self.improvement = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
+							/tf.reduce_mean(tf.pow(self.y_true - self.y_mean,2)))
+		with tf.name_scope('mad'):
 			try:
 				import tensorflow_probability as tfp
 				absolute_deviation = tf.math.abs(self.y_true - self.y_prediction)
 				self.mad = tfp.stats.percentile(absolute_deviation,50.0,interpolation = 'midpoint')
 			except:
 				self.mad = None
+
 
 class AutoencoderProblem(Problem):
 	def __init__(self,NeuralNetwork,dtype = tf.float32):
