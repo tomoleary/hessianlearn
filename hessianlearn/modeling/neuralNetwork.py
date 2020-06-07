@@ -948,6 +948,8 @@ class ConvResNetClassifier(NeuralNetwork):
 
 		final_layer_shape = (int(conv_output_dimension),int(self.n_outputs))
 
+		print('final_layer_shape = ',final_layer_shape)
+
 
 		final_layer_w = tf.Variable(tf.random_normal(final_layer_shape,stddev=0.35,seed = self.seed),\
 									name = 'final_layer_weight')
