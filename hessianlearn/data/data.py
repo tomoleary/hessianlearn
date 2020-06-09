@@ -33,7 +33,7 @@ class Data(ABC):
 	def __init__(self,data,train_data_size, batch_size,test_data_size = 500,\
 					 validation_data_size = 0,total_population_size = None,max_epochs = 1000,\
 					variable_batch = False,hessian_batch_size = -1,batch_increment = None,
-					shuffle = True,verbose = False):
+					shuffle = True,verbose = False,seed = 0):
 		self._train_data_size = train_data_size
 		self._batch_size = batch_size
 		self._validation_data_size = validation_data_size
@@ -59,7 +59,7 @@ class Data(ABC):
 		else:
 			self._total_population_size = min(data_size,total_population_size)
 		# Partition data and instantiate iterables for train, val test etc.
-		self._partition(data)
+		self._partition(data,seed = seed)
 
 	@property
 	def test(self):
