@@ -83,10 +83,10 @@ class GenericDNN(NeuralNetwork):
 		e_bs = []
 		for k, shape in enumerate(self.shapes):
 			print('shape',shape)
-			init = tf.random_normal(shape,stddev=0.35,seed = self.seed)
+			init = tf.random_normal(shape,stddev=0.35,seed = self.seed,dtype = self.dtype)
 			init_ws.append(init)
 			e_ws.append(tf.Variable(init,name='encoder_weights%d'%k))
-			e_bs.append(tf.Variable(tf.zeros(shape[1]), name='encoder_bias%d'%k))
+			e_bs.append(tf.Variable(tf.zeros(shape[1],dtype = self.dtype), name='encoder_bias%d'%k))
 
 			
 		ws = e_ws 
