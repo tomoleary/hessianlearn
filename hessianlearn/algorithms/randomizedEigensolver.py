@@ -34,7 +34,7 @@ def low_rank_hessian(optimizer,feed_dict,k,p=None,verbose = False):
 
 
 
-def randomized_eigensolver(Aop, n, k, p = None,verbose = False):
+def randomized_eigensolver(Aop, n, k, p = None,seed = 0,verbose = False):
     """
     Randomized algorithm for Hermitian eigenvalue problems
     Returns k largest eigenvalues computed using the randomized algorithm
@@ -78,7 +78,8 @@ def randomized_eigensolver(Aop, n, k, p = None,verbose = False):
     """
     if p is None:
         p = int(0.01*k)
-    Omega = np.random.randn(n,k+p)
+    random_state = np.random.RandomState(seed=seed)
+    Omega = random_state.randn(n,k+p)
     n  = Omega.shape[0]  
 
     assert(n >= k )
