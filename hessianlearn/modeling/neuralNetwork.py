@@ -485,7 +485,7 @@ class ProjectedGenericDNN(NeuralNetwork):
 			activation_functions = architecture['activation_functions']
 			assert len(activation_functions) is len(ws)
 		except:
-			self.activation_functions = [tf.nn.softmax for w in ws[:-1]] + [tf.identity]
+			self.activation_functions = [tf.nn.relu for w in ws[:-1]] + [tf.identity]
 			# self.activation_functions = [tf.nn.softmax for w in ws]
 
 		h = x
@@ -661,7 +661,7 @@ class ProjectedLowRankResidualEncoderDecoder(NeuralNetwork):
 		except:
 			# Need one activation function for the first projection, one for each 
 			# subsequent "inner layer" and then identity for the output
-			self.activation_functions = [tf.nn.softmax for w in inner_biases] + [tf.nn.softmax] + [tf.identity]
+			self.activation_functions = [tf.nn.softmax for w in inner_biases] + [tf.nn.softplus] + [tf.identity]
 
 
 		# Build the neural network
@@ -753,7 +753,7 @@ class ProjectedResidualEncoderDecoder(NeuralNetwork):
 		except:
 			# Need one activation function for the first projection, one for each 
 			# subsequent "inner layer" and then identity for the output
-			self.activation_functions = [tf.nn.softmax for w in inner_weights] + [tf.nn.softmax] + [tf.identity]
+			self.activation_functions = [tf.nn.softmax for w in inner_weights] + [tf.nn.softplus] + [tf.identity]
 
 
 		# Build the neural network

@@ -75,7 +75,11 @@ class Problem(ABC):
 		# input_shape = NeuralNetwork.input_shape
 
 		# self.x = tf.placeholder(self.dtype,input_shape,name = 'image_placeholder')
-		self.x = NeuralNetwork.x
+		try:
+			self.x = NeuralNetwork.x
+		except:
+			input_shape = NeuralNetwork.input_shape
+			self.x = tf.placeholder(self.dtype,input_shape,name = 'image_placeholder')
 		# self.x_shape = NeuralNetwork.input_shape
 		# placeholder for true output
 		try:
@@ -87,8 +91,10 @@ class Problem(ABC):
 			# self.y_true = tf.placeholder(self.dtype, [None,NeuralNetwork.n_outputs],name='label_placeholder')
 			pass
 
-
-		self.y_prediction = NeuralNetwork.y_prediction
+		try:
+			self.y_prediction = NeuralNetwork.y_prediction
+		except:
+			self.y_prediction = NeuralNetwork(self.x)
 		# self.y_shape = y_prediction.shape
 		# Assign trainable variables to member variable w "weights"
 		self._w = tf.trainable_variables()
@@ -330,6 +336,7 @@ class AutoencoderProblem(Problem):
 			self.loss = tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)) 
 			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
 							/tf.reduce_mean(tf.pow(self.x,2)))
+			self.accuracy = 1. - self.rel_error
 
 
 
