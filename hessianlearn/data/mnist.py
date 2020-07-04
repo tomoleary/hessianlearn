@@ -47,7 +47,7 @@ def read_idx(filename):
 		return np.fromstring(f.read(), dtype=np.uint8).reshape(shape)
 
 
-def load_mnist():
+def load_mnist(rescale = True):
 	try: 
 		# read from file
 		images = np.load('mnist_all_images.npy')
@@ -77,6 +77,9 @@ def load_mnist():
 		train_labels = read_idx('train-labels-idx1-ubyte.gz')
 
 		images = np.concatenate((test_images,train_images))
+		images = images.astype(np.float64)
+		if rescale:
+			images *= 1./(np.max(images))
 		labels_temp = np.concatenate((test_labels,train_labels))
 
 		labels = np.zeros((labels_temp.shape[0],10))
