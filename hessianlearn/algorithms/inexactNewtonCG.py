@@ -30,19 +30,20 @@ from ..modeling import L2Regularization
 
 
 def ParametersInexactNewtonCG(parameters = {}):
-	parameters['alpha']                         = [1e0, "Initial steplength, or learning rate"]
-	parameters['rel_tolerance']                 = [1e-3, "Relative convergence when sqrt(g,g)/sqrt(g_0,g_0) <= rel_tolerance"]
-	parameters['abs_tolerance']                 = [1e-4,"Absolute converge when sqrt(g,g) <= abs_tolerance"]
-	parameters['max_NN_evals_per_batch']        = [10000, "Scale constant for maximum neural network evaluations per datum"]
-	parameters['max_NN_evals']                  = [None, "Maximum number of neural network evaluations"]
+	parameters['alpha']                         	= [1e0, "Initial steplength, or learning rate"]
+	parameters['rel_tolerance']                 	= [1e-3, "Relative convergence when sqrt(g,g)/sqrt(g_0,g_0) <= rel_tolerance"]
+	parameters['abs_tolerance']                 	= [1e-4,"Absolute converge when sqrt(g,g) <= abs_tolerance"]
+	parameters['max_NN_evals_per_batch']        	= [10000, "Scale constant for maximum neural network evaluations per datum"]
+	parameters['max_NN_evals']                  	= [None, "Maximum number of neural network evaluations"]
 
-	parameters['cg_parameters']					= [ ParametersCGSolver(),'CG Parameters']
+
+	parameters['cg_parameters']						= [ ParametersCGSolver(),'CG Parameters']
 	# CG solver parameters
-	parameters['cg_coarse_tol']					= [0.5,'CG coarse solve tolerance']
-	parameters['cg_max_iter']					= [10,'CG maximum iterations']
-	parameters['eta_mode']						= [0, 'eta mode for E-W conditions:0,1,2']
-	parameters['globalization']					= ['None', 'Choose from trust_region, line_search or none']
-	parameters['max_backtracking_iter']			= [10, 'max backtracking iterations for line search']
+	parameters['cg_coarse_tol']						= [0.5,'CG coarse solve tolerance']
+	parameters['cg_max_iter']						= [10,'CG maximum iterations']
+	parameters['eta_mode']							= [0, 'eta mode for E-W conditions:0,1,2']
+	parameters['globalization']						= ['None', 'Choose from trust_region, line_search or none']
+	parameters['max_backtracking_iter']				= [10, 'max backtracking iterations for line search']
 
 	# Reasons for convergence failure
 	parameters['reasons'] = [[], 'list of reasons for termination']

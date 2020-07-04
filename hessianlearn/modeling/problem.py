@@ -288,6 +288,8 @@ class ClassificationProblem(Problem):
 
 	def _initialize_loss(self):
 		with tf.name_scope('loss'):
+			# scce = tf.keras.losses.SparseCategoricalCrossentropy()
+			# self.loss = scce(self.y_true,self.y_prediction)
 			self.loss = tf.reduce_mean(-tf.reduce_sum(self.y_true*tf.nn.log_softmax(self.y_prediction), [1]))
 
 		with tf.name_scope('accuracy'):
@@ -296,6 +298,23 @@ class ClassificationProblem(Problem):
 			correct_prediction = tf.cast(correct_prediction, self.dtype)
 			self.accuracy = tf.reduce_mean(correct_prediction)
 
+
+class LeastSquaresClassificationProblem(Problem):
+	def __init__(self,NeuralNetwork,y_mean = None,dtype = tf.float32):
+		super(LeastSquaresClassificationProblem,self).__init__(NeuralNetwork,dtype)
+		
+
+	def _initialize_loss(self):
+		with tf.name_scope('loss'):
+			self.loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
+		with tf.name_scope('rel_error'):
+			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
+							/tf.reduce_mean(tf.pow(self.y_true,2)))
+		with tf.name_scope('accuracy'):
+			y_prediction_sm = tf.nn.softmax(self.y_prediction)
+			correct_prediction = tf.equal(tf.argmax(self.y_prediction, 1), tf.argmax(self.y_true,1))
+			correct_prediction = tf.cast(correct_prediction, self.dtype)
+			self.accuracy = tf.reduce_mean(correct_prediction)
 
 
 class RegressionProblem(Problem):

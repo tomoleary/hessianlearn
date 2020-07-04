@@ -86,24 +86,27 @@ def randomized_eigensolver(Aop, n, k, p = None,seed = 0,verbose = False):
     
     m = Omega.shape[1]
 
-
-    
-    Y = np.zeros(Omega.shape, dtype = 'd')
+    # Y = np.zeros(Omega.shape, dtype = 'd')
+    Y = np.zeros(Omega.shape)
 
     if verbose:
         print('Applying Hessian')
         try:
             from tqdm import tqdm
             for i in tqdm(range(m)):
-                # print(i,)
+                # print('i = ',i,' m = ',m)
                 Y[:,i] = Aop(Omega[:,i])
+                # print('Y[:,i] max = ',np.max(Y[:,i]))
+                # print('Y[:,i] min = ',np.min(Y[:,i]))
+
         except:
             print('No progress bar :(')
             for i in range(m):
                 # print(i,)
                 Y[:,i] = Aop(Omega[:,i])
+        print('type(Y) = ',type(Y))
+        # print('condition number for Y = ',np.linalg.cond(Y))
         Q,_ = qr(Y, mode = 'economic')
-        
         T = np.zeros((m,m),dtype = 'd')
         print('Forming small square matrix')
         try:

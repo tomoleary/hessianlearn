@@ -55,10 +55,13 @@ def label_to_vector(input_list):
     return np.array(labels)
 
 
-def load_cifar10():
+def load_cifar10(normalize=True):
 	try: 
 		# read from file
-		images = np.load('cifar10_all_images.npy')
+		if normalize:
+			images = np.load('cifar10_all_normalized_images.npy')
+		else:
+			images = np.load('cifar10_all_images.npy')
 		labels = np.load('cifar10_all_labels.npy')
 		return [images, labels]
 	except:
@@ -97,7 +100,12 @@ def load_cifar10():
 		print(labels.shape)
 
 		images = np.array(images)
-		np.save('cifar10_all_images.npy',images)
+		images = images.astype(np.float64)
+		if normalize:
+			images *= 1./(np.max(images))
+			np.save('cifar10_all_normalized_images.npy',images)
+		else:
+			np.save('cifar10_all_images.npy',images)
 		labels = np.array(labels)
 		np.save('cifar10_all_labels.npy',labels)
 

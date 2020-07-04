@@ -40,7 +40,7 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 	parameters['max_NN_evals']                  = [None, "Maximum number of neural network evaluations"]
 
 	parameters['hessian_low_rank']        		= [20, "Scale constant for maximum neural network evaluations per datum"]
-
+	parameters['default_damping']        		= [1e-3, "Levenberg-Marquardt damping when no regularization is used"]
 
 	parameters['globalization']					= ['None', 'Choose from trust_region, line_search or none']
 	parameters['max_backtracking_iter']			= [5, 'Max backtracking iterations for armijo line search']
@@ -95,12 +95,16 @@ class LowRankSaddleFreeNewton(Optimizer):
 		rank = self.parameters['hessian_low_rank']
 		H = lambda x: self.H_w_hat(x,hessian_feed_dict)
 		n = self.problem.dimension
-		Lmbda,U = randomized_eigensolver(H, n, rank)
+
+		Lmbda,U = randomized_eigensolver(H, n, rank,verbose=False)
 		self.lambdas = Lmbda
 		Lmbda_abs = np.abs(Lmbda)
 		Lmbda_diags = diags(Lmbda_abs)
 
-		alpha_damping = self.regularization.parameters['beta']
+		if self.regularization.parameters['beta'] < 1e-4:
+			alpha_damping = self.parameters['default_damping']
+		else:
+			alpha_damping = self.regularization.parameters['beta']
 		# Build terms for Woodbury inversion
 		D_denominator = Lmbda_abs + alpha_damping*np.ones_like(Lmbda_abs)
 

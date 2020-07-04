@@ -50,6 +50,8 @@ def ParametersCGSolver(dictionary = {}):
 	parameters["print_level"] = [-1, "verbosity level: -1 --> no output on screen; 0 --> only final residual at convergence or reason for not not convergence"]
 	
 	parameters['coarse_tol'] = [0.5,'coarse tolerance used in calculation of relative tolerances for E-W conditions']
+
+	parameters['default_damping']  = [1e-3, "Levenberg-Marquardt damping when no regularization is used"]
 	return ParameterList(parameters)
 
 
@@ -66,6 +68,8 @@ class CGSolver(ABC):
 	def __init__(self,problem,regularization,sess = None,Aop = None,preconditioner = None,x = None,parameters = ParametersCGSolver()):
 		self.sess = sess
 		self.problem = problem
+		if regularization.parameters['beta'] < 1e-4:
+			regularization = L2Regularization(self.problem,beta = parameters['default_damping'])
 		self.regularization = regularization
 		if x is None:
 			# self.x = tf.Variable(self.problem.gradient.initialized_value())

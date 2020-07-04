@@ -47,10 +47,13 @@ def read_idx(filename):
 		return np.fromstring(f.read(), dtype=np.uint8).reshape(shape)
 
 
-def load_mnist(rescale = True):
+def load_mnist(normalize = True):
 	try: 
 		# read from file
-		images = np.load('mnist_all_images.npy')
+		if normalize:
+			images = np.load('mnist_all_normalized_images.npy')
+		else:
+			images = np.load('mnist_all_images.npy')
 		labels = np.load('mnist_all_labels.npy')
 	except:
 		# write to file
@@ -78,7 +81,7 @@ def load_mnist(rescale = True):
 
 		images = np.concatenate((test_images,train_images))
 		images = images.astype(np.float64)
-		if rescale:
+		if normalize:
 			images *= 1./(np.max(images))
 		labels_temp = np.concatenate((test_labels,train_labels))
 
@@ -89,7 +92,10 @@ def load_mnist(rescale = True):
 
 		for i in range(1):
 			images = np.expand_dims(images,axis = -1)
-		np.save('mnist_all_images.npy',images)
+		if normalize:
+			np.save('mnist_all_normalized_images.npy',images)
+		else:
+			np.save('mnist_all_images.npy',images)
 		np.save('mnist_all_labels.npy',labels)
 	return [images,labels]
 
