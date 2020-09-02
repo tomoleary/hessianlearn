@@ -87,6 +87,11 @@ class Data(ABC):
 	def hess_train(self):
 		return self._hess_train
 
+	@property
+	def batch_factor(self):
+		return self._batch_factor
+	
+
 	def _load_data(self):
 		# Collect Data in a reproducible way (same ordering)
 		# Put in numpy array
@@ -101,7 +106,7 @@ class Data(ABC):
 			_train_data = xyData(data)
 		else:
 			# In this case we parititon from the entire dataset
-			
+
 			indices = range(self._total_population_size)
 			test_indices,train_indices 	= np.split(indices,[self._test_data_size])
 
@@ -148,7 +153,12 @@ class Data(ABC):
 
 		if self.verbose:
 			duration = time.time() - t0
-			print('Instantiating iterables took ', duration,' s')		
+			print('Instantiating iterables took ', duration,' s')
+
+		training_data_size = len(_train_data.x)
+
+		self._batch_factor = [float(self._batch_size)/float(training_data_size),\
+					 float(self._hessian_batch_size)/float(training_data_size)]		
 
 
 

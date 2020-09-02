@@ -165,6 +165,8 @@ class Problem(ABC):
 				assignment_ops.append(tf.assign(w,v))
 		self._assignment_ops = tf.group(*assignment_ops)
 
+		self._is_autoencoder = False
+
 
 
 
@@ -203,6 +205,11 @@ class Problem(ABC):
 	@property
 	def H_w_hat(self):
 		return self._H_w_hat
+
+	@property
+	def is_autoencoder(self):
+		return self._is_autoencoder
+	
 
 	def _initialize_loss(self):
 		raise NotImplementedError("Child class should implement method initialize_loss") 
@@ -356,6 +363,7 @@ class AutoencoderProblem(Problem):
 			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
 							/tf.reduce_mean(tf.pow(self.x,2)))
 			self.accuracy = 1. - self.rel_error
+			self._is_autoencoder = True
 
 
 

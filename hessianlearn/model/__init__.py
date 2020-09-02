@@ -15,19 +15,4 @@
 # Author: Tom O'Leary-Roseberry
 # Contact: tom.olearyroseberry@utexas.edu
 
-
-from __future__ import absolute_import, division, print_function
-import numpy as np
-import tensorflow as tf
-if int(tf.__version__[0]) > 1:
-	import tensorflow.compat.v1 as tf
-	tf.disable_v2_behavior()
-from abc import ABC, abstractmethod
-
-
-class HessianlearnModel(ABC):
-	def __init__(self):
-
-		pass
-
-		
+from .model import HessianlearnModel, HessianlearnModelSettings

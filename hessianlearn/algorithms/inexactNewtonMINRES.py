@@ -24,7 +24,7 @@ import numpy as np
 from ..utilities.parameterList import ParameterList
 from ..algorithms import Optimizer, MINRESSolver, ParametersMINRESSolver
 from ..algorithms.globalization import ArmijoLineSearch, TrustRegion
-from ..modeling import L2Regularization
+from ..problem import L2Regularization
 
 
 

@@ -19,7 +19,9 @@ from __future__ import absolute_import, division, print_function
 
 from .algorithms import *
 
-from .modeling import *
+from .problem import *
+
+from .model import *
 
 from .data import *
 

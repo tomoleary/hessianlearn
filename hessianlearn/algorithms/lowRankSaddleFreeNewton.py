@@ -26,7 +26,7 @@ from ..utilities.parameterList import ParameterList
 from ..algorithms import Optimizer
 from ..algorithms.globalization import ArmijoLineSearch, TrustRegion
 from ..algorithms.randomizedEigensolver import randomized_eigensolver
-from ..modeling import L2Regularization
+from ..problem import L2Regularization
 
 
 

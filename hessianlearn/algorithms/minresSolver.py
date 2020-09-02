@@ -27,8 +27,8 @@ if int(tf.__version__[0]) > 1:
 
 from ..utilities.parameterList import ParameterList
 from ..algorithms import Optimizer
-from .. modeling import IdentityPreconditioner
-from ..modeling import L2Regularization
+from .. problem import IdentityPreconditioner
+from ..problem import L2Regularization
 from abc import ABC, abstractmethod
 
 class Identity(object):

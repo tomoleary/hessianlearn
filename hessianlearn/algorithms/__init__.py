@@ -27,9 +27,9 @@ from .gmresSolver import GMRESSolver, ParametersGMRESSolver
 
 from .minresSolver import MINRESSolver, ParametersMINRESSolver
 
-from .gradientDescent import GradientDescent, ParametersGradientDescent
-
 from .adam import Adam, ParametersAdam
+
+from .gradientDescent import GradientDescent, ParametersGradientDescent
 
 from .inexactNewtonCG import InexactNewtonCG, ParametersInexactNewtonCG
 
@@ -38,5 +38,3 @@ from .inexactNewtonGMRES import InexactNewtonGMRES, ParametersInexactNewtonGMRES
 from .inexactNewtonMINRES import InexactNewtonMINRES, ParametersInexactNewtonMINRES
 
 from .lowRankSaddleFreeNewton import LowRankSaddleFreeNewton, ParametersLowRankSaddleFreeNewton
-
-
