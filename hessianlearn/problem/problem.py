@@ -73,17 +73,17 @@ class Problem(ABC):
 		self._dtype = dtype
 		# placeholder for input
 		# input_shape = NeuralNetwork.input_shape
-
+		self._NN = NeuralNetwork
 		# self.x = tf.placeholder(self.dtype,input_shape,name = 'image_placeholder')
 		try:
-			self.x = NeuralNetwork.x
+			self.x = self.NN.x
 		except:
-			input_shape = NeuralNetwork.input_shape
+			input_shape = self.NN.input_shape
 			self.x = tf.placeholder(self.dtype,input_shape,name = 'image_placeholder')
 		# self.x_shape = NeuralNetwork.input_shape
 		# placeholder for true output
 		try:
-			output_shape = NeuralNetwork.output_shape
+			output_shape = self.NN.output_shape
 			# if output_shape[0] == -1:
 			# 	output_shape[0] = None
 			self.y_true = tf.placeholder(self.dtype, output_shape,name='label_placeholder')
@@ -92,9 +92,9 @@ class Problem(ABC):
 			pass
 
 		try:
-			self.y_prediction = NeuralNetwork.y_prediction
+			self.y_prediction = self.NN.y_prediction
 		except:
-			self.y_prediction = NeuralNetwork(self.x)
+			self.y_prediction = self.NN(self.x)
 		# self.y_shape = y_prediction.shape
 		# Assign trainable variables to member variable w "weights"
 		self._w = tf.trainable_variables()
@@ -168,6 +168,10 @@ class Problem(ABC):
 		self._is_autoencoder = False
 
 
+	@property
+	def NN(self):
+		return self._NN
+	
 
 
 	@property

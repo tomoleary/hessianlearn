@@ -61,7 +61,7 @@ def HessianlearnModelSettings(settings = {}):
 	settings['max_backtrack']				= [4, "Maximum number of backtracking iterations for each line search"]
 
 
-	settings['max_sweeps']					= [20,"Maximum number of times through the data (measured in epoch equivalents"]
+	settings['max_sweeps']					= [10,"Maximum number of times through the data (measured in epoch equivalents"]
 
 
 
@@ -83,7 +83,7 @@ class HessianlearnModel(ABC):
 			print(80*'#')
 
 
-		self._sess = None
+		# self._sess = None
 		self._optimizer = None
 
 
@@ -117,79 +117,85 @@ class HessianlearnModel(ABC):
 	def _fit(self,options = None):
 		# Consider doing scope managed sess
 		# For now I will use the sess as a member variable
-		self._sess = tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=self.settings['intra_threads'],\
-											inter_op_parallelism_threads=self.settings['inter_threads']))
-	
-		self._initialize_optimizer()
+		# self._sess = tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=self.settings['intra_threads'],\
+		# 									inter_op_parallelism_threads=self.settings['inter_threads']))
+		with tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=self.settings['intra_threads'],\
+											inter_op_parallelism_threads=self.settings['inter_threads'])) as sess:
+			self._initialize_optimizer(sess)
 
-		# After optimizer is instantiated, we call the global variables initializer
-		self.sess.run(tf.global_variables_initializer())
+			# After optimizer is instantiated, we call the global variables initializer
+			sess.run(tf.global_variables_initializer())
 
-		# random_state = np.random.RandomState(seed = 0)
-		# w_0 = random_state.randn(problem.dimension)
-		# sess.run(problem._assignment_ops,feed_dict = {problem._assignment_placeholder:w_0})
+			# random_state = np.random.RandomState(seed = 0)
+			# w_0 = random_state.randn(problem.dimension)
+			# sess.run(problem._assignment_ops,feed_dict = {problem._assignment_placeholder:w_0})
 
-		if self.settings['verbose']:
-			print(80*'#')
-			# First print
-			print('{0:8} {1:11} {2:11} {3:11} {4:11} {5:11} {6:11} {7:11}'.format(\
-									'Sweeps'.center(8),'Loss'.center(8),'acc train'.center(8),'||g||'.center(8),\
-														'Loss_test'.center(8), 'acc test'.center(8),'max test'.center(8), 'alpha'.center(8)))
+			if self.settings['verbose']:
+				print(80*'#')
+				# First print
+				print('{0:8} {1:11} {2:11} {3:11} {4:11} {5:11} {6:11} {7:11}'.format(\
+										'Sweeps'.center(8),'Loss'.center(8),'acc train'.center(8),'||g||'.center(8),\
+															'Loss_test'.center(8), 'acc test'.center(8),'max test'.center(8), 'alpha'.center(8)))
 
-		x_test, y_test = next(iter(self.data.test))
+			x_test, y_test = next(iter(self.data.test))
 
-		test_dict = {self.problem.x: x_test}
+			test_dict = {self.problem.x: x_test}
 
-		# Iteration Loop
-		max_sweeps = self.settings['max_sweeps']
-		train_data = iter(self.data.train)
-		x_batch,y_batch = next(train_data)
-		sweeps = 0
-		min_test_loss = np.inf
-		max_test_acc = -np.inf
-		t0 = time.time()
-		for i, (data_g,data_H) in enumerate(zip(self.data.train,self.data.hess_train)):
-			x_batch,y_batch = data_g
-			x_hess, y_hess = data_H
+			# Iteration Loop
+			max_sweeps = self.settings['max_sweeps']
+			train_data = iter(self.data.train)
+			x_batch,y_batch = next(train_data)
+			sweeps = 0
+			min_test_loss = np.inf
+			max_test_acc = -np.inf
+			t0 = time.time()
+			for i, (data_g,data_H) in enumerate(zip(self.data.train,self.data.hess_train)):
+				x_batch,y_batch = data_g
+				x_hess, y_hess = data_H
 
-			feed_dict = {self.problem.x: x_batch}
-			hess_dict = {self.problem.x: x_hess}
+				feed_dict = {self.problem.x: x_batch}
+				hess_dict = {self.problem.x: x_hess}
 
-			norm_g, loss_train, accuracy_train = self.sess.run([self.problem.norm_g,self.problem.loss,self.problem.accuracy],feed_dict)
-			# logger['||g||'][i] = norm_g
-			# logger['loss'][i] = loss_train
-			# logger['accuracy_train'][i] = accuracy_train
-			# logger['time'][i] = time.time() - t0
-			
-			# logger['sweeps'][i] = sweeps
-			loss_test,	accuracy_test = self.sess.run([self.problem.loss,self.problem.accuracy],test_dict)
-			# logger['accuracy_test'][i] = accuracy_test
-			# logger['loss_test'][i] = loss_test
-			min_test_loss = min(min_test_loss,loss_test)
-			max_test_acc = max(max_test_acc,accuracy_test)
-			# if accuracy_test == max_test_acc:
-			# 	if len(logger['best_weight']) > 2:
-			# 		logger['best_weight'].pop(0)
-			# 	acc_weight_tuple = (accuracy_test,accuracy_train,sess.run(problem._flat_w))
-			# 	logger['best_weight'].append(acc_weight_tuple) 
+				norm_g, loss_train, accuracy_train = sess.run([self.problem.norm_g,self.problem.loss,self.problem.accuracy],feed_dict)
+				# logger['||g||'][i] = norm_g
+				# logger['loss'][i] = loss_train
+				# logger['accuracy_train'][i] = accuracy_train
+				# logger['time'][i] = time.time() - t0
+				
+				# logger['sweeps'][i] = sweeps
+				loss_test,	accuracy_test = sess.run([self.problem.loss,self.problem.accuracy],test_dict)
+				# logger['accuracy_test'][i] = accuracy_test
+				# logger['loss_test'][i] = loss_test
+				min_test_loss = min(min_test_loss,loss_test)
+				max_test_acc = max(max_test_acc,accuracy_test)
+				if accuracy_test == max_test_acc:
+					self._best_weights = sess.run(self.problem._w)
+				# 	if len(logger['best_weight']) > 2:
+				# 		logger['best_weight'].pop(0)
+				# 	acc_weight_tuple = (accuracy_test,accuracy_train,sess.run(problem._flat_w))
+				# 	logger['best_weight'].append(acc_weight_tuple) 
 
-			sweeps = np.dot(self.data.batch_factor,self.optimizer.sweeps)
-			if self.settings['verbose'] and i % 10 == 0:
-				# Print once each epoch
+				sweeps = np.dot(self.data.batch_factor,self.optimizer.sweeps)
+				if self.settings['verbose'] and i % 20 == 0:
+					# Print once each epoch
+					try:
+						print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:1.4e}'.format(\
+							sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
+					except:
+						print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:11}'.format(\
+							sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
 				try:
-					print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:1.4e}'.format(\
-						sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
+					self.optimizer.minimize(feed_dict,hessian_feed_dict=hess_dict)
 				except:
-					print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:11}'.format(\
-						sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
-			try:
-				self.optimizer.minimize(feed_dict,hessian_feed_dict=hess_dict)
-			except:
-				self.optimizer.minimize(feed_dict)
+					self.optimizer.minimize(feed_dict)
 
-			if sweeps > max_sweeps:
-				break
-
+				if sweeps > max_sweeps:
+					break
+		# The weights need to be manually set once the session scope is closed.
+		try:
+			self._problem._NN.set_weights(self._best_weights)
+		except:
+			pass
 
 	# try:
 	# 	os.makedirs('results/')
@@ -201,20 +207,20 @@ class HessianlearnModel(ABC):
 
 		
 
-	def _initialize_optimizer(self):
+	def _initialize_optimizer(self, sess):
 		settings = self.settings
-		assert self.sess is not None
+		# assert self.sess is not None
 		if settings['optimizer'] == 'adam':
 			print(('Using Adam optimizer').center(80))
 			print(('Batch size = '+str(self.data._batch_size)).center(80))
-			optimizer = Adam(self.problem,self.regularization,self.sess)
+			optimizer = Adam(self.problem,self.regularization,sess)
 			optimizer.parameters['alpha'] = settings['alpha']
 			optimizer.alpha = settings['alpha']
 
 		elif settings['optimizer'] == 'gd':
 			print('Using gradient descent optimizer with line search'.center(80))
 			print(('Batch size = '+str(self.data._batch_size)).center(80))
-			optimizer = GradientDescent(self.problem,self.regularization,self.sess)
+			optimizer = GradientDescent(self.problem,self.regularization,sess)
 			optimizer.parameters['globalization'] = 'line_search'
 			optimizer.parameters['max_backtracking_iter'] = 8
 		elif settings['optimizer'] == 'incg':
@@ -222,14 +228,14 @@ class HessianlearnModel(ABC):
 				print('Using inexact Newton CG optimizer with line search'.center(80))
 				print(('Batch size = '+str(self.data._batch_size)).center(80))
 				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
-				optimizer = InexactNewtonCG(self.problem,self.regularization,self.sess)
+				optimizer = InexactNewtonCG(self.problem,self.regularization,sess)
 				optimizer.parameters['globalization'] = 'line_search'
 				optimizer.parameters['max_backtracking_iter'] = settings['max_backtrack']
 			else:
 				print('Using inexact Newton CG optimizer with fixed step'.center(80))
 				print(('Batch size = '+str(self.data._batch_size)).center(80))
 				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
-				optimizer = InexactNewtonCG(self.problem,self.regularization,self.sess)
+				optimizer = InexactNewtonCG(self.problem,self.regularization,sess)
 				optimizer.parameters['globalization'] = 'None'
 				optimizer.alpha = settings['alpha']
 		elif settings['optimizer'] == 'lrsfn':
@@ -238,7 +244,7 @@ class HessianlearnModel(ABC):
 				print(('Batch size = '+str(self.data._batch_size)).center(80))
 				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
 				print(('Hessian low rank = '+str(settings['sfn_lr'])).center(80))
-				optimizer = LowRankSaddleFreeNewton(self.problem,self.regularization,self.sess)
+				optimizer = LowRankSaddleFreeNewton(self.problem,self.regularization,sess)
 				optimizer.parameters['globalization'] = 'line_search'
 				optimizer.parameters['max_backtracking_iter'] = settings['max_backtrack']
 				optimizer.parameters['hessian_low_rank'] = settings['sfn_lr']
@@ -247,7 +253,7 @@ class HessianlearnModel(ABC):
 				print(('Batch size = '+str(self.data._batch_size)).center(80))
 				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
 				print(('Hessian low rank = '+str(settings['sfn_lr'])).center(80))
-				optimizer = LowRankSaddleFreeNewton(self.problem,self.regularization,self.sess)
+				optimizer = LowRankSaddleFreeNewton(self.problem,self.regularization,sess)
 				optimizer.parameters['hessian_low_rank'] = settings['sfn_lr']
 				optimizer.parameters['alpha'] = settings['alpha']
 				optimizer.alpha = settings['alpha']
