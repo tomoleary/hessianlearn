@@ -101,10 +101,10 @@ class LowRankSaddleFreeNewton(Optimizer):
 		Lmbda_abs = np.abs(Lmbda)
 		Lmbda_diags = diags(Lmbda_abs)
 
-		if self.regularization.parameters['beta'] < 1e-4:
+		if self.regularization.parameters['gamma'] < 1e-4:
 			alpha_damping = self.parameters['default_damping']
 		else:
-			alpha_damping = self.regularization.parameters['beta']
+			alpha_damping = self.regularization.parameters['gamma']
 		# Build terms for Woodbury inversion
 		D_denominator = Lmbda_abs + alpha_damping*np.ones_like(Lmbda_abs)
 

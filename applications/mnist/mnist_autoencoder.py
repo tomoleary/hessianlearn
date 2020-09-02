@@ -34,20 +34,11 @@ import pickle
 
 settings = {}
 # Set run specifications
+# Data specs
 settings['batch_size'] = 100
 settings['hess_batch_size'] = 10
-settings['tikhonov_gamma'] = 0.0
-settings['intra_threads'] = 2
-settings['inter_threads'] = 2
 
-# Optimizer specifications
-settings['optimizer'] = 'lrsfn'
-settings['sfn_lr'] = 10
-settings['fixed_step'] = 1
-settings['alpha'] = 5e-2
-settings['max_backtrack'] = 4
 
-settings['max_sweeps'] = 20
 
 ################################################################################
 # Instantiate data
@@ -62,7 +53,7 @@ x_train = x_train.reshape((len(x_train), np.prod(x_train.shape[1:])))
 x_test = x_test.reshape((len(x_test), np.prod(x_test.shape[1:])))
 
 # Instante the data object
-data = Data([x_train,y_train],settings['batch_size'],test_data = [x_test,y_test],hessian_batch_size = settings['hess_batch_size'],test_data_size = testing_data_size)
+data = Data([x_train,y_train],settings['batch_size'],test_data = [x_test,y_test],hessian_batch_size = settings['hess_batch_size'])
 
 settings['input_shape'] = data._input_shape
 settings['output_shape'] = data._output_shape
@@ -97,7 +88,9 @@ autoencoder = tf.keras.models.Model(input_img, decoded)
 
 problem = AutoencoderProblem(autoencoder,dtype=tf.float32)
 
-regularization = L2Regularization(problem,beta = settings['tikhonov_gamma'])
+settings['tikhonov_gamma'] = 0.0
+
+regularization = L2Regularization(problem,gamma = settings['tikhonov_gamma'])
 
 print(80*'#')
 print(('Size of configuration space: '+str(problem.dimension)).center(80))
@@ -107,6 +100,19 @@ settings['dimension'] = problem.dimension
 
 ################################################################################
 # Instantiate the model object
+
+
+settings['intra_threads'] = 2
+settings['inter_threads'] = 2
+
+# Optimizer specifications
+settings['optimizer'] = 'lrsfn'
+settings['sfn_lr'] = 10
+settings['fixed_step'] = 1
+settings['alpha'] = 5e-2
+settings['max_backtrack'] = 4
+
+settings['max_sweeps'] = 20
 
 # Model takes problem regularization and the specified optimizer in its constructor
 

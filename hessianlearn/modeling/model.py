@@ -15,19 +15,19 @@
 # Author: Tom O'Leary-Roseberry
 # Contact: tom.olearyroseberry@utexas.edu
 
+
 from __future__ import absolute_import, division, print_function
+import numpy as np
+import tensorflow as tf
+if int(tf.__version__[0]) > 1:
+	import tensorflow.compat.v1 as tf
+	tf.disable_v2_behavior()
+from abc import ABC, abstractmethod
 
-from .problem import Problem, ClassificationProblem, RegressionProblem, AutoencoderProblem,\
-								LeastSquaresClassificationProblem
 
-from .model import HessianlearnModel
+class HessianlearnModel(ABC):
+	def __init__(self):
 
-from .neuralNetwork import NeuralNetwork, GenericDNN, GenericCDNN, GenericCAE,\
-							 GenericDAE, GenericCED, ProjectedGenericDNN, \
-							 ProjectedDenseEncoderDecoder, ProjectedResidualEncoderDecoder,\
-							 ProjectedLowRankResidualEncoderDecoder,\
-							 ConvResNet, ConvResNetClassifier
+		pass
 
-from .preconditioner import Preconditioner, IdentityPreconditioner
-
-from .regularization import ZeroRegularization, L2Regularization
+		

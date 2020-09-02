@@ -27,7 +27,7 @@ from abc import ABC, abstractmethod
 
 def ParametersRegularization(dictionary = {}):
 	parameters = dictionary
-	parameters["beta"] = [1e1, "regularization parameter"]
+	parameters["gamma"] = [1e-1, "regularization parameter"]
 
 	return ParameterList(parameters)
 
@@ -54,7 +54,7 @@ class Regularization (ABC):
 
 
 class ZeroRegularization(Regularization):
-	def __init__(self,problem,beta = None,parameters = ParametersRegularization(),dtype = tf.float32):
+	def __init__(self,problem,gamma = None,parameters = ParametersRegularization(),dtype = tf.float32):
 		# Must implement hessian apply and gradient
 		self._problem = problem
 		self.parameters = parameters
@@ -69,19 +69,19 @@ class ZeroRegularization(Regularization):
 
 
 class L2Regularization(Regularization):
-	def __init__(self,problem, beta = None,parameters = ParametersRegularization(),dtype = tf.float32):
+	def __init__(self,problem, gamma = None,parameters = ParametersRegularization(),dtype = tf.float32):
 		# Must implement hessian apply and gradient
 		self.problem = problem
 		self.parameters = parameters
 
-		if beta is not None:
-			self.parameters['beta'] = beta
+		if gamma is not None:
+			self.parameters['gamma'] = gamma
 		# fix this
-		self._cost = 0.5*self.parameters['beta']*tf.reduce_sum(self.problem._flat_w*self.problem._flat_w)
+		self._cost = 0.5*self.parameters['gamma']*tf.reduce_sum(self.problem._flat_w*self.problem._flat_w)
 		# fix this
-		self._gradient = self.parameters['beta']*self.problem._flat_w
+		self._gradient = self.parameters['gamma']*self.problem._flat_w
 		# fix this
-		self._H_w_hat = self.parameters['beta']*self.problem.w_hat
+		self._H_w_hat = self.parameters['gamma']*self.problem.w_hat
 
 
 

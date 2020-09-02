@@ -68,8 +68,8 @@ class CGSolver(ABC):
 	def __init__(self,problem,regularization,sess = None,Aop = None,preconditioner = None,x = None,parameters = ParametersCGSolver()):
 		self.sess = sess
 		self.problem = problem
-		if regularization.parameters['beta'] < 1e-4:
-			regularization = L2Regularization(self.problem,beta = parameters['default_damping'])
+		if regularization.parameters['gamma'] < 1e-4:
+			regularization = L2Regularization(self.problem,gamma = parameters['default_damping'])
 		self.regularization = regularization
 		if x is None:
 			# self.x = tf.Variable(self.problem.gradient.initialized_value())
