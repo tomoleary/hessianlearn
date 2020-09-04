@@ -15,6 +15,10 @@
 # Author: Tom O'Leary-Roseberry
 # Contact: tom.olearyroseberry@utexas.edu
 
+################################################################################
+# Uses some code from https://blog.keras.io/building-autoencoders-in-keras.html
+################################################################################
+
 import numpy as np
 import os
 import tensorflow as tf

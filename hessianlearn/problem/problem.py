@@ -69,18 +69,21 @@ def placeholder_like(shapes,name,dtype):
 
 
 class Problem(ABC):
-	def __init__(self,NeuralNetwork = None,dtype = tf.float32):
+	def __init__(self,NeuralNetwork,inputs = None,dtype = tf.float32):
 		self._dtype = dtype
-		# placeholder for input
-		# input_shape = NeuralNetwork.input_shape
+
 		self._NN = NeuralNetwork
-		# self.x = tf.placeholder(self.dtype,input_shape,name = 'image_placeholder')
-		try:
-			self.x = self.NN.x
-		except:
-			input_shape = self.NN.input_shape
-			self.x = tf.placeholder(self.dtype,input_shape,name = 'image_placeholder')
-		# self.x_shape = NeuralNetwork.input_shape
+
+		if inputs is None:
+			try:
+				self.x = self.NN.x
+			except:
+				input_shape = self.NN.input_shape
+				self.x = tf.placeholder(self.dtype,input_shape,name = 'image_placeholder')
+		else:
+			# For more complex models like VAE, inputs are used to evaluate intermediate quantities
+			# In this case they must be explicitly passed in
+			self.x = inputs 
 		# placeholder for true output
 		try:
 			output_shape = self.NN.output_shape
@@ -357,8 +360,9 @@ class RegressionProblem(Problem):
 
 
 class AutoencoderProblem(Problem):
-	def __init__(self,NeuralNetwork,dtype = tf.float32):
-		super(AutoencoderProblem,self).__init__(NeuralNetwork,dtype)
+	def __init__(self,NeuralNetwork,inputs = None,dtype = tf.float32):
+		super(AutoencoderProblem,self).__init__(NeuralNetwork,inputs = inputs,dtype = dtype)
+		self._is_autoencoder = True
 
 
 	def _initialize_loss(self):
@@ -367,10 +371,32 @@ class AutoencoderProblem(Problem):
 			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
 							/tf.reduce_mean(tf.pow(self.x,2)))
 			self.accuracy = 1. - self.rel_error
-			self._is_autoencoder = True
+			
 
 
+class VariationalAutoencoderProblem(Problem):
+	def __init__(self,NeuralNetwork,z_mean,z_log_sigma,inputs,dtype = tf.float32):
+		self.z_mean = z_mean
+		self.z_log_sigma = z_log_sigma
+		super(VariationalAutoencoderProblem,self).__init__(NeuralNetwork,inputs,dtype)
+		self._is_autoencoder = True
 
+	def _initialize_loss(self,cross_entropy = False):
+		with tf.name_scope('loss'): # 
+			if cross_entropy:
+				pass
+			else:
+				# VAE tutorials rescale the mse by the input dimension
+				least_squares_loss = np.prod(self.NN.input_shape[1:])*tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)) 
+				kl_loss = tf.reduce_mean(-0.5*tf.reduce_sum(1 + self.z_log_sigma - tf.pow(self.z_mean,2) - tf.exp(self.z_log_sigma),axis = -1))
+				# kl_loss = 0.0
+
+				self.loss = least_squares_loss + kl_loss
+
+				self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
+								/tf.reduce_mean(tf.pow(self.x,2)))
+				self.accuracy = 1. - self.rel_error
+			
 
 
 

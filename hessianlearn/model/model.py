@@ -33,8 +33,8 @@ from ..utilities.parameterList import ParameterList
 
 # from ..algorithms import *
 
-# from ..algorithms.adam import Adam
-# from ..algorithms.gradientDescent import GradientDescent
+from ..algorithms.adam import Adam
+from ..algorithms.gradientDescent import GradientDescent
 # from ..algorithms.cgSolver import CGSolver
 # from ..algorithms.inexactNewtonCG import InexactNewtonCG
 # from ..algorithms.gmresSolver import GMRESSolver 
@@ -57,8 +57,8 @@ def HessianlearnModelSettings(settings = {}):
 	settings['optimizer']                	= ['lrsfn', "String to denote choice of optimizer"]
 	settings['alpha']                		= [5e-2, "Initial steplength, or learning rate"]
 	settings['sfn_lr']						= [10, "Low rank to be used for LRSFN / SFN"]
-	settings['fixed_step']					= [True, " True means steps of length alpha will be taken at each iteration"]
-	settings['max_backtrack']				= [4, "Maximum number of backtracking iterations for each line search"]
+	settings['fixed_step']					= [False, " True means steps of length alpha will be taken at each iteration"]
+	settings['max_backtrack']				= [10, "Maximum number of backtracking iterations for each line search"]
 
 
 	settings['max_sweeps']					= [10,"Maximum number of times through the data (measured in epoch equivalents"]
@@ -176,7 +176,7 @@ class HessianlearnModel(ABC):
 				# 	logger['best_weight'].append(acc_weight_tuple) 
 
 				sweeps = np.dot(self.data.batch_factor,self.optimizer.sweeps)
-				if self.settings['verbose'] and i % 20 == 0:
+				if self.settings['verbose'] and i % 1 == 0:
 					# Print once each epoch
 					try:
 						print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:1.4e}'.format(\
@@ -257,6 +257,12 @@ class HessianlearnModel(ABC):
 				optimizer.parameters['hessian_low_rank'] = settings['sfn_lr']
 				optimizer.parameters['alpha'] = settings['alpha']
 				optimizer.alpha = settings['alpha']
+		elif settings['optimizer'] == 'sgd':
+			print(('Using stochastic gradient descent optimizer').center(80))
+			print(('Batch size = '+str(self._data._batch_size)).center(80))
+			optimizer = GradientDescent(self.problem,self.regularization,sess)
+			optimizer.parameters['alpha'] = settings['alpha']
+			optimizer.alpha = settings['alpha']
 		else:
 			raise
 		self._optimizer = optimizer

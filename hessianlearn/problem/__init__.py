@@ -18,7 +18,7 @@
 from __future__ import absolute_import, division, print_function
 
 from .problem import Problem, ClassificationProblem, RegressionProblem, AutoencoderProblem,\
-								LeastSquaresClassificationProblem
+								LeastSquaresClassificationProblem, VariationalAutoencoderProblem
 
 from .neuralNetwork import NeuralNetwork, GenericDNN, GenericCDNN, GenericCAE,\
 							 GenericDAE, GenericCED, ProjectedGenericDNN, \
