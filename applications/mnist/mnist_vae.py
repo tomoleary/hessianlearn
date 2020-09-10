@@ -35,6 +35,8 @@ from hessianlearn import *
 
 import pickle
 
+tf.set_random_seed(0)
+
 settings = {}
 # Set run specifications
 # Data specs
@@ -121,25 +123,28 @@ vae = tf.keras.models.Model(inputs, outputs, name='vae_mlp')
 problem = VariationalAutoencoderProblem(vae,z_mean,z_log_var,inputs,dtype=tf.float32)
 
 settings['tikhonov_gamma'] = 1e-2
-
 regularization = L2Regularization(problem,gamma = settings['tikhonov_gamma'])
 
 
 ################################################################################
 # Instantiate the model object
 HLModelSettings = HessianlearnModelSettings()
-HLModelSettings['optimizer'] = 'lrsfn'
+HLModelSettings['optimizer'] = 'sgd'
 HLModelSettings['alpha'] = 5e-4
-HLModelSettings['fixed_step'] = True
+HLModelSettings['fixed_step'] = False
 HLModelSettings['sfn_lr'] = 20
+HLModelSettings['max_backtrack'] = 16
+HLModelSettings['max_sweeps'] = 50
 
 
-HLModel = HessianlearnModel(problem,regularization,data)
+HLModel = HessianlearnModel(problem,regularization,data,settings = HLModelSettings)
+
 
 HLModel.fit()
 
 ################################################################################
 # Post processing
+import matplotlib.pyplot as plt
 def plot_results(models,
                  data,
                  batch_size=128,
@@ -205,7 +210,7 @@ models = (encoder, decoder)
 data = (x_test, y_test)
 plot_results(models,
              data,
-             batch_size=batch_size,
+             batch_size=settings['batch_size'],
              model_name="vae_mlp")
 
 

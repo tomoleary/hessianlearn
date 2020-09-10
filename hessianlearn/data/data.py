@@ -45,6 +45,8 @@ class Data(ABC):
 			assert test_data_size is not None
 			self._test_data_size = test_data_size
 
+		self._train_data_size = None
+
 		self._max_epochs = max_epochs
 		self.verbose = verbose
 		self._variable_batch = variable_batch
@@ -90,6 +92,15 @@ class Data(ABC):
 	@property
 	def batch_factor(self):
 		return self._batch_factor
+
+	@property
+	def test_data_size(self):
+		return self._test_data_size
+	
+	@property
+	def train_data_size(self):
+		return self._train_data_size
+	
 	
 
 	def _load_data(self):
@@ -130,6 +141,8 @@ class Data(ABC):
 				print('Instantiating data iterables')
 				t0 = time.time()
 
+		
+
 		# Instantiate the testing data static iterator
 		self._test = StaticIterator(_test_data)
 		# Instantiate the training data iterator
@@ -155,10 +168,10 @@ class Data(ABC):
 			duration = time.time() - t0
 			print('Instantiating iterables took ', duration,' s')
 
-		training_data_size = len(_train_data.x)
+		self._train_data_size = len(_train_data.x)
 
-		self._batch_factor = [float(self._batch_size)/float(training_data_size),\
-					 float(self._hessian_batch_size)/float(training_data_size)]		
+		self._batch_factor = [float(self._batch_size)/float(self._train_data_size),\
+					 float(self._hessian_batch_size)/float(self._train_data_size)]		
 
 
 

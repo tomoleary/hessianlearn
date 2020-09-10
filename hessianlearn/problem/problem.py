@@ -69,43 +69,17 @@ def placeholder_like(shapes,name,dtype):
 
 
 class Problem(ABC):
-	def __init__(self,NeuralNetwork,inputs = None,dtype = tf.float32):
+	def __init__(self,NeuralNetwork,inputs = None, outputs = None,dtype = tf.float32):
 		self._dtype = dtype
 
-		self._NN = NeuralNetwork
+		self._initialize_neural_network(NeuralNetwork,inputs = inputs, outputs = outputs)
 
-		if inputs is None:
-			try:
-				self.x = self.NN.x
-			except:
-				input_shape = self.NN.input_shape
-				self.x = tf.placeholder(self.dtype,input_shape,name = 'image_placeholder')
-		else:
-			# For more complex models like VAE, inputs are used to evaluate intermediate quantities
-			# In this case they must be explicitly passed in
-			self.x = inputs 
-		# placeholder for true output
-		try:
-			output_shape = self.NN.output_shape
-			# if output_shape[0] == -1:
-			# 	output_shape[0] = None
-			self.y_true = tf.placeholder(self.dtype, output_shape,name='label_placeholder')
-		except:
-			# self.y_true = tf.placeholder(self.dtype, [None,NeuralNetwork.n_outputs],name='label_placeholder')
-			pass
-
-		try:
-			self.y_prediction = self.NN.y_prediction
-		except:
-			self.y_prediction = self.NN(self.x)
-		# self.y_shape = y_prediction.shape
 		# Assign trainable variables to member variable w "weights"
 		self._w = tf.trainable_variables()
 
 		self._flat_w = my_flatten(self._w)
 
 		self._shapes = [tuple(int(wii) for wii in wi.shape) for wi in self._w]
-
 		self._indices = initialize_indices(self.shapes)
 
 		layer_descriptors = {}
@@ -118,29 +92,23 @@ class Problem(ABC):
 
 		self.layer_descriptors = layer_descriptors
 
-
 		dims = [np.prod(shape) for shape in self.shapes]
-
-		
-
 		self._dimension = np.sum(dims)
+
 		# Define loss function and accuracy in initialize_loss
 		self._initialize_loss()
 		# Once loss is defined gradients can be instantiated
+
 		self._gradient = my_flatten(tf.gradients(self.loss,self._w, name = 'gradient'))
 		self._norm_g = tf.sqrt(tf.reduce_sum(self.gradient*self.gradient))
-		# Initialize indexing for vector representation if needed
-		# self._initialize_indices()
 		# Initialize vector for Hessian mat-vecs
 		self._w_hat = tf.placeholder(self.dtype,self.dimension )
-		# w_hat = self.placeholder_like_g('w_hat')
-		# self.w_hat = tuple(w_hat)
 		# Define (g,dw) inner product
 		self._g_inner_w_hat = tf.tensordot(self._w_hat,self._gradient,axes = [[0],[0]])
-		# self.g_inner_w_hat = [tf.reduce_sum(g * w_hat) for g, w_hat in zip(self.gradient, self.w_hat)]
 		# Define Hessian action Hdw
 		self._H_w_hat = my_flatten(tf.gradients(self._g_inner_w_hat,self._w,stop_gradients = self._w_hat,name = 'hessian_action'))
-		
+
+		# Define operations for updating and assigment used during training
 		self._update_placeholder = tf.placeholder(self.dtype,[self._dimension],name = 'update_placeholder')
 		self._assignment_placeholder = tf.placeholder(self.dtype,[self._dimension],name = 'assignment_placeholder')
 		split_indices = []
@@ -167,15 +135,13 @@ class Problem(ABC):
 			with tf.control_dependencies(assignment_ops):
 				assignment_ops.append(tf.assign(w,v))
 		self._assignment_ops = tf.group(*assignment_ops)
-
+		# Boolean to indicate if only input data should be passed into loss function
 		self._is_autoencoder = False
 
 
 	@property
 	def NN(self):
 		return self._NN
-	
-
 
 	@property
 	def dtype(self):
@@ -214,12 +180,41 @@ class Problem(ABC):
 		return self._H_w_hat
 
 	@property
-	def is_autoencoder(self):
-		return self._is_autoencoder
+	def loss(self):
+		return self._loss
 	
 
+	@property
+	def is_autoencoder(self):
+		return self._is_autoencoder
+
+	def _initialize_neural_network(self, NeuralNetwork, inputs = None, outputs = None):
+		# Initializiation for generic neural network
+		# Classes with more complicated neural networks must implement 
+		# case specific neural network 
+		self._NN = NeuralNetwork
+		# Initialize inputs and outputs
+		if inputs is None:
+			input_shape = self.NN.input_shape
+			self.x = tf.placeholder(self.dtype,input_shape,name = 'input_placeholder')
+		else:
+			# For more complex models like VAE, inputs are used to evaluate intermediate quantities
+			# In this case they must be explicitly passed in
+			# Alternatively could use keras.models.Model.get_layer method and enforce input naming convention
+			self.x = inputs 
+		# placeholder for true output
+		output_shape = self.NN.output_shape
+		self.y_true = tf.placeholder(self.dtype, output_shape,name='output_placeholder')
+
+
+		# For neural network prediction
+		# Assumes neural network is callable function of just x
+		self.y_prediction = self.NN(self.x)
+		
+
 	def _initialize_loss(self):
-		raise NotImplementedError("Child class should implement method initialize_loss") 
+		raise NotImplementedError("Child class must implement method initialize_loss") 
+
 
 
 	def _initialize_indices(self):
@@ -303,8 +298,8 @@ class ClassificationProblem(Problem):
 	def _initialize_loss(self):
 		with tf.name_scope('loss'):
 			# scce = tf.keras.losses.SparseCategoricalCrossentropy()
-			# self.loss = scce(self.y_true,self.y_prediction)
-			self.loss = tf.reduce_mean(-tf.reduce_sum(self.y_true*tf.nn.log_softmax(self.y_prediction), [1]))
+			# self._loss = scce(self.y_true,self.y_prediction)
+			self._loss = tf.reduce_mean(-tf.reduce_sum(self.y_true*tf.nn.log_softmax(self.y_prediction), [1]))
 
 		with tf.name_scope('accuracy'):
 			y_prediction_sm = tf.nn.softmax(self.y_prediction)
@@ -320,7 +315,7 @@ class LeastSquaresClassificationProblem(Problem):
 
 	def _initialize_loss(self):
 		with tf.name_scope('loss'):
-			self.loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
+			self._loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
 		with tf.name_scope('rel_error'):
 			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
 							/tf.reduce_mean(tf.pow(self.y_true,2)))
@@ -342,7 +337,7 @@ class RegressionProblem(Problem):
 
 	def _initialize_loss(self):
 		with tf.name_scope('loss'):
-			self.loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
+			self._loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
 		with tf.name_scope('rel_error'):
 			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
 							/tf.reduce_mean(tf.pow(self.y_true,2)))
@@ -367,7 +362,7 @@ class AutoencoderProblem(Problem):
 
 	def _initialize_loss(self):
 		with tf.name_scope('loss'): # 
-			self.loss = tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)) 
+			self._loss = tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)) 
 			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
 							/tf.reduce_mean(tf.pow(self.x,2)))
 			self.accuracy = 1. - self.rel_error
@@ -391,7 +386,7 @@ class VariationalAutoencoderProblem(Problem):
 				kl_loss = tf.reduce_mean(-0.5*tf.reduce_sum(1 + self.z_log_sigma - tf.pow(self.z_mean,2) - tf.exp(self.z_log_sigma),axis = -1))
 				# kl_loss = 0.0
 
-				self.loss = least_squares_loss + kl_loss
+				self._loss = least_squares_loss + kl_loss
 
 				self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
 								/tf.reduce_mean(tf.pow(self.x,2)))

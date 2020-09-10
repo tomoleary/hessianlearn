@@ -63,13 +63,13 @@ def HessianlearnModelSettings(settings = {}):
 
 	settings['max_sweeps']					= [10,"Maximum number of times through the data (measured in epoch equivalents"]
 
-
+	settings['record_spectrum']         	= [False, "Boolean for recording spectrum during training"]
 
 	return ParameterList(settings)
 
 
 class HessianlearnModel(ABC):
-	def __init__(self,problem,regularization,data,settings = HessianlearnModelSettings()):
+	def __init__(self,problem,regularization,data,settings = HessianlearnModelSettings({})):
 
 		self._problem = problem
 		self._regularization = regularization
@@ -79,9 +79,14 @@ class HessianlearnModel(ABC):
 
 		if self.settings['verbose']:
 			print(80*'#')
-			print(('Size of configuration space: '+str(self.problem.dimension)).center(80))
+			print(('Size of configuration space:  '+str(self.problem.dimension)).center(80))
+			print(('Size of training data: '+str(self.data.train_data_size)).center(80))
+			# Approximate data needed is d_W / output
+			print(('Approximate data cardinality needed: '\
+				+str(int(float(self.problem.dimension)/float(self.problem.y_prediction.shape[-1].value)))).center(80))
 			print(80*'#')
-
+		# Initialize logging:
+		self._initialize_logging()
 
 		# self._sess = None
 		self._optimizer = None
@@ -111,24 +116,41 @@ class HessianlearnModel(ABC):
 	@property
 	def data(self):
 		return self._data
+
+	@property
+	def logger(self):
+		return self._logger
+	
 	
 
 
-	def _fit(self,options = None):
+	def _fit(self,options = None, w_0 = None):
 		# Consider doing scope managed sess
 		# For now I will use the sess as a member variable
 		# self._sess = tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=self.settings['intra_threads'],\
 		# 									inter_op_parallelism_threads=self.settings['inter_threads']))
 		with tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=self.settings['intra_threads'],\
 											inter_op_parallelism_threads=self.settings['inter_threads'])) as sess:
-			self._initialize_optimizer(sess)
 
+			self._initialize_optimizer(sess)
 			# After optimizer is instantiated, we call the global variables initializer
 			sess.run(tf.global_variables_initializer())
-
-			# random_state = np.random.RandomState(seed = 0)
-			# w_0 = random_state.randn(problem.dimension)
-			# sess.run(problem._assignment_ops,feed_dict = {problem._assignment_placeholder:w_0})
+			# Load initial guess if requested:
+			if w_0 is not None:
+				if type(w_0) is list:
+					self._problem._NN.set_weights(w_0)
+				else:
+					try:
+						sess.run(self.problem._assignment_ops,feed_dict = {self.problem._assignment_placeholder:w_0})
+					except:
+						print(80*'#')
+						print('Issue setting weights manually'.center(80))
+						print('tf.global_variables_initializer used to initial instead'.center(80))		
+			else:
+				pass
+				# random_state = np.random.RandomState(seed = 0)
+				# w_0 = random_state.randn(problem.dimension)
+				# sess.run(problem._assignment_ops,feed_dict = {problem._assignment_placeholder:w_0})
 
 			if self.settings['verbose']:
 				print(80*'#')
@@ -150,30 +172,41 @@ class HessianlearnModel(ABC):
 			max_test_acc = -np.inf
 			t0 = time.time()
 			for i, (data_g,data_H) in enumerate(zip(self.data.train,self.data.hess_train)):
+				# Unpack data pairs
 				x_batch,y_batch = data_g
 				x_hess, y_hess = data_H
-
-				feed_dict = {self.problem.x: x_batch}
+				# Instantiate data dictionaries for this iteration
+				train_dict = {self.problem.x: x_batch}
 				hess_dict = {self.problem.x: x_hess}
-
-				norm_g, loss_train, accuracy_train = sess.run([self.problem.norm_g,self.problem.loss,self.problem.accuracy],feed_dict)
-				# logger['||g||'][i] = norm_g
-				# logger['loss'][i] = loss_train
-				# logger['accuracy_train'][i] = accuracy_train
-				# logger['time'][i] = time.time() - t0
-				
-				# logger['sweeps'][i] = sweeps
-				loss_test,	accuracy_test = sess.run([self.problem.loss,self.problem.accuracy],test_dict)
-				# logger['accuracy_test'][i] = accuracy_test
-				# logger['loss_test'][i] = loss_test
+				# Log time / sweep number
+				# Every element of dictionary is 
+				# keyed by the optimization iteration
+				self._logger['time'][i] = time.time() - t0
+				self._logger['sweeps'][i] = sweeps
+				# Log information for training data
+				if hasattr(self.problem,'accuracy'):
+					norm_g, loss_train, accuracy_train = sess.run([self.problem.norm_g,self.problem.loss,self.problem.accuracy],train_dict)
+					self._logger['accuracy_train'][i] = accuracy_train
+				else:
+					norm_g, loss_train = sess.run([self.problem.norm_g,self.problem.loss],train_dict)
+				self._logger['||g||'][i] = norm_g
+				self._logger['loss_train'][i] = loss_train
+				# Log for test data
+				if hasattr(self.problem,'accuracy'):
+					loss_test,	accuracy_test = sess.run([self.problem.loss,self.problem.accuracy],test_dict)
+					self._logger['accuracy_test'][i] = accuracy_test
+				else:
+					loss_test = sess.run(self.problem.loss,test_dict)
+				self._logger['loss_test'][i] = loss_test
 				min_test_loss = min(min_test_loss,loss_test)
 				max_test_acc = max(max_test_acc,accuracy_test)
+
 				if accuracy_test == max_test_acc:
 					self._best_weights = sess.run(self.problem._w)
-				# 	if len(logger['best_weight']) > 2:
-				# 		logger['best_weight'].pop(0)
-				# 	acc_weight_tuple = (accuracy_test,accuracy_train,sess.run(problem._flat_w))
-				# 	logger['best_weight'].append(acc_weight_tuple) 
+					if len(self._logger['best_weight']) > 2:
+						self._logger['best_weight'].pop(0)
+					acc_weight_tuple = (accuracy_test,accuracy_train,sess.run(self.problem._flat_w))
+					self._logger['best_weight'].append(acc_weight_tuple) 
 
 				sweeps = np.dot(self.data.batch_factor,self.optimizer.sweeps)
 				if self.settings['verbose'] and i % 1 == 0:
@@ -185,9 +218,15 @@ class HessianlearnModel(ABC):
 						print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:11}'.format(\
 							sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
 				try:
-					self.optimizer.minimize(feed_dict,hessian_feed_dict=hess_dict)
+					self.optimizer.minimize(train_dict,hessian_feed_dict=hess_dict)
 				except:
-					self.optimizer.minimize(feed_dict)
+					self.optimizer.minimize(train_dict)
+
+				if i+1 == sgd_iterations_first:
+					print('Switching to selected optimizer')
+					current_sweeps = self.optimizer.sweeps
+					self._initialize_optimizer(sess)
+					self.optimizer._sweeps = current_sweeps
 
 				if sweeps > max_sweeps:
 					break
@@ -197,18 +236,21 @@ class HessianlearnModel(ABC):
 		except:
 			pass
 
-	# try:
-	# 	os.makedirs('results/')
-	# except:
-	# 	pass
-	# with open('results/'+ outname +'.pkl', 'wb+') as f:
-	# 	pickle.dump(logger, f, pickle.HIGHEST_PROTOCOL)
+		try:
+			os.makedirs('logging/')
+		except:
+			pass
+
+		with open('logging/'+ outname +'.pkl', 'wb+') as f:
+			pickle.dump(logger, f, pickle.HIGHEST_PROTOCOL)
 
 
 		
 
-	def _initialize_optimizer(self, sess):
-		settings = self.settings
+	def _initialize_optimizer(self, sess,settings = None):
+		if settings == None:
+			settings = self.settings
+
 		# assert self.sess is not None
 		if settings['optimizer'] == 'adam':
 			print(('Using Adam optimizer').center(80))
@@ -269,8 +311,27 @@ class HessianlearnModel(ABC):
 
 
 
-		def _initialize_logging(self):
-			pass
+	def _initialize_logging(self):
+		# Initialize Logging 
+		logger = {}
+		logger['dimension'] = self.problem.dimension
+		logger['loss_train'] = {}
+		logger['loss_test'] = {}
+		logger['||g||'] ={}
+		logger['sweeps'] = {}
+		logger['time'] = {}
+		logger['best_weight'] = []
+
+		logger['accuracy_test'] = {}
+		logger['accuracy_train'] = {}
+
+		if self.settings['record_spectrum']:
+			logger['lambdases'] = {}
+			logger['lambdases_full'] = {}
+			logger['lambdases_test'] = {}
+			logger['rq_std'] = {}
+
+		self._logger = logger
 
 
 

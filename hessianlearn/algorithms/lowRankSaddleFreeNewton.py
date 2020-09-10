@@ -91,6 +91,8 @@ class LowRankSaddleFreeNewton(Optimizer):
 		
 		gradient = self.sess.run(self.grad,feed_dict = feed_dict)
 
+		# print('||g|| = ',np.linalg.norm(gradient))
+
 		alpha = self.parameters['alpha']
 		rank = self.parameters['hessian_low_rank']
 		H = lambda x: self.H_w_hat(x,hessian_feed_dict)
@@ -101,6 +103,8 @@ class LowRankSaddleFreeNewton(Optimizer):
 		Lmbda_abs = np.abs(Lmbda)
 		Lmbda_diags = diags(Lmbda_abs)
 
+		# print('Lmbda_abs = ',Lmbda_abs)
+
 		if self.regularization.parameters['gamma'] < 1e-4:
 			alpha_damping = self.parameters['default_damping']
 		else:
@@ -109,9 +113,6 @@ class LowRankSaddleFreeNewton(Optimizer):
 		D_denominator = Lmbda_abs + alpha_damping*np.ones_like(Lmbda_abs)
 
 		D = np.divide(Lmbda_abs,D_denominator)
-
-
-
 
 		# Invert by applying terms in Woodbury formula:
 		UTg = np.dot(U.T,gradient)
