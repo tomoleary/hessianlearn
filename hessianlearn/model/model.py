@@ -63,7 +63,12 @@ def HessianlearnModelSettings(settings = {}):
 
 	settings['max_sweeps']					= [10,"Maximum number of times through the data (measured in epoch equivalents"]
 
+	#Settings for recording spectral information during training
 	settings['record_spectrum']         	= [False, "Boolean for recording spectrum during training"]
+	settings['spec_frequency'] 				= [1, "Frequency for recording of spectrum"]
+	settings['rayleigh_quotients']         	= [True, "Boolean for recording of spectral variance during training"]
+	settings['rq_data_size'] 				= [None,"Amount of training data to be used, None means all"]
+	settings['rq_samps']					= [100,"Number of partitions used for sample average statistics of RQs"]
 
 	return ParameterList(settings)
 
@@ -160,8 +165,10 @@ class HessianlearnModel(ABC):
 															'Loss_test'.center(8), 'acc test'.center(8),'max test'.center(8), 'alpha'.center(8)))
 
 			x_test, y_test = next(iter(self.data.test))
-
-			test_dict = {self.problem.x: x_test}
+			if self.problem.is_autoencoder:
+				test_dict = {self.problem.x: x_test}
+			else:
+				test_dict = {self.problem.x: x_test,self.problem.y_true: y_test}
 
 			# Iteration Loop
 			max_sweeps = self.settings['max_sweeps']
@@ -176,8 +183,12 @@ class HessianlearnModel(ABC):
 				x_batch,y_batch = data_g
 				x_hess, y_hess = data_H
 				# Instantiate data dictionaries for this iteration
-				train_dict = {self.problem.x: x_batch}
-				hess_dict = {self.problem.x: x_hess}
+				if self.problem.is_autoencoder:
+					train_dict = {self.problem.x: x_batch}
+					hess_dict = {self.problem.x: x_hess}
+				else:
+					train_dict = {self.problem.x: x_batch, self.problem.y_true: y_batch}
+					hess_dict = {self.problem.x: x_hess, self.problem.y_true: y_hess}
 				# Log time / sweep number
 				# Every element of dictionary is 
 				# keyed by the optimization iteration
@@ -222,11 +233,55 @@ class HessianlearnModel(ABC):
 				except:
 					self.optimizer.minimize(train_dict)
 
-				if i+1 == sgd_iterations_first:
-					print('Switching to selected optimizer')
-					current_sweeps = self.optimizer.sweeps
-					self._initialize_optimizer(sess)
-					self.optimizer._sweeps = current_sweeps
+				if self.settings['record_spectrum'] and i%self.settings['spec_frequency'] ==0:
+					k = 100
+					p = 10
+					if not os.path.isdir('rq_plots'):
+						os.mkdir('rq_plots')
+					
+					if self.settings['rayleigh_quotients']:
+						train_data_xs = self.data.train._data.x[0:self.settings['rq_data_size']]
+						train_data_ys = self.data.train._data.y[0:self.settings['rq_data_size']]
+						test_data_xs = self.data.test._data.x
+						test_data_ys = self.data.test._data.y
+						if self.problem.is_autoencoder:
+							full_train_dict = {self.problem.x:train_data_xs}
+							full_test_dict = {self.problem.x:test_data_xs}
+						else:
+							full_train_dict = {self.problem.x:train_data_xs,self.problem.y_true:train_data_ys}
+							full_test_dict = {self.problem.x:test_data_xs,self.problem.y_true:test_data_ys}
+
+						d_full, U_full = low_rank_hessian(optimizer,full_train_dict,k,p,verbose=True)
+						self._logger['lambdases_full'][i] = d_full
+						RQ_samples = np.zeros((self.settings['rq_samps'],U_full.shape[1]))
+						chunk_size = int(train_data_xs.shape[0]/self.settings['rq_samps'])
+						for samp_i in range(settings['rq_samps']):
+							print('RQ for sample i = ',samp_i)
+							my_chunk_x = train_data_xs[(samp_i)*chunk_size:(samp_i+1)*chunk_size]
+							my_chunk_y = train_data_ys[(samp_i)*chunk_size:(samp_i+1)*chunk_size]
+							if self.problem.is_autoencoder:
+								sample_dict = {self.problem.x: my_chunk_x}
+							else:
+								sample_dict = {self.problem.x: my_chunk_x, self.problem.y_true: my_chunk_y}
+							H_sample = lambda x: optimizer.H_w_hat(x,sample_dict)
+							RQ_samples[samp_i] = rayleigh_quotients(H_sample,U_full)
+						RQ_sample_std = np.std(RQ_samples,axis = 0)
+						logger['rq_std'][i] = RQ_sample_std
+						ranks = np.arange(U_full.shape[1])
+						# try:
+						# 	continuous_sorted_error_bar_plot(ranks,d_full,RQ_sample_std,\
+						# 			axis_label = ['i','$|\lambda_i|$','Eigenvalue uncertainty at iteration'+str(i)],
+						# 			out_name = 'rq_plots/'+outname+'_'+str(i))
+						# except:
+						# 	pass
+					else:
+						# d,_ = low_rank_hessian(optimizer,hess_dict,k)
+						# logger['lambdases'][i] = d
+						d_full,_ = low_rank_hessian(optimizer,feed_dict,k)
+						logger['lambdases_full'][i] = d_full
+						# d_test,_ = low_rank_hessian(optimizer,test_dict,k)
+						# logger['lambdases_test'][i] = d_test
+						print('We made it')
 
 				if sweeps > max_sweeps:
 					break
