@@ -213,6 +213,6 @@ data = (x_test, y_test)
 plot_results(models,
              data,
              batch_size=settings['batch_size'],
-             model_name="vae_mlp")
+             model_name= HLModelSettings['optimizer']+'_vae_mlp')
 
 
