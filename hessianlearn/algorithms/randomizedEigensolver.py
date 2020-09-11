@@ -76,8 +76,12 @@ def randomized_eigensolver(Aop, n, k, p = None,seed = 0,verbose = False):
     >>> p = 5
     >>> lmbda, U = randomized_eigensolver(Aop, n, k, p)
     """
-    if p is None:
+    if n == k:
+        p = 0
+    elif p is None:
         p = int(0.01*k)
+        if k+p > n:
+            p = n - k
     random_state = np.random.RandomState(seed=seed)
     Omega = random_state.randn(n,k+p)
     n  = Omega.shape[0]  

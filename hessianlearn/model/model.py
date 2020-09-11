@@ -29,7 +29,7 @@ import sys, os, pickle, time, datetime
 # from hessianlearn import *
 
 from ..utilities.parameterList import ParameterList
-from ..utilities.rayleigh_quotients import rayleigh_quotients
+from ..utilities.rayleighQuotients import rayleigh_quotients
 
 # from ..algorithms import *
 
@@ -225,8 +225,14 @@ class HessianlearnModel(ABC):
 		# Set outname for logging file
 		if self.settings['logger_outname'] is None:
 			logger_outname = str(datetime.date.today())+'-'+self.settings['optimizer']+'-d_W='+str(self.problem.dimension)
+			if self.settings['optimizer'] in ['lrsfn','incg','gd']:
+				if self.settings['fixed_step']:
+					logger_outname += str(self.settings['alpha'])
+			else:
+				logger_outname += str(self.settings['alpha'])
+
 			if self.settings['problem_name'] is not None:
-				logger_outname = self.settings['problem_name']+logger_outname
+				logger_outname = self.settings['problem_name']+'-'+logger_outname
 		else:
 			logger_outname = self.settings['logger_outname']
 		self.logger_outname = logger_outname
