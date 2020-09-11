@@ -128,7 +128,7 @@ regularization = L2Regularization(problem,gamma = settings['tikhonov_gamma'])
 # Instantiate the model object
 HLModelSettings = HessianlearnModelSettings()
 
-HLModelSettings['optimizer'] = 'sgd'
+HLModelSettings['optimizer'] = 'lrsfn'
 HLModelSettings['alpha'] = 5e-4
 HLModelSettings['fixed_step'] = False
 HLModelSettings['sfn_lr'] = 20
