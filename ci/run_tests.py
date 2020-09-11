@@ -15,26 +15,8 @@
 # Author: Tom O'Leary-Roseberry
 # Contact: tom.olearyroseberry@utexas.edu
 
-language: python
-python:
-  - "3.5"
-  - "3.6"
-install:
-  - sudo apt-get update
-  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-  - bash miniconda.sh -b -p $HOME/miniconda
-  - source "$HOME/miniconda/etc/profile.d/conda.sh"
-  - hash -r
-  - "export PYTHONPATH=$PYTHONPATH:$(pwd)"
-  - conda config --set always_yes yes --set changeps1 no
-  - conda update -q conda
-  # # Useful for debugging any issues with conda
-  # - conda info -a
-  # Replace dep1 dep2 ... with your dependencies
-  - conda create -n hessianlearn2 python=$TRAVIS_PYTHON_VERSION tensorflow scipy
-  - conda activate hessianlearn2
-  # # - python setup.py install
-script:
-  # - ls -l 
-  # - ls ci/
-  - python ci/run_tests.py
+import os
+
+# Run randomized eigenvalue test
+os.system('python hessianlearn/test/test_randomizedEigensolver')
+
