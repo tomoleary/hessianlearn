@@ -104,7 +104,6 @@ def randomized_eigensolver(Aop, n, k, p = None,seed = 0,verbose = False):
             for i in range(m):
                 # print(i,)
                 Y[:,i] = Aop(Omega[:,i])
-        print('type(Y) = ',type(Y))
         # print('condition number for Y = ',np.linalg.cond(Y))
         Q,_ = qr(Y, mode = 'economic')
         T = np.zeros((m,m),dtype = 'd')

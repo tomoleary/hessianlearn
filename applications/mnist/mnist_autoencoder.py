@@ -33,7 +33,7 @@ import sys
 sys.path.append( os.environ.get('HESSIANLEARN_PATH', "../../"))
 from hessianlearn import *
 
-import pickle
+tf.set_random_seed(0)
 
 settings = {}
 # Set run specifications
@@ -83,8 +83,21 @@ regularization = L2Regularization(problem,gamma = settings['tikhonov_gamma'])
 
 ################################################################################
 # Instantiate the model object
+HLModelSettings = HessianlearnModelSettings()
 
-HLModel = HessianlearnModel(problem,regularization,data)
+HLModelSettings['optimizer'] = 'lrsfn'
+HLModelSettings['alpha'] = 1e-2
+HLModelSettings['fixed_step'] = False
+HLModelSettings['sfn_lr'] = 20
+HLModelSettings['max_backtrack'] = 16
+HLModelSettings['max_sweeps'] = 50
+
+HLModelSettings['problem_name'] = 'mnist_ae'
+HLModelSettings['record_spectrum'] = False
+HLModelSettings['rq_data_size'] = 100
+
+
+HLModel = HessianlearnModel(problem,regularization,data,settings = HLModelSettings)
 
 HLModel.fit()
 
@@ -102,24 +115,26 @@ decoder = tf.keras.models.Model(encoded_input, decoder_layer(encoded_input))
 encoded_imgs = encoder.predict(x_test)
 decoded_imgs = decoder.predict(encoded_imgs)
 
-import matplotlib.pyplot as plt
+try:
+	import matplotlib.pyplot as plt
 
-n = 10  # how many digits we will display
-plt.figure(figsize=(20, 4))
-for i in range(n):
-    # display original
-    ax = plt.subplot(2, n, i + 1)
-    plt.imshow(x_test[i].reshape(28, 28))
-    plt.gray()
-    ax.get_xaxis().set_visible(False)
-    ax.get_yaxis().set_visible(False)
+	n = 10  # how many digits we will display
+	plt.figure(figsize=(20, 4))
+	for i in range(n):
+	    # display original
+	    ax = plt.subplot(2, n, i + 1)
+	    plt.imshow(x_test[i].reshape(28, 28))
+	    plt.gray()
+	    ax.get_xaxis().set_visible(False)
+	    ax.get_yaxis().set_visible(False)
 
-    # display reconstruction
-    ax = plt.subplot(2, n, i + 1 + n)
-    plt.imshow(decoded_imgs[i].reshape(28, 28))
-    plt.gray()
-    ax.get_xaxis().set_visible(False)
-    ax.get_yaxis().set_visible(False)
-plt.show()
-
+	    # display reconstruction
+	    ax = plt.subplot(2, n, i + 1 + n)
+	    plt.imshow(decoded_imgs[i].reshape(28, 28))
+	    plt.gray()
+	    ax.get_xaxis().set_visible(False)
+	    ax.get_yaxis().set_visible(False)
+	plt.show()
+except:
+	pass
 

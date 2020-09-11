@@ -33,8 +33,6 @@ import sys
 sys.path.append( os.environ.get('HESSIANLEARN_PATH', "../../"))
 from hessianlearn import *
 
-import pickle
-
 tf.set_random_seed(0)
 
 settings = {}
@@ -129,6 +127,7 @@ regularization = L2Regularization(problem,gamma = settings['tikhonov_gamma'])
 ################################################################################
 # Instantiate the model object
 HLModelSettings = HessianlearnModelSettings()
+
 HLModelSettings['optimizer'] = 'sgd'
 HLModelSettings['alpha'] = 5e-4
 HLModelSettings['fixed_step'] = False
@@ -136,11 +135,14 @@ HLModelSettings['sfn_lr'] = 20
 HLModelSettings['max_backtrack'] = 16
 HLModelSettings['max_sweeps'] = 50
 
+HLModelSettings['problem_name'] = 'mnist_vae'
+
 
 HLModel = HessianlearnModel(problem,regularization,data,settings = HLModelSettings)
 
 
-HLModel.fit()
+# Can pass in an initial guess for the weights w_0 to the method fit, if desired.
+HLModel.fit(w_0 = None)
 
 ################################################################################
 # Post processing

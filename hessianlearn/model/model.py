@@ -23,13 +23,13 @@ if int(tf.__version__[0]) > 1:
 	import tensorflow.compat.v1 as tf
 	tf.disable_v2_behavior()
 from abc import ABC, abstractmethod
-import time
 
-# import sys, os
+import sys, os, pickle, time, datetime
 # sys.path.append( os.environ.get('HESSIANLEARN_PATH', "../../"))
 # from hessianlearn import *
 
 from ..utilities.parameterList import ParameterList
+from ..utilities.rayleigh_quotients import rayleigh_quotients
 
 # from ..algorithms import *
 
@@ -41,13 +41,16 @@ from ..algorithms.gradientDescent import GradientDescent
 # from ..algorithms.inexactNewtonGMRES import InexactNewtonGMRES
 # from ..algorithms.minresSolver import MINRESSolver
 # from ..algorithms.inexactNewtonMINRES import InexactNewtonMINRES
-# from ..algorithms.randomizedEigensolver import *
+from ..algorithms.randomizedEigensolver import *
 from ..problem.regularization import L2Regularization
 from ..algorithms.lowRankSaddleFreeNewton import LowRankSaddleFreeNewton
 
 
 
 def HessianlearnModelSettings(settings = {}):
+	settings['problem_name']         		= [None, "string for name used in file naming"]
+	settings['logger_outname']         		= [None, "string for name used in logger file naming"]
+
 	settings['verbose']         			= [True, "Boolean for printing"]
 
 	settings['intra_threads']         		= [2, "Setting for intra op parallelism"]
@@ -65,10 +68,12 @@ def HessianlearnModelSettings(settings = {}):
 
 	#Settings for recording spectral information during training
 	settings['record_spectrum']         	= [False, "Boolean for recording spectrum during training"]
-	settings['spec_frequency'] 				= [1, "Frequency for recording of spectrum"]
+	settings['spec_frequency'] 				= [10, "Frequency for recording of spectrum"]
 	settings['rayleigh_quotients']         	= [True, "Boolean for recording of spectral variance during training"]
 	settings['rq_data_size'] 				= [None,"Amount of training data to be used, None means all"]
 	settings['rq_samps']					= [100,"Number of partitions used for sample average statistics of RQs"]
+	settings['target_rank']					= [100,"Target rank for randomized eigenvalue solver"]
+	settings['oversample']					= [10,"Oversampling for randomized eigenvalue solver"]
 
 	return ParameterList(settings)
 
@@ -125,187 +130,12 @@ class HessianlearnModel(ABC):
 	@property
 	def logger(self):
 		return self._logger
-	
-	
-
-
-	def _fit(self,options = None, w_0 = None):
-		# Consider doing scope managed sess
-		# For now I will use the sess as a member variable
-		# self._sess = tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=self.settings['intra_threads'],\
-		# 									inter_op_parallelism_threads=self.settings['inter_threads']))
-		with tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=self.settings['intra_threads'],\
-											inter_op_parallelism_threads=self.settings['inter_threads'])) as sess:
-
-			self._initialize_optimizer(sess)
-			# After optimizer is instantiated, we call the global variables initializer
-			sess.run(tf.global_variables_initializer())
-			# Load initial guess if requested:
-			if w_0 is not None:
-				if type(w_0) is list:
-					self._problem._NN.set_weights(w_0)
-				else:
-					try:
-						sess.run(self.problem._assignment_ops,feed_dict = {self.problem._assignment_placeholder:w_0})
-					except:
-						print(80*'#')
-						print('Issue setting weights manually'.center(80))
-						print('tf.global_variables_initializer used to initial instead'.center(80))		
-			else:
-				pass
-				# random_state = np.random.RandomState(seed = 0)
-				# w_0 = random_state.randn(problem.dimension)
-				# sess.run(problem._assignment_ops,feed_dict = {problem._assignment_placeholder:w_0})
-
-			if self.settings['verbose']:
-				print(80*'#')
-				# First print
-				print('{0:8} {1:11} {2:11} {3:11} {4:11} {5:11} {6:11} {7:11}'.format(\
-										'Sweeps'.center(8),'Loss'.center(8),'acc train'.center(8),'||g||'.center(8),\
-															'Loss_test'.center(8), 'acc test'.center(8),'max test'.center(8), 'alpha'.center(8)))
-
-			x_test, y_test = next(iter(self.data.test))
-			if self.problem.is_autoencoder:
-				test_dict = {self.problem.x: x_test}
-			else:
-				test_dict = {self.problem.x: x_test,self.problem.y_true: y_test}
-
-			# Iteration Loop
-			max_sweeps = self.settings['max_sweeps']
-			train_data = iter(self.data.train)
-			x_batch,y_batch = next(train_data)
-			sweeps = 0
-			min_test_loss = np.inf
-			max_test_acc = -np.inf
-			t0 = time.time()
-			for i, (data_g,data_H) in enumerate(zip(self.data.train,self.data.hess_train)):
-				# Unpack data pairs
-				x_batch,y_batch = data_g
-				x_hess, y_hess = data_H
-				# Instantiate data dictionaries for this iteration
-				if self.problem.is_autoencoder:
-					train_dict = {self.problem.x: x_batch}
-					hess_dict = {self.problem.x: x_hess}
-				else:
-					train_dict = {self.problem.x: x_batch, self.problem.y_true: y_batch}
-					hess_dict = {self.problem.x: x_hess, self.problem.y_true: y_hess}
-				# Log time / sweep number
-				# Every element of dictionary is 
-				# keyed by the optimization iteration
-				self._logger['time'][i] = time.time() - t0
-				self._logger['sweeps'][i] = sweeps
-				# Log information for training data
-				if hasattr(self.problem,'accuracy'):
-					norm_g, loss_train, accuracy_train = sess.run([self.problem.norm_g,self.problem.loss,self.problem.accuracy],train_dict)
-					self._logger['accuracy_train'][i] = accuracy_train
-				else:
-					norm_g, loss_train = sess.run([self.problem.norm_g,self.problem.loss],train_dict)
-				self._logger['||g||'][i] = norm_g
-				self._logger['loss_train'][i] = loss_train
-				# Log for test data
-				if hasattr(self.problem,'accuracy'):
-					loss_test,	accuracy_test = sess.run([self.problem.loss,self.problem.accuracy],test_dict)
-					self._logger['accuracy_test'][i] = accuracy_test
-				else:
-					loss_test = sess.run(self.problem.loss,test_dict)
-				self._logger['loss_test'][i] = loss_test
-				min_test_loss = min(min_test_loss,loss_test)
-				max_test_acc = max(max_test_acc,accuracy_test)
-
-				if accuracy_test == max_test_acc:
-					self._best_weights = sess.run(self.problem._w)
-					if len(self._logger['best_weight']) > 2:
-						self._logger['best_weight'].pop(0)
-					acc_weight_tuple = (accuracy_test,accuracy_train,sess.run(self.problem._flat_w))
-					self._logger['best_weight'].append(acc_weight_tuple) 
-
-				sweeps = np.dot(self.data.batch_factor,self.optimizer.sweeps)
-				if self.settings['verbose'] and i % 1 == 0:
-					# Print once each epoch
-					try:
-						print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:1.4e}'.format(\
-							sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
-					except:
-						print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:11}'.format(\
-							sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
-				try:
-					self.optimizer.minimize(train_dict,hessian_feed_dict=hess_dict)
-				except:
-					self.optimizer.minimize(train_dict)
-
-				if self.settings['record_spectrum'] and i%self.settings['spec_frequency'] ==0:
-					k = 100
-					p = 10
-					if not os.path.isdir('rq_plots'):
-						os.mkdir('rq_plots')
-					
-					if self.settings['rayleigh_quotients']:
-						train_data_xs = self.data.train._data.x[0:self.settings['rq_data_size']]
-						train_data_ys = self.data.train._data.y[0:self.settings['rq_data_size']]
-						test_data_xs = self.data.test._data.x
-						test_data_ys = self.data.test._data.y
-						if self.problem.is_autoencoder:
-							full_train_dict = {self.problem.x:train_data_xs}
-							full_test_dict = {self.problem.x:test_data_xs}
-						else:
-							full_train_dict = {self.problem.x:train_data_xs,self.problem.y_true:train_data_ys}
-							full_test_dict = {self.problem.x:test_data_xs,self.problem.y_true:test_data_ys}
-
-						d_full, U_full = low_rank_hessian(optimizer,full_train_dict,k,p,verbose=True)
-						self._logger['lambdases_full'][i] = d_full
-						RQ_samples = np.zeros((self.settings['rq_samps'],U_full.shape[1]))
-						chunk_size = int(train_data_xs.shape[0]/self.settings['rq_samps'])
-						for samp_i in range(settings['rq_samps']):
-							print('RQ for sample i = ',samp_i)
-							my_chunk_x = train_data_xs[(samp_i)*chunk_size:(samp_i+1)*chunk_size]
-							my_chunk_y = train_data_ys[(samp_i)*chunk_size:(samp_i+1)*chunk_size]
-							if self.problem.is_autoencoder:
-								sample_dict = {self.problem.x: my_chunk_x}
-							else:
-								sample_dict = {self.problem.x: my_chunk_x, self.problem.y_true: my_chunk_y}
-							H_sample = lambda x: optimizer.H_w_hat(x,sample_dict)
-							RQ_samples[samp_i] = rayleigh_quotients(H_sample,U_full)
-						RQ_sample_std = np.std(RQ_samples,axis = 0)
-						logger['rq_std'][i] = RQ_sample_std
-						ranks = np.arange(U_full.shape[1])
-						# try:
-						# 	continuous_sorted_error_bar_plot(ranks,d_full,RQ_sample_std,\
-						# 			axis_label = ['i','$|\lambda_i|$','Eigenvalue uncertainty at iteration'+str(i)],
-						# 			out_name = 'rq_plots/'+outname+'_'+str(i))
-						# except:
-						# 	pass
-					else:
-						# d,_ = low_rank_hessian(optimizer,hess_dict,k)
-						# logger['lambdases'][i] = d
-						d_full,_ = low_rank_hessian(optimizer,feed_dict,k)
-						logger['lambdases_full'][i] = d_full
-						# d_test,_ = low_rank_hessian(optimizer,test_dict,k)
-						# logger['lambdases_test'][i] = d_test
-						print('We made it')
-
-				if sweeps > max_sweeps:
-					break
-		# The weights need to be manually set once the session scope is closed.
-		try:
-			self._problem._NN.set_weights(self._best_weights)
-		except:
-			pass
-
-		try:
-			os.makedirs('logging/')
-		except:
-			pass
-
-		with open('logging/'+ outname +'.pkl', 'wb+') as f:
-			pickle.dump(logger, f, pickle.HIGHEST_PROTOCOL)
-
-
-		
 
 	def _initialize_optimizer(self, sess,settings = None):
 		if settings == None:
 			settings = self.settings
 
+		self._logger['optimizer'] = settings['optimizer']
 		# assert self.sess is not None
 		if settings['optimizer'] == 'adam':
 			print(('Using Adam optimizer').center(80))
@@ -376,26 +206,204 @@ class HessianlearnModel(ABC):
 		logger['sweeps'] = {}
 		logger['time'] = {}
 		logger['best_weight'] = []
+		logger['optimizer'] = None
 
 		logger['accuracy_test'] = {}
 		logger['accuracy_train'] = {}
 
 		if self.settings['record_spectrum']:
-			logger['lambdases'] = {}
-			logger['lambdases_full'] = {}
-			logger['lambdases_test'] = {}
+			logger['full_train_eigenvalues'] = {}
+			logger['train_eigenvalues'] = {}
+			logger['test_eigenvalues'] = {}
 			logger['rq_std'] = {}
 
 		self._logger = logger
 
+		if not os.path.isdir('logging/'):
+			os.makedirs('logging/')
+
+		# Set outname for logging file
+		if self.settings['logger_outname'] is None:
+			logger_outname = str(datetime.date.today())+'-'+self.settings['optimizer']+'-d_W='+str(self.problem.dimension)
+			if self.settings['problem_name'] is not None:
+				logger_outname = self.settings['problem_name']+logger_outname
+		else:
+			logger_outname = self.settings['logger_outname']
+		self.logger_outname = logger_outname
+	
 
 
+	def _fit(self,options = None, w_0 = None):
+		# Consider doing scope managed sess
+		# For now I will use the sess as a member variable
+		# self._sess = tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=self.settings['intra_threads'],\
+		# 									inter_op_parallelism_threads=self.settings['inter_threads']))
+		with tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=self.settings['intra_threads'],\
+											inter_op_parallelism_threads=self.settings['inter_threads'])) as sess:
 
+			self._initialize_optimizer(sess)
+			# After optimizer is instantiated, we call the global variables initializer
+			sess.run(tf.global_variables_initializer())
+			# Load initial guess if requested:
+			if w_0 is not None:
+				if type(w_0) is list:
+					self._problem._NN.set_weights(w_0)
+				else:
+					try:
+						sess.run(self.problem._assignment_ops,feed_dict = {self.problem._assignment_placeholder:w_0})
+					except:
+						print(80*'#')
+						print('Issue setting weights manually'.center(80))
+						print('tf.global_variables_initializer used to initial instead'.center(80))		
+			else:
+				pass
+				# random_state = np.random.RandomState(seed = 0)
+				# w_0 = random_state.randn(problem.dimension)
+				# sess.run(problem._assignment_ops,feed_dict = {problem._assignment_placeholder:w_0})
 
+			if self.settings['verbose']:
+				print(80*'#')
+				# First print
+				print('{0:8} {1:11} {2:11} {3:11} {4:11} {5:11} {6:11} {7:11}'.format(\
+										'Sweeps'.center(8),'Loss'.center(8),'acc train'.center(8),'||g||'.center(8),\
+															'Loss_test'.center(8), 'acc test'.center(8),'max test'.center(8), 'alpha'.center(8)))
+			x_test, y_test = next(iter(self.data.test))
+			if self.problem.is_autoencoder:
+				test_dict = {self.problem.x: x_test}
+			else:
+				test_dict = {self.problem.x: x_test,self.problem.y_true: y_test}
 
+			# Iteration Loop
+			max_sweeps = self.settings['max_sweeps']
+			train_data = iter(self.data.train)
+			x_batch,y_batch = next(train_data)
+			sweeps = 0
+			min_test_loss = np.inf
+			max_test_acc = -np.inf
+			t0 = time.time()
+			for iteration, (data_g,data_H) in enumerate(zip(self.data.train,self.data.hess_train)):
+				# Unpack data pairs
+				x_batch,y_batch = data_g
+				x_hess, y_hess = data_H
+				# Instantiate data dictionaries for this iteration
+				if self.problem.is_autoencoder:
+					train_dict = {self.problem.x: x_batch}
+					hess_dict = {self.problem.x: x_hess}
+				else:
+					train_dict = {self.problem.x: x_batch, self.problem.y_true: y_batch}
+					hess_dict = {self.problem.x: x_hess, self.problem.y_true: y_hess}
+				# Log time / sweep number
+				# Every element of dictionary is 
+				# keyed by the optimization iteration
+				self._logger['time'][iteration] = time.time() - t0
+				self._logger['sweeps'][iteration] = sweeps
+				# Log information for training data
+				if hasattr(self.problem,'accuracy'):
+					norm_g, loss_train, accuracy_train = sess.run([self.problem.norm_g,self.problem.loss,self.problem.accuracy],train_dict)
+					self._logger['accuracy_train'][iteration] = accuracy_train
+				else:
+					norm_g, loss_train = sess.run([self.problem.norm_g,self.problem.loss],train_dict)
+				self._logger['||g||'][iteration] = norm_g
+				self._logger['loss_train'][iteration] = loss_train
+				# Log for test data
+				if hasattr(self.problem,'accuracy'):
+					loss_test,	accuracy_test = sess.run([self.problem.loss,self.problem.accuracy],test_dict)
+					self._logger['accuracy_test'][iteration] = accuracy_test
+				else:
+					loss_test = sess.run(self.problem.loss,test_dict)
+				self._logger['loss_test'][iteration] = loss_test
+				min_test_loss = min(min_test_loss,loss_test)
+				max_test_acc = max(max_test_acc,accuracy_test)
 
+				if accuracy_test == max_test_acc:
+					self._best_weights = sess.run(self.problem._w)
+					if len(self._logger['best_weight']) > 2:
+						self._logger['best_weight'].pop(0)
+					acc_weight_tuple = (accuracy_test,accuracy_train,sess.run(self.problem._flat_w))
+					self._logger['best_weight'].append(acc_weight_tuple) 
 
+				sweeps = np.dot(self.data.batch_factor,self.optimizer.sweeps)
+				if self.settings['verbose'] and iteration % 1 == 0:
+					# Print once each epoch
+					try:
+						print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:1.4e}'.format(\
+							sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
+					except:
+						print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:11}'.format(\
+							sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
+				try:
+					self.optimizer.minimize(train_dict,hessian_feed_dict=hess_dict)
+				except:
+					self.optimizer.minimize(train_dict)
 
+				if self.settings['record_spectrum'] and iteration%self.settings['spec_frequency'] ==0:
+					self._record_spectrum(iteration)
+				with open('logging/'+ self.logger_outname +'.pkl', 'wb+') as f:
+					pickle.dump(self.logger, f, pickle.HIGHEST_PROTOCOL)
+
+				if sweeps > max_sweeps:
+					break
+
+		# The weights need to be manually set once the session scope is closed.
+		try:
+			self._problem._NN.set_weights(self._best_weights)
+		except:
+			pass
+
+	
+	def _record_spectrum(self,iteration):
+		k_rank = self.settings['target_rank']
+		p_oversample = self.settings['oversample']
+		
+		
+		if self.settings['rayleigh_quotients']:
+			train_data_xs = self.data.train._data.x[0:self.settings['rq_data_size']]
+			train_data_ys = self.data.train._data.y[0:self.settings['rq_data_size']]
+			test_data_xs = self.data.test._data.x
+			test_data_ys = self.data.test._data.y
+			if self.problem.is_autoencoder:
+				full_train_dict = {self.problem.x:train_data_xs}
+				full_test_dict = {self.problem.x:test_data_xs}
+			else:
+				full_train_dict = {self.problem.x:train_data_xs,self.problem.y_true:train_data_ys}
+				full_test_dict = {self.problem.x:test_data_xs,self.problem.y_true:test_data_ys}
+
+			d_full_train, U_full_train = low_rank_hessian(self.optimizer,full_train_dict,k_rank,p_oversample,verbose=True)
+			self._logger['full_train_eigenvalues'][iteration] = d_full_train
+			RQ_samples = np.zeros((self.settings['rq_samps'],U_full_train.shape[1]))
+			chunk_size = int(train_data_xs.shape[0]/self.settings['rq_samps'])
+			try:
+				from tqdm import tqdm
+				for samp_i in tqdm(range(self.settings['rq_samps'])):
+					my_chunk_x = train_data_xs[(samp_i)*chunk_size:(samp_i+1)*chunk_size]
+					my_chunk_y = train_data_ys[(samp_i)*chunk_size:(samp_i+1)*chunk_size]
+					if self.problem.is_autoencoder:
+						sample_dict = {self.problem.x: my_chunk_x}
+					else:
+						sample_dict = {self.problem.x: my_chunk_x, self.problem.y_true: my_chunk_y}
+					H_sample = lambda x: self.optimizer.H_w_hat(x,sample_dict)
+					RQ_samples[samp_i] = rayleigh_quotients(H_sample,U_full_train)
+			except:
+				for samp_i in range(self.settings['rq_samps']):
+					print('RQ for sample i = ',samp_i)
+					my_chunk_x = train_data_xs[(samp_i)*chunk_size:(samp_i+1)*chunk_size]
+					my_chunk_y = train_data_ys[(samp_i)*chunk_size:(samp_i+1)*chunk_size]
+					if self.problem.is_autoencoder:
+						sample_dict = {self.problem.x: my_chunk_x}
+					else:
+						sample_dict = {self.problem.x: my_chunk_x, self.problem.y_true: my_chunk_y}
+					H_sample = lambda x: self.optimizer.H_w_hat(x,sample_dict)
+					RQ_samples[samp_i] = rayleigh_quotients(H_sample,U_full_train)
+
+			RQ_sample_std = np.std(RQ_samples,axis = 0)
+			self._logger['rq_std'][iteration] = RQ_sample_std
+			ranks = np.arange(U_full_train.shape[1])
+
+		else:
+			d_full,_ = low_rank_hessian(self.optimizer,train_dict,k_rank,p_oversample)
+			self._logger['train_eigenvalues'][iteration] = d_full
+			d_test,_ = low_rank_hessian(self.optimizer,test_dict,k)
+			self._logger['test_eigenvalues'][iteration] = d_test
 
 
 
