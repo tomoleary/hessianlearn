@@ -18,5 +18,5 @@
 import os
 
 # Run randomized eigenvalue test
-os.system('python hessianlearn/test/test_randomizedEigensolver')
+os.system('python hessianlearn/test/test_randomizedEigensolver.py')
 
