@@ -30,7 +30,7 @@ class TestRandomizedEigensolver(unittest.TestCase):
 		n = 100
 		Q,_ = np.linalg.qr(my_state.randn(n,n))
 		d = np.concatenate((np.ones(10),np.exp(-np.arange(n-10))))
-		Aop = lambda x: Q@np.diag(d)@Q.T@x
+		Aop = lambda x: Q@np.diag(d)@(Q.T@x)
 		d_hl, Q_hl = randomized_eigensolver(Aop,100, 100)
 		assert np.linalg.norm(d[:50] - d_hl[0:50]) < 1e-10
 

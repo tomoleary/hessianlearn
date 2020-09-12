@@ -26,17 +26,37 @@ from scipy.linalg import cholesky, eigh, solve_triangular, qr, rq
 import time
 
 
+def block_range_finder(A_op,n,epsilon,block_size):
+    # Taken from http://people.maths.ox.ac.uk/martinsson/Pubs/2015_randQB.pdf
+    # Assumes A is symmetric
+    my_state = np.random.RandomState(seed=0)
+    W = my_state.randn(n,1)
+    Action = A_op(W)
+    big_Q = None
+    converged = False
+    iterator = 0
+    while not converged:
+        # Sample Gaussian random matrix
+        Omega = my_state.randn(n,block_size)
+        # Perform QR on action
+        Q,_ = np.linalg.qr(A_op(Omega))
+        # Update basis
+        if big_Q is None:
+            big_Q = Q
+        else:
+            Q -= big_Q@(big_Q.T@Q)
+            big_Q = np.concatenate((big_Q,Q),axis = 1)
+            big_Q,_ = np.linalg.qr(big_Q)
+        # Error estimation
+        Approximate_Error = Action - big_Q@(big_Q.T@Action)
+        error = np.linalg.norm(Approximate_Error)
+        converged = error < epsilon
+        iterator+=1 
+        if iterator > n//block_size:
+            break
+    return big_Q
 
 
-def adaptive_range_finder(Aop,n,rank_guess,tolerance, seed = 0):
-    # This case handles Hessians (symmetric matrices),
-    # So operation Aop(\cdot) is taken to also be its transpose
-    # In general case (SVD) one needs to work out matmult and transpmult
-    # and pass these into the range finder as well
-
-
-
-    pass
 
 def noise_aware_adaptive_range_finder(Aop,n,rank_guess,tolerance, noise_tolerance,seed = 0):
 

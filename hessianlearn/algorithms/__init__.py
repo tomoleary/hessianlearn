@@ -19,7 +19,7 @@ from __future__ import absolute_import, division, print_function
 
 from .randomizedEigensolver import low_rank_hessian, randomized_eigensolver
 
-from .rangeFinders import adaptive_range_finder, noise_aware_adaptive_range_finder
+from .rangeFinders import block_range_finder, noise_aware_adaptive_range_finder
 
 from .optimizer import Optimizer, ParametersOptimizer
 

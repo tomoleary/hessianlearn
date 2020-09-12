@@ -88,7 +88,7 @@ HLModelSettings = HessianlearnModelSettings()
 HLModelSettings['optimizer'] = 'lrsfn'
 HLModelSettings['alpha'] = 1e-2
 HLModelSettings['fixed_step'] = False
-HLModelSettings['sfn_lr'] = 20
+HLModelSettings['hessian_low_rank'] = 20
 HLModelSettings['max_backtrack'] = 16
 HLModelSettings['max_sweeps'] = 50
 
