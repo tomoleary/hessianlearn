@@ -49,6 +49,7 @@ from ..algorithms.lowRankSaddleFreeNewton import LowRankSaddleFreeNewton
 
 def HessianlearnModelSettings(settings = {}):
 	settings['problem_name']         		= [None, "string for name used in file naming"]
+	settings['title']         				= [None, "string for name used in plotting"]
 	settings['logger_outname']         		= [None, "string for name used in logger file naming"]
 
 	settings['verbose']         			= [True, "Boolean for printing"]
@@ -59,7 +60,7 @@ def HessianlearnModelSettings(settings = {}):
 	# Optimizer settings
 	settings['optimizer']                	= ['lrsfn', "String to denote choice of optimizer"]
 	settings['alpha']                		= [5e-2, "Initial steplength, or learning rate"]
-	settings['sfn_lr']						= [10, "Low rank to be used for LRSFN / SFN"]
+	settings['hessian_low_rank']			= [10, "Low rank to be used for LRSFN / SFN"]
 	settings['fixed_step']					= [False, " True means steps of length alpha will be taken at each iteration"]
 	settings['max_backtrack']				= [10, "Maximum number of backtracking iterations for each line search"]
 
@@ -95,8 +96,6 @@ class HessianlearnModel(ABC):
 			print(('Approximate data cardinality needed: '\
 				+str(int(float(self.problem.dimension)/float(self.problem.y_prediction.shape[-1].value)))).center(80))
 			print(80*'#')
-		# Initialize logging:
-		self._initialize_logging()
 
 		# self._sess = None
 		self._optimizer = None
@@ -143,12 +142,14 @@ class HessianlearnModel(ABC):
 			optimizer = Adam(self.problem,self.regularization,sess)
 			optimizer.parameters['alpha'] = settings['alpha']
 			optimizer.alpha = settings['alpha']
+			self._logger['alpha'] = settings['alpha']
 
 		elif settings['optimizer'] == 'gd':
 			print('Using gradient descent optimizer with line search'.center(80))
 			print(('Batch size = '+str(self.data._batch_size)).center(80))
 			optimizer = GradientDescent(self.problem,self.regularization,sess)
 			optimizer.parameters['globalization'] = 'line_search'
+			self._logger['globalization'] = 'line_search'
 			optimizer.parameters['max_backtracking_iter'] = 8
 		elif settings['optimizer'] == 'incg':
 			if not settings['fixed_step']:
@@ -157,6 +158,7 @@ class HessianlearnModel(ABC):
 				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
 				optimizer = InexactNewtonCG(self.problem,self.regularization,sess)
 				optimizer.parameters['globalization'] = 'line_search'
+				self._logger['globalization'] = 'line_search'
 				optimizer.parameters['max_backtracking_iter'] = settings['max_backtrack']
 			else:
 				print('Using inexact Newton CG optimizer with fixed step'.center(80))
@@ -165,31 +167,36 @@ class HessianlearnModel(ABC):
 				optimizer = InexactNewtonCG(self.problem,self.regularization,sess)
 				optimizer.parameters['globalization'] = 'None'
 				optimizer.alpha = settings['alpha']
+				self._logger['alpha'] = settings['alpha']
 		elif settings['optimizer'] == 'lrsfn':
+			self._logger['hessian_low_rank'] = settings['hessian_low_rank']
 			if not settings['fixed_step']:
 				print('Using low rank SFN optimizer with line search'.center(80))
 				print(('Batch size = '+str(self.data._batch_size)).center(80))
 				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
-				print(('Hessian low rank = '+str(settings['sfn_lr'])).center(80))
+				print(('Hessian low rank = '+str(settings['hessian_low_rank'])).center(80))
 				optimizer = LowRankSaddleFreeNewton(self.problem,self.regularization,sess)
 				optimizer.parameters['globalization'] = 'line_search'
+				self._logger['globalization'] = 'line_search'
 				optimizer.parameters['max_backtracking_iter'] = settings['max_backtrack']
-				optimizer.parameters['hessian_low_rank'] = settings['sfn_lr']
+				optimizer.parameters['hessian_low_rank'] = settings['hessian_low_rank']
 			else:
 				print('Using low rank SFN optimizer with fixed step'.center(80))
 				print(('Batch size = '+str(self.data._batch_size)).center(80))
 				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
-				print(('Hessian low rank = '+str(settings['sfn_lr'])).center(80))
+				print(('Hessian low rank = '+str(settings['hessian_low_rank'])).center(80))
 				optimizer = LowRankSaddleFreeNewton(self.problem,self.regularization,sess)
-				optimizer.parameters['hessian_low_rank'] = settings['sfn_lr']
+				optimizer.parameters['hessian_low_rank'] = settings['hessian_low_rank']
 				optimizer.parameters['alpha'] = settings['alpha']
 				optimizer.alpha = settings['alpha']
+				self._logger['alpha'] = settings['alpha']
 		elif settings['optimizer'] == 'sgd':
 			print(('Using stochastic gradient descent optimizer').center(80))
 			print(('Batch size = '+str(self._data._batch_size)).center(80))
 			optimizer = GradientDescent(self.problem,self.regularization,sess)
 			optimizer.parameters['alpha'] = settings['alpha']
 			optimizer.alpha = settings['alpha']
+			self._logger['alpha'] = settings['alpha']
 		else:
 			raise
 		self._optimizer = optimizer
@@ -200,6 +207,10 @@ class HessianlearnModel(ABC):
 		# Initialize Logging 
 		logger = {}
 		logger['dimension'] = self.problem.dimension
+		logger['problem_name'] = self.settings['problem_name']
+		logger['title'] = self.settings['title']
+		logger['batch_size'] = self.data._batch_size
+		logger['hessian_batch_size'] = self.data._hessian_batch_size
 		logger['loss_train'] = {}
 		logger['loss_test'] = {}
 		logger['||g||'] ={}
@@ -207,6 +218,9 @@ class HessianlearnModel(ABC):
 		logger['time'] = {}
 		logger['best_weight'] = []
 		logger['optimizer'] = None
+		logger['alpha'] = None
+		logger['globalization'] = None
+		logger['hessian_low_rank'] = None
 
 		logger['accuracy_test'] = {}
 		logger['accuracy_train'] = {}
@@ -224,12 +238,14 @@ class HessianlearnModel(ABC):
 
 		# Set outname for logging file
 		if self.settings['logger_outname'] is None:
-			logger_outname = str(datetime.date.today())+'-'+self.settings['optimizer']+'-d_W='+str(self.problem.dimension)
+			logger_outname = str(datetime.date.today())+'-'+self.settings['optimizer']+'-dW='+str(self.problem.dimension)
 			if self.settings['optimizer'] in ['lrsfn','incg','gd']:
 				if self.settings['fixed_step']:
-					logger_outname += str(self.settings['alpha'])
+					logger_outname += '-alpha='+str(self.settings['alpha'])
+				if self.settings['optimizer'] == 'lrsfn':
+					logger_outname += '-rank='+str(self.settings['hessian_low_rank'])
 			else:
-				logger_outname += str(self.settings['alpha'])
+				logger_outname += '-alpha='+str(self.settings['alpha'])
 
 			if self.settings['problem_name'] is not None:
 				logger_outname = self.settings['problem_name']+'-'+logger_outname
@@ -246,7 +262,9 @@ class HessianlearnModel(ABC):
 		# 									inter_op_parallelism_threads=self.settings['inter_threads']))
 		with tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=self.settings['intra_threads'],\
 											inter_op_parallelism_threads=self.settings['inter_threads'])) as sess:
-
+			# Initialize logging:
+			self._initialize_logging()
+			# Initialize the optimizer
 			self._initialize_optimizer(sess)
 			# After optimizer is instantiated, we call the global variables initializer
 			sess.run(tf.global_variables_initializer())
@@ -349,6 +367,12 @@ class HessianlearnModel(ABC):
 
 				if sweeps > max_sweeps:
 					break
+
+				if np.isnan(loss_train):
+					print(80*'#')
+					print('Encountered nan, exiting'.center(80))
+					print(80*'#')
+					return
 
 		# The weights need to be manually set once the session scope is closed.
 		try:

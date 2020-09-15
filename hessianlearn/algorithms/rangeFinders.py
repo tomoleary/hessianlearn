@@ -34,7 +34,7 @@ def block_range_finder(A_op,n,epsilon,block_size):
     Action = A_op(W)
     big_Q = None
     converged = False
-    iterator = 0
+    iteration = 0
     while not converged:
         # Sample Gaussian random matrix
         Omega = my_state.randn(n,block_size)
@@ -51,8 +51,8 @@ def block_range_finder(A_op,n,epsilon,block_size):
         Approximate_Error = Action - big_Q@(big_Q.T@Action)
         error = np.linalg.norm(Approximate_Error)
         converged = error < epsilon
-        iterator+=1 
-        if iterator > n//block_size:
+        iteration+=1 
+        if iteration > n//block_size:
             break
     return big_Q
 

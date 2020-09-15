@@ -271,8 +271,8 @@ class StaticIterator(object):
 		return self
 
 	def __next__(self):
-		if self.index > 0:
-			raise StopIteration
+		# if self.index > 0:
+		# 	raise StopIteration
 		next_x = self._data.x
 		next_y = self._data.y
 		self.index += 1
