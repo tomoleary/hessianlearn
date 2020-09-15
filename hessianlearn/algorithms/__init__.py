@@ -17,7 +17,7 @@
 
 from __future__ import absolute_import, division, print_function
 
-from .randomizedEigensolver import low_rank_hessian, randomized_eigensolver
+from .randomizedEigensolver import low_rank_hessian, randomized_eigensolver, eigensolver_from_range
 
 from .rangeFinders import block_range_finder, noise_aware_adaptive_range_finder
 

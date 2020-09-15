@@ -79,7 +79,7 @@ class MINRESSolver(ABC):
 		self.parameters = parameters
 
 		
-		self.Aop = self.problem.H_w_hat + self.regularization.H_w_hat
+		self.Aop = self.problem.H_action + self.regularization.H_action
 
 		# # Define preconditioner 
 		# if preconditioner is None:

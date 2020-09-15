@@ -106,7 +106,7 @@ class Problem(ABC):
 		# Define (g,dw) inner product
 		self._g_inner_w_hat = tf.tensordot(self._w_hat,self._gradient,axes = [[0],[0]])
 		# Define Hessian action Hdw
-		self._H_w_hat = my_flatten(tf.gradients(self._g_inner_w_hat,self._w,stop_gradients = self._w_hat,name = 'hessian_action'))
+		self._H_action = my_flatten(tf.gradients(self._g_inner_w_hat,self._w,stop_gradients = self._w_hat,name = 'hessian_action'))
 
 		# Define operations for updating and assigment used during training
 		self._update_placeholder = tf.placeholder(self.dtype,[self._dimension],name = 'update_placeholder')
@@ -176,8 +176,8 @@ class Problem(ABC):
 		return self._w_hat
 
 	@property
-	def H_w_hat(self):
-		return self._H_w_hat
+	def H_action(self):
+		return self._H_action
 
 	@property
 	def loss(self):

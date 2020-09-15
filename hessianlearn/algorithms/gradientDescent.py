@@ -36,7 +36,7 @@ def ParametersGradientDescent(parameters = {}):
 	parameters['max_NN_evals']                  = [None, "Maximum number of neural network evaluations"]
 	parameters['max_backtracking_iter']			= [10, 'max backtracking iterations for line search']
 
-	parameters['globalization']					= ['None', 'Choose from trust_region, line_search or none']
+	parameters['globalization']					= [None, 'Choose from trust_region, line_search or none']
 	# Reasons for convergence failure
 	parameters['reasons'] = [[], 'list of reasons for termination']
 
@@ -83,7 +83,7 @@ class GradientDescent(Optimizer):
 			p = self.alpha*w_dir
 			self._sweeps += [1+0.5*line_search_iter,0]
 
-		elif self.parameters['globalization'] == 'None':
+		elif self.parameters['globalization'] == None:
 			self.alpha = self.parameters['alpha']
 			p = -self.parameters['alpha']*g
 			self._sweeps += [1,0]

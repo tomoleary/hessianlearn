@@ -38,7 +38,7 @@ def ParametersAdam(parameters = {}):
 	parameters['max_NN_evals_per_batch']        = [10000, "Scale constant for maximum neural network evaluations per datum"]
 	parameters['max_NN_evals']                  = [None, "Maximum number of neural network evaluations"]
 
-	parameters['globalization']					= ['None', 'Choose from trust_region, line_search or none']
+	parameters['globalization']					= [None, 'Choose from trust_region, line_search or none']
 	# Reasons for convergence failure
 	parameters['reasons'] = [[], 'list of reasons for termination']
 

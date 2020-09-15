@@ -20,6 +20,7 @@ from __future__ import division
 from __future__ import print_function
 
 from abc import ABC, abstractmethod
+import numpy as np
 
 from ..utilities.parameterList import ParameterList
 
@@ -31,7 +32,7 @@ def ParametersOptimizer(dictionary = {}):
 	parameters['max_NN_evals_per_batch']        = [10000, "Scale constant for maximum neural network evaluations per datum"]
 	parameters['max_NN_evals']                  = [None, "Maximum number of neural network evaluations"]
 
-	parameters['globalization']					= ['None', 'Choose from trust_region, line_search or none']
+	parameters['globalization']					= [None, 'Choose from trust_region, line_search or none']
 	# Reasons for convergence failure
 	parameters['reasons'] = [[], 'list of reasons for termination']
 
@@ -90,7 +91,6 @@ class Optimizer(ABC):
 		"""
 		raise NotImplementedError("Child class should implement method minimize") 
 
-	# this will need to become H_w_hat
 
 
 	def _loss_at_candidate(self,p,feed_dict):
@@ -102,12 +102,35 @@ class Optimizer(ABC):
 		return misfit
 
 
-	def H_w_hat(self,x,feed_dict):
+	def H(self,x,feed_dict,verbose = False):
+		# Should this all be defined here?
+		import numpy as np
 		assert self.problem is not None
 		assert self.sess is not None
-
-		feed_dict[self.problem.w_hat] = x
-		H_w_hat = self.sess.run(self.problem.H_w_hat,feed_dict)
-		return H_w_hat
+		x_shape = x.shape
+		if len(x_shape) == 1:
+			feed_dict[self.problem.w_hat] = x
+			return self.sess.run(self.problem.H_action,feed_dict)
+		elif len(x_shape) == 2:
+			H_action = np.zeros_like(x)
+			if verbose:
+				try:
+					from tqdm import tqdm
+					for i in tqdm(range(x_shape[1])):
+						feed_dict[self.problem.w_hat] = x[:,i]
+						H_action[:,i] = self.sess.run(self.problem.H_action,feed_dict)
+				except:
+					print('No progress bar :(')
+					for i in range(x_shape[1]):
+						feed_dict[self.problem.w_hat] = x[:,i]
+						H_action[:,i] = self.sess.run(self.problem.H_action,feed_dict)
+			else:
+				for i in range(x_shape[1]):
+					feed_dict[self.problem.w_hat] = x[:,i]
+					H_action[:,i] = self.sess.run(self.problem.H_action,feed_dict)
+			return H_action
+		else:
+			raise
+		
 
 

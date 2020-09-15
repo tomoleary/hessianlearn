@@ -63,6 +63,11 @@ def HessianlearnModelSettings(settings = {}):
 	settings['hessian_low_rank']			= [10, "Low rank to be used for LRSFN / SFN"]
 	settings['fixed_step']					= [False, " True means steps of length alpha will be taken at each iteration"]
 	settings['max_backtrack']				= [10, "Maximum number of backtracking iterations for each line search"]
+	# Range finding settings for LRSFN
+	settings['range_finding']				= [None,"Range finding, if None then r = hessian_low_rank\
+	 														Choose from None, 'arf', 'naarf'"]
+	settings['range_rel_error_tolerance']   = [10, "Error tolerance for error estimator in adaptive range finding"]
+	settings['range_block_size']        	= [5, "Block size used in range finder"]
 
 
 	settings['max_sweeps']					= [10,"Maximum number of times through the data (measured in epoch equivalents"]
@@ -169,7 +174,7 @@ class HessianlearnModel(ABC):
 				optimizer.alpha = settings['alpha']
 				self._logger['alpha'] = settings['alpha']
 		elif settings['optimizer'] == 'lrsfn':
-			self._logger['hessian_low_rank'] = settings['hessian_low_rank']
+
 			if not settings['fixed_step']:
 				print('Using low rank SFN optimizer with line search'.center(80))
 				print(('Batch size = '+str(self.data._batch_size)).center(80))
@@ -180,16 +185,26 @@ class HessianlearnModel(ABC):
 				self._logger['globalization'] = 'line_search'
 				optimizer.parameters['max_backtracking_iter'] = settings['max_backtrack']
 				optimizer.parameters['hessian_low_rank'] = settings['hessian_low_rank']
+				optimizer.parameters['range_finding'] = settings['range_finding']
+				optimizer.parameters['range_rel_error_tolerance'] =	settings['range_rel_error_tolerance']
+				optimizer.parameters['range_block_size'] =	settings['range_block_size']
+
 			else:
 				print('Using low rank SFN optimizer with fixed step'.center(80))
 				print(('Batch size = '+str(self.data._batch_size)).center(80))
 				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
 				print(('Hessian low rank = '+str(settings['hessian_low_rank'])).center(80))
 				optimizer = LowRankSaddleFreeNewton(self.problem,self.regularization,sess)
+				optimizer.parameters['globalization'] = 'None'
 				optimizer.parameters['hessian_low_rank'] = settings['hessian_low_rank']
 				optimizer.parameters['alpha'] = settings['alpha']
+				optimizer.parameters['range_finding'] = settings['range_finding']
+				optimizer.parameters['range_rel_error_tolerance'] =	settings['range_rel_error_tolerance']
+				optimizer.parameters['range_block_size'] =	settings['range_block_size']
 				optimizer.alpha = settings['alpha']
 				self._logger['alpha'] = settings['alpha']
+			if self.settings['range_finding'] is None:
+				self._logger['hessian_low_rank'][0] = settings['hessian_low_rank']
 		elif settings['optimizer'] == 'sgd':
 			print(('Using stochastic gradient descent optimizer').center(80))
 			print(('Batch size = '+str(self._data._batch_size)).center(80))
@@ -220,7 +235,7 @@ class HessianlearnModel(ABC):
 		logger['optimizer'] = None
 		logger['alpha'] = None
 		logger['globalization'] = None
-		logger['hessian_low_rank'] = None
+		logger['hessian_low_rank'] = {}
 
 		logger['accuracy_test'] = {}
 		logger['accuracy_train'] = {}
@@ -233,8 +248,8 @@ class HessianlearnModel(ABC):
 
 		self._logger = logger
 
-		if not os.path.isdir('logging/'):
-			os.makedirs('logging/')
+		if not os.path.isdir(self.settings['problem_name']+'_logging/'):
+			os.makedirs(self.settings['problem_name']+'_logging/')
 
 		# Set outname for logging file
 		if self.settings['logger_outname'] is None:
@@ -288,7 +303,12 @@ class HessianlearnModel(ABC):
 			if self.settings['verbose']:
 				print(80*'#')
 				# First print
-				print('{0:8} {1:11} {2:11} {3:11} {4:11} {5:11} {6:11} {7:11}'.format(\
+				if self.settings['optimizer'] == 'lrsfn':
+					print('{0:7} {1:10} {2:10} {3:10} {4:10} {5:11} {6:10} {7:10} {8:10}'.format(\
+										'Sweeps'.center(8),'Loss'.center(8),'acc train'.center(8),'||g||'.center(8),\
+															'Loss_test'.center(8), 'acc test'.center(8),'max test'.center(8), 'alpha'.center(8),'rank'.center(8)))
+				else:
+					print('{0:7} {1:10} {2:10} {3:10} {4:10} {5:11} {6:10} {7:10}'.format(\
 										'Sweeps'.center(8),'Loss'.center(8),'acc train'.center(8),'||g||'.center(8),\
 															'Loss_test'.center(8), 'acc test'.center(8),'max test'.center(8), 'alpha'.center(8)))
 			x_test, y_test = next(iter(self.data.test))
@@ -350,29 +370,59 @@ class HessianlearnModel(ABC):
 				if self.settings['verbose'] and iteration % 1 == 0:
 					# Print once each epoch
 					try:
-						print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:1.4e}'.format(\
-							sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
+						if self.settings['optimizer'] == 'lrsfn':
+							if accuracy_train < 0:
+								print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:1.4e} {8:8}'.format(\
+									sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha,str(self.optimizer.rank)))
+							else:
+								print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:1.4e} {8:8}'.format(\
+								sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha,str(self.optimizer.rank)))
+						else:
+							if accuracy_test
+							print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:1.4e}'.format(\
+								sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
 					except:
-						print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:11}'.format(\
-							sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
+						if self.settings['optimizer'] == 'lrsfn':
+							print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:11} {8:8}'.format(\
+								sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha,str(self.optimizer.rank)))
+						else:
+							print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:11}'.format(\
+								sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
+				if np.isnan(loss_train) or np.isnan(norm_g):
+					print(80*'#')
+					print('Encountered nan, exiting'.center(80))
+					print(80*'#')
+					return
 				try:
 					self.optimizer.minimize(train_dict,hessian_feed_dict=hess_dict)
 				except:
 					self.optimizer.minimize(train_dict)
 
+				# If LRSFN used with range_finding need to record rank at each iteration
+				# If LRSFN used with range_finding need to record rank at each iteration
+				# If LRSFN used with range_finding need to record rank at each iteration
+				# If LRSFN used with range_finding need to record rank at each iteration
+				# If LRSFN used with range_finding need to record rank at each iteration
+				# If LRSFN used with range_finding need to record rank at each iteration
+				# If LRSFN used with range_finding need to record rank at each iteration
+				# If LRSFN used with range_finding need to record rank at each iteration
+				# If LRSFN used with range_finding need to record rank at each iteration
+				# If LRSFN used with range_finding need to record rank at each iteration
+				# If LRSFN used with range_finding need to record rank at each iteration
+				# If LRSFN used with range_finding need to record rank at each iteration
+				# If LRSFN used with range_finding need to record rank at each iteration
+				# If LRSFN used with range_finding need to record rank at each iteration
+				# print('Fix this recording thing for LRSFN with adaptive range finding')
+
 				if self.settings['record_spectrum'] and iteration%self.settings['spec_frequency'] ==0:
 					self._record_spectrum(iteration)
-				with open('logging/'+ self.logger_outname +'.pkl', 'wb+') as f:
+				with open(self.settings['problem_name']+'_logging/'+ self.logger_outname +'.pkl', 'wb+') as f:
 					pickle.dump(self.logger, f, pickle.HIGHEST_PROTOCOL)
 
 				if sweeps > max_sweeps:
 					break
 
-				if np.isnan(loss_train):
-					print(80*'#')
-					print('Encountered nan, exiting'.center(80))
-					print(80*'#')
-					return
+				
 
 		# The weights need to be manually set once the session scope is closed.
 		try:

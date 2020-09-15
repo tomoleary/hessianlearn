@@ -78,7 +78,7 @@ class CGSolver(ABC):
 			self.x = x
 		self.parameters = parameters
 		if Aop is None:
-			self.Aop = self.problem.H_w_hat + self.regularization.H_w_hat
+			self.Aop = self.problem.H_action + self.regularization.H_action
 		else:
 			# be careful to note what the operator requires be passed into feed_dict 
 			self.Aop = Aop
@@ -280,7 +280,7 @@ class CGSolver_scipy(ABC):
 			self.x = x
 		self.parameters = parameters
 		if Aop is None:
-			self.Aop = self.problem.H_w_hat + self.regularization.H_w_hat
+			self.Aop = self.problem.H_action + self.regularization.H_action
 		else:
 			# be careful to note what the operator requires be passed into feed_dict 
 			self.Aop = Aop

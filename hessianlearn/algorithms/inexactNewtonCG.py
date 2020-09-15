@@ -42,7 +42,7 @@ def ParametersInexactNewtonCG(parameters = {}):
 	parameters['cg_coarse_tol']						= [0.5,'CG coarse solve tolerance']
 	parameters['cg_max_iter']						= [10,'CG maximum iterations']
 	parameters['eta_mode']							= [0, 'eta mode for E-W conditions:0,1,2']
-	parameters['globalization']						= ['None', 'Choose from trust_region, line_search or none']
+	parameters['globalization']						= [None, 'Choose from trust_region, line_search or none']
 	parameters['max_backtracking_iter']				= [10, 'max backtracking iterations for line search']
 
 	# Reasons for convergence failure
@@ -97,7 +97,7 @@ class InexactNewtonCG(Optimizer):
 
 
 
-		if self.parameters['globalization'] is 'None':
+		if self.parameters['globalization'] is None:
 			alpha = self.parameters['alpha']
 			p,on_boundary = self.cg_solver.solve(-self.gradient,hessian_feed_dict)
 			self._sweeps += [1,2*self.cg_solver.iter]

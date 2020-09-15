@@ -41,7 +41,7 @@ def ParametersInexactNewtonGMRES(parameters = {}):
 	parameters['cg_coarse_tol']					= [0.5,'CG coarse solve tolerance']
 	parameters['cg_max_iter']					= [1000,'CG maximum iterations']
 	parameters['eta_mode']						= [0, 'eta mode for E-W conditions:0,1,2']
-	parameters['globalization']					= ['None', 'Choose from trust_region, line_search or none']
+	parameters['globalization']					= [None, 'Choose from trust_region, line_search or none']
 	parameters['max_backtracking_iter']			= [10, 'max backtracking iterations for line search']
 
 
@@ -89,7 +89,7 @@ class InexactNewtonGMRES(Optimizer):
 			update = self.alpha*w_dir
 			self._sweeps += [1+0.5*line_search_iter,2*self.gmres_solver.iter]
 			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
-		elif self.parameters['globalization'] == 'None':
+		elif self.parameters['globalization'] == None:
 			self.alpha = self.parameters['alpha']
 			p,converged = self.gmres_solver.solve(-self.gradient,hessian_feed_dict)
 			# print(converged)

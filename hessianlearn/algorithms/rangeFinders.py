@@ -26,7 +26,7 @@ from scipy.linalg import cholesky, eigh, solve_triangular, qr, rq
 import time
 
 
-def block_range_finder(A_op,n,epsilon,block_size):
+def block_range_finder(A_op,n,epsilon,block_size,verbose = False):
     # Taken from http://people.maths.ox.ac.uk/martinsson/Pubs/2015_randQB.pdf
     # Assumes A is symmetric
     my_state = np.random.RandomState(seed=0)
@@ -52,9 +52,16 @@ def block_range_finder(A_op,n,epsilon,block_size):
         error = np.linalg.norm(Approximate_Error)
         converged = error < epsilon
         iteration+=1 
+        if verbose:
+            print('At iteration', iteration, ' error is ',error,' converged = ',converged)
         if iteration > n//block_size:
             break
+    # I believe that the extra action of A_op in forming B for the QB factorization 
+    # is cheaper to do once after the fact, and is not needed for the matrix 
+    # free randomized error estimator. For this reason I just return Q, and 
+    # do not form B.
     return big_Q
+
 
 
 

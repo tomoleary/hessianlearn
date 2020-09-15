@@ -27,7 +27,7 @@ import time
 
 
 def low_rank_hessian(optimizer,feed_dict,k,p=None,verbose = False):
-    H = lambda x: optimizer.H_w_hat(x,feed_dict)
+    H = lambda x: optimizer.H(x,feed_dict)
     n = optimizer.problem.dimension
     return randomized_eigensolver(H, n, k,p = p,verbose = verbose)
 
@@ -89,57 +89,17 @@ def randomized_eigensolver(Aop, n, k, p = None,seed = 0,verbose = False):
     assert(n >= k )
     
     m = Omega.shape[1]
+    Y = Aop(Omega)
 
-    # Y = np.zeros(Omega.shape, dtype = 'd')
-    Y = np.zeros(Omega.shape)
-
+    # print('condition number for Y = ',np.linalg.cond(Y))
+    Q,_ = qr(Y, mode = 'economic')
+    T = np.zeros((m,m),dtype = 'd')
     if verbose:
-        print('Applying Hessian')
-        try:
-            from tqdm import tqdm
-            for i in tqdm(range(m)):
-                # print('i = ',i,' m = ',m)
-                Y[:,i] = Aop(Omega[:,i])
-                # print('Y[:,i] max = ',np.max(Y[:,i]))
-                # print('Y[:,i] min = ',np.min(Y[:,i]))
-
-        except:
-            print('No progress bar :(')
-            for i in range(m):
-                # print(i,)
-                Y[:,i] = Aop(Omega[:,i])
-        # print('condition number for Y = ',np.linalg.cond(Y))
-        Q,_ = qr(Y, mode = 'economic')
-        T = np.zeros((m,m),dtype = 'd')
         print('Forming small square matrix')
-        try:
-            for i in tqdm(np.arange(m)):
-                # print( i,)
-                Aq = Aop(Q[:,i])    
-                for j in np.arange(m):
-                    T[i,j] = np.dot(Q[:,j].T,Aq)
-        except:
-            for i in np.arange(m):
-                # print( i,)
-                Aq = Aop(Q[:,i])    
-                for j in np.arange(m):
-                    T[i,j] = np.dot(Q[:,j].T,Aq)
-    else:
+    AQ = Aop(Q)
+    T = Q.T@AQ
 
-        for i in range(m):
-            # print(i,)
-            Y[:,i] = Aop(Omega[:,i])
-        Q,_ = qr(Y, mode = 'economic')
-        
-        T = np.zeros((m,m),dtype = 'd')
-
-        for i in np.arange(m):
-            # print( i,)
-            Aq = Aop(Q[:,i])    
-            for j in np.arange(m):
-                T[i,j] = np.dot(Q[:,j].T,Aq)
-                
-    #Eigen subproblem
+    # Eigenvalue problem for T 
     if verbose:
         print('Computing eigenvalue decomposition')
     d, V = eigh(T)
@@ -157,7 +117,7 @@ def randomized_eigensolver(Aop, n, k, p = None,seed = 0,verbose = False):
     return d[:k], U[:,:k]
 
 
-def randomized_eigensolver_from_range(Aop, Q,verbose = False):
+def eigensolver_from_range(Aop, Q,verbose = False):
     """
     Randomized algorithm for Hermitian eigenvalue problems
     Returns k largest eigenvalues computed using the randomized algorithm
@@ -192,44 +152,13 @@ def randomized_eigensolver_from_range(Aop, Q,verbose = False):
     >>> p = 5
     >>> lmbda, U = randomized_eigensolver(Aop, n, k, p)
     """
-
-    
     m = Q.shape[1]
-
-    # Y = np.zeros(Omega.shape, dtype = 'd')
-    Y = np.zeros(Omega.shape)
-
+    T = np.zeros((m,m),dtype = 'd')
     if verbose:
-        T = np.zeros((m,m),dtype = 'd')
         print('Forming small square matrix')
-        try:
-            for i in tqdm(np.arange(m)):
-                # print( i,)
-                Aq = Aop(Q[:,i])    
-                for j in np.arange(m):
-                    T[i,j] = np.dot(Q[:,j].T,Aq)
-        except:
-            for i in np.arange(m):
-                # print( i,)
-                Aq = Aop(Q[:,i])    
-                for j in np.arange(m):
-                    T[i,j] = np.dot(Q[:,j].T,Aq)
-    else:
-
-        for i in range(m):
-            # print(i,)
-            Y[:,i] = Aop(Omega[:,i])
-        Q,_ = qr(Y, mode = 'economic')
-        
-        T = np.zeros((m,m),dtype = 'd')
-
-        for i in np.arange(m):
-            # print( i,)
-            Aq = Aop(Q[:,i])    
-            for j in np.arange(m):
-                T[i,j] = np.dot(Q[:,j].T,Aq)
-                
-    #Eigen subproblem
+    AQ = Aop(Q)
+    T = Q.T@AQ
+    # Eigenvalue problem for T 
     if verbose:
         print('Computing eigenvalue decomposition')
     d, V = eigh(T)
@@ -238,13 +167,13 @@ def randomized_eigensolver_from_range(Aop, Q,verbose = False):
         
     sort_perm = sort_perm[::-1]
     
-    d = d[sort_perm[0:k]]
-    V = V[:, sort_perm[0:k]] 
+    d = d[sort_perm[0:m]]
+    V = V[:, sort_perm[0:m]] 
     
     #Compute eigenvectors        
     U = np.dot(Q, V[:,::-1])    
 
-    return d[:k], U[:,:k]
+    return d[:m], U[:,:m]
 
 def randomized_double_pass_eigensolver(Aop, Y, k):
     """
