@@ -107,7 +107,11 @@ class Problem(ABC):
 		self._g_inner_w_hat = tf.tensordot(self._w_hat,self._gradient,axes = [[0],[0]])
 		# Define Hessian action Hdw
 		self._H_action = my_flatten(tf.gradients(self._g_inner_w_hat,self._w,stop_gradients = self._w_hat,name = 'hessian_action'))
-
+		self._H_quadratic = tf.tensordot(self._w_hat,self._H_action,axes = [[0],[0]])
+		print(80*'#')
+		print('H_action.shape = ',self.H_action.shape)
+		print('_H_quadratic.shape = ',self._H_quadratic.shape)
+		print(80*'#')
 		# Define operations for updating and assigment used during training
 		self._update_placeholder = tf.placeholder(self.dtype,[self._dimension],name = 'update_placeholder')
 		self._assignment_placeholder = tf.placeholder(self.dtype,[self._dimension],name = 'assignment_placeholder')
@@ -178,6 +182,11 @@ class Problem(ABC):
 	@property
 	def H_action(self):
 		return self._H_action
+
+	@property
+	def H_quadratic(self):
+		return self._H_quadratic
+	
 
 	@property
 	def loss(self):

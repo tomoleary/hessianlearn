@@ -43,6 +43,7 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 	parameters['range_finding']					= [None,"Range finding, if None then r = hessian_low_rank\
 	 														Choose from None, 'arf', 'naarf'"]
 	parameters['range_rel_error_tolerance']     = [100, "Error tolerance for error estimator in adaptive range finding"]
+	parameters['range_rel_abs_tolerance']     	= [100, "Error tolerance for error estimator in adaptive range finding"]
 	parameters['range_block_size']        		= [5, "Block size used in range finder"]
 	parameters['hessian_low_rank']        		= [20, "Fixed rank for randomized eigenvalue decomposition"]
 	
@@ -76,7 +77,7 @@ class LowRankSaddleFreeNewton(Optimizer):
 	
 
 
-	def minimize(self,feed_dict = None,hessian_feed_dict = None):
+	def minimize(self,feed_dict = None,hessian_feed_dict = None,rq_estimator_dict = None):
 		r"""
 		Solves the saddle escape problem. Given a misfit (loss) Hessian operator (H)
 		Takes:
@@ -106,8 +107,6 @@ class LowRankSaddleFreeNewton(Optimizer):
 
 		alpha = self.parameters['alpha']
 		
-		
-
 		if self.parameters['range_finding'] == 'arf':
 			H = lambda x: self.H(x,hessian_feed_dict,verbose = self.parameters['verbose'])
 			n = self.problem.dimension
@@ -117,19 +116,16 @@ class LowRankSaddleFreeNewton(Optimizer):
 			self._rank = Q.shape[1]
 			Lmbda,U = eigensolver_from_range(H,Q)
 
-			# if self.parameters['verbose']:
-			# 	print(80*'#')
-			# 	print('tolerance = ',tolerance)
-			# 	print('Rank from range finding is')
-			# 	if False:
-			# 		my_state = np.random.RandomState(seed=0)
-			# 		w_action = my_state.randn(n)
-			# 		action = H(w_action)
-			# 		error = np.linalg.norm(action - Q@(Q.T@action))
-			# 		print('error = ',error)
-
 		elif self.parameters['range_finding'] == 'naarf':
+			n = self.problem.dimension
+			norm_g = np.linalg.norm(gradient)
+			tolerance = self.parameters['range_rel_error_tolerance']*norm_g
+			# Pass in data dictionary to be used for 
+			noise_tolerance = 1e-1
 
+			Q = noise_aware_adaptive_range_finder(self.H,n,hessian_feed_dict,noise_tolerance,tolerance,self.parameters['range_block_size'])
+			self._rank = Q.shape[1]
+			Lmbda,U = eigensolver_from_range(H,Q)
 			pass
 		else:
 			H = lambda x: self.H(x,hessian_feed_dict,verbose = self.parameters['verbose'])

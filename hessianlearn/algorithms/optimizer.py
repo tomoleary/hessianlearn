@@ -131,6 +131,37 @@ class Optimizer(ABC):
 			return H_action
 		else:
 			raise
+
+	def H_quadratics(self,x,feed_dict,verbose = False):
+		
+		import numpy as np
+		assert self.problem is not None
+		assert self.sess is not None
+		x_shape = x.shape
+		if len(x_shape) == 1:
+			feed_dict[self.problem.w_hat] = x
+			return self.sess.run(self.problem.H_quadratic,feed_dict)
+		elif len(x_shape) == 2:
+			number_of_quadratics = x_shape[1]
+			H_quads = np.zeros(number_of_quadratics)
+			if verbose:
+				try:
+					from tqdm import tqdm
+					for i in tqdm(range(number_of_quadratics)):
+						feed_dict[self.problem.w_hat] = x[:,i]
+						H_quads[i] = self.sess.run(self.problem.H_quadratic,feed_dict)
+				except:
+					print('No progress bar :(')
+					for i in range(number_of_quadratics):
+						feed_dict[self.problem.w_hat] = x[:,i]
+						H_quads[i] = self.sess.run(self.problem.H_quadratic,feed_dict)
+			else:
+				for i in range(number_of_quadratics):
+					feed_dict[self.problem.w_hat] = x[:,i]
+					H_quads[i] = self.sess.run(self.problem.H_quadratic,feed_dict)
+			return H_quads
+		else:
+			raise
 		
 
 

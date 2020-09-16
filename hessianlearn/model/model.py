@@ -29,7 +29,6 @@ import sys, os, pickle, time, datetime
 # from hessianlearn import *
 
 from ..utilities.parameterList import ParameterList
-from ..utilities.rayleighQuotients import rayleigh_quotients
 
 # from ..algorithms import *
 
@@ -66,7 +65,8 @@ def HessianlearnModelSettings(settings = {}):
 	# Range finding settings for LRSFN
 	settings['range_finding']				= [None,"Range finding, if None then r = hessian_low_rank\
 	 														Choose from None, 'arf', 'naarf'"]
-	settings['range_rel_error_tolerance']   = [10, "Error tolerance for error estimator in adaptive range finding"]
+	settings['range_rel_error_tolerance']   = [50, "Error tolerance for error estimator in adaptive range finding"]
+	settings['range_abs_error_tolerance']   = [50, "Error tolerance for error estimator in adaptive range finding"]
 	settings['range_block_size']        	= [5, "Block size used in range finder"]
 
 
@@ -304,11 +304,11 @@ class HessianlearnModel(ABC):
 				print(80*'#')
 				# First print
 				if self.settings['optimizer'] == 'lrsfn':
-					print('{0:7} {1:10} {2:10} {3:10} {4:10} {5:11} {6:10} {7:10} {8:10}'.format(\
+					print('{0:7} {1:9} {2:10} {3:10} {4:10} {5:11} {6:10} {7:10} {8:10}'.format(\
 										'Sweeps'.center(8),'Loss'.center(8),'acc train'.center(8),'||g||'.center(8),\
 															'Loss_test'.center(8), 'acc test'.center(8),'max test'.center(8), 'alpha'.center(8),'rank'.center(8)))
 				else:
-					print('{0:7} {1:10} {2:10} {3:10} {4:10} {5:11} {6:10} {7:10}'.format(\
+					print('{0:7} {1:9} {2:10} {3:10} {4:10} {5:11} {6:10} {7:10}'.format(\
 										'Sweeps'.center(8),'Loss'.center(8),'acc train'.center(8),'||g||'.center(8),\
 															'Loss_test'.center(8), 'acc test'.center(8),'max test'.center(8), 'alpha'.center(8)))
 			x_test, y_test = next(iter(self.data.test))
@@ -371,23 +371,34 @@ class HessianlearnModel(ABC):
 					# Print once each epoch
 					try:
 						if self.settings['optimizer'] == 'lrsfn':
-							if accuracy_train < 0:
-								print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:1.4e} {8:8}'.format(\
+							if accuracy_test < 0 or accuracy_test > 10.:
+								print(' {0:^8.2f} {1:1.4e} {2:.2%} {3:1.4e} {4:1.4e} {5:.2%} {6:.3%} {7:1.4e} {8:8}'.format(\
 									sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha,str(self.optimizer.rank)))
 							else:
 								print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:1.4e} {8:8}'.format(\
 								sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha,str(self.optimizer.rank)))
 						else:
-							if accuracy_test
-							print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:1.4e}'.format(\
-								sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
-					except:
+							if accuracy_test < 0 or accuracy_test > 10.:
+								print(' {0:^8.2f} {1:1.4e} {2:.2%} {3:1.4e} {4:1.4e} {5:.2%} {6:.3%} {7:1.4e}'.format(\
+									sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
+							else:
+								print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:1.4e}'.format(\
+									sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
+					except:	
 						if self.settings['optimizer'] == 'lrsfn':
-							print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:11} {8:8}'.format(\
-								sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha,str(self.optimizer.rank)))
+							if accuracy_test < 0 or accuracy_test > 10.:
+								print(' {0:^8.2f} {1:1.4e} {2:.2%} {3:1.4e} {4:1.4e} {5:.2%} {6:.3%} {7:11} {8:8}'.format(\
+									sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha,str(self.optimizer.rank)))
+							else:
+								print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:11} {8:8}'.format(\
+									sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha,str(self.optimizer.rank)))
 						else:
-							print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:11}'.format(\
-								sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
+							if accuracy_test < 0 or accuracy_test > 10.:
+								print(' {0:^8.2f} {1:1.4e} {2:.2%} {3:1.4e} {4:1.4e} {5:.2%} {6:.3%} {7:11}'.format(\
+									sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
+							else:
+								print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:11}'.format(\
+									sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
 				if np.isnan(loss_train) or np.isnan(norm_g):
 					print(80*'#')
 					print('Encountered nan, exiting'.center(80))
@@ -461,8 +472,7 @@ class HessianlearnModel(ABC):
 						sample_dict = {self.problem.x: my_chunk_x}
 					else:
 						sample_dict = {self.problem.x: my_chunk_x, self.problem.y_true: my_chunk_y}
-					H_sample = lambda x: self.optimizer.H_w_hat(x,sample_dict)
-					RQ_samples[samp_i] = rayleigh_quotients(H_sample,U_full_train)
+					RQ_samples[samp_i] = self.optimizer.H_quadratics(U_full_train,sample_dict)
 			except:
 				for samp_i in range(self.settings['rq_samps']):
 					print('RQ for sample i = ',samp_i)
@@ -472,12 +482,11 @@ class HessianlearnModel(ABC):
 						sample_dict = {self.problem.x: my_chunk_x}
 					else:
 						sample_dict = {self.problem.x: my_chunk_x, self.problem.y_true: my_chunk_y}
-					H_sample = lambda x: self.optimizer.H_w_hat(x,sample_dict)
-					RQ_samples[samp_i] = rayleigh_quotients(H_sample,U_full_train)
-
+					RQ_samples[samp_i] = self.optimizer.H_quadratics(U_full_train,sample_dict)
 			RQ_sample_std = np.std(RQ_samples,axis = 0)
 			self._logger['rq_std'][iteration] = RQ_sample_std
 			ranks = np.arange(U_full_train.shape[1])
+
 
 		else:
 			d_full,_ = low_rank_hessian(self.optimizer,train_dict,k_rank,p_oversample)
