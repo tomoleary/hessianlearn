@@ -23,6 +23,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from ..utilities.parameterList import ParameterList
+from ..problem import Hessian
 
 def ParametersOptimizer(dictionary = {}):
 	parameters = dictionary
@@ -49,6 +50,7 @@ class Optimizer(ABC):
 		self._sweeps = 0
 		self._comm = comm
 		self._iter = 0
+		self.H = Hessian(problem=problem,sess=sess)
 
 	@property
 	def problem(self):
@@ -100,68 +102,6 @@ class Optimizer(ABC):
 		self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:-p})
 		# self.sess.run(self.problem._update_w(-p))
 		return misfit
-
-
-	def H(self,x,feed_dict,verbose = False):
-		# Should this all be defined here?
-		import numpy as np
-		assert self.problem is not None
-		assert self.sess is not None
-		x_shape = x.shape
-		if len(x_shape) == 1:
-			feed_dict[self.problem.w_hat] = x
-			return self.sess.run(self.problem.H_action,feed_dict)
-		elif len(x_shape) == 2:
-			H_action = np.zeros_like(x)
-			if verbose:
-				try:
-					from tqdm import tqdm
-					for i in tqdm(range(x_shape[1])):
-						feed_dict[self.problem.w_hat] = x[:,i]
-						H_action[:,i] = self.sess.run(self.problem.H_action,feed_dict)
-				except:
-					print('No progress bar :(')
-					for i in range(x_shape[1]):
-						feed_dict[self.problem.w_hat] = x[:,i]
-						H_action[:,i] = self.sess.run(self.problem.H_action,feed_dict)
-			else:
-				for i in range(x_shape[1]):
-					feed_dict[self.problem.w_hat] = x[:,i]
-					H_action[:,i] = self.sess.run(self.problem.H_action,feed_dict)
-			return H_action
-		else:
-			raise
-
-	def H_quadratics(self,x,feed_dict,verbose = False):
-		
-		import numpy as np
-		assert self.problem is not None
-		assert self.sess is not None
-		x_shape = x.shape
-		if len(x_shape) == 1:
-			feed_dict[self.problem.w_hat] = x
-			return self.sess.run(self.problem.H_quadratic,feed_dict)
-		elif len(x_shape) == 2:
-			number_of_quadratics = x_shape[1]
-			H_quads = np.zeros(number_of_quadratics)
-			if verbose:
-				try:
-					from tqdm import tqdm
-					for i in tqdm(range(number_of_quadratics)):
-						feed_dict[self.problem.w_hat] = x[:,i]
-						H_quads[i] = self.sess.run(self.problem.H_quadratic,feed_dict)
-				except:
-					print('No progress bar :(')
-					for i in range(number_of_quadratics):
-						feed_dict[self.problem.w_hat] = x[:,i]
-						H_quads[i] = self.sess.run(self.problem.H_quadratic,feed_dict)
-			else:
-				for i in range(number_of_quadratics):
-					feed_dict[self.problem.w_hat] = x[:,i]
-					H_quads[i] = self.sess.run(self.problem.H_quadratic,feed_dict)
-			return H_quads
-		else:
-			raise
 		
 
 

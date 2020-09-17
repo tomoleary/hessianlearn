@@ -311,7 +311,7 @@ class HessianlearnModel(ABC):
 					print('{0:7} {1:9} {2:10} {3:10} {4:10} {5:11} {6:10} {7:10}'.format(\
 										'Sweeps'.center(8),'Loss'.center(8),'acc train'.center(8),'||g||'.center(8),\
 															'Loss_test'.center(8), 'acc test'.center(8),'max test'.center(8), 'alpha'.center(8)))
-			
+
 			x_test, y_test = next(iter(self.data.test))
 			if self.problem.is_autoencoder:
 				test_dict = {self.problem.x: x_test}
@@ -464,32 +464,22 @@ class HessianlearnModel(ABC):
 
 			d_full_train, U_full_train = low_rank_hessian(self.optimizer,full_train_dict,k_rank,p_oversample,verbose=True)
 			self._logger['full_train_eigenvalues'][iteration] = d_full_train
+			# Initialize array for Rayleigh quotient samples
 			RQ_samples = np.zeros((self.settings['rq_samps'],U_full_train.shape[1]))
-			chunk_size = int(train_data_xs.shape[0]/self.settings['rq_samps'])
+
+			partitioned_dictionaries_train = self.problem._partition_dictionaries(full_train_dict,self.settings['rq_samps'])
+
 			try:
 				from tqdm import tqdm
-				for samp_i in tqdm(range(self.settings['rq_samps'])):
-					my_chunk_x = train_data_xs[(samp_i)*chunk_size:(samp_i+1)*chunk_size]
-					my_chunk_y = train_data_ys[(samp_i)*chunk_size:(samp_i+1)*chunk_size]
-					if self.problem.is_autoencoder:
-						sample_dict = {self.problem.x: my_chunk_x}
-					else:
-						sample_dict = {self.problem.x: my_chunk_x, self.problem.y_true: my_chunk_y}
-					RQ_samples[samp_i] = self.optimizer.H_quadratics(U_full_train,sample_dict)
+				for samp_i,sample_dictionary in enumerate(tqdm(partitioned_dictionaries_train)):
+					RQ_samples[samp_i] = self.optimizer.H.quadratics(U_full_train,sample_dictionary)
 			except:
-				for samp_i in range(self.settings['rq_samps']):
-					print('RQ for sample i = ',samp_i)
-					my_chunk_x = train_data_xs[(samp_i)*chunk_size:(samp_i+1)*chunk_size]
-					my_chunk_y = train_data_ys[(samp_i)*chunk_size:(samp_i+1)*chunk_size]
-					if self.problem.is_autoencoder:
-						sample_dict = {self.problem.x: my_chunk_x}
-					else:
-						sample_dict = {self.problem.x: my_chunk_x, self.problem.y_true: my_chunk_y}
-					RQ_samples[samp_i] = self.optimizer.H_quadratics(U_full_train,sample_dict)
+				print('Issue with tqdm')
+				for samp_i,sample_dictionary in enumerate(partitioned_dictionaries_train):
+					RQ_samples[samp_i] = self.optimizer.H.quadratics(U_full_train,sample_dictionary)
+
 			RQ_sample_std = np.std(RQ_samples,axis = 0)
 			self._logger['rq_std'][iteration] = RQ_sample_std
-			ranks = np.arange(U_full_train.shape[1])
-
 
 		else:
 			d_full,_ = low_rank_hessian(self.optimizer,train_dict,k_rank,p_oversample)

@@ -20,6 +20,8 @@ from __future__ import absolute_import, division, print_function
 from .problem import Problem, ClassificationProblem, RegressionProblem, AutoencoderProblem,\
 								LeastSquaresClassificationProblem, VariationalAutoencoderProblem
 
+from .hessian import Hessian
+
 from .neuralNetwork import NeuralNetwork, GenericDNN, GenericCDNN, GenericCAE,\
 							 GenericDAE, GenericCED, ProjectedGenericDNN, \
 							 ProjectedDenseEncoderDecoder, ProjectedResidualEncoderDecoder,\

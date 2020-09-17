@@ -43,8 +43,9 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 	parameters['range_finding']					= [None,"Range finding, if None then r = hessian_low_rank\
 	 														Choose from None, 'arf', 'naarf'"]
 	parameters['range_rel_error_tolerance']     = [100, "Error tolerance for error estimator in adaptive range finding"]
-	parameters['range_rel_abs_tolerance']     	= [100, "Error tolerance for error estimator in adaptive range finding"]
+	parameters['range_abs_error_tolerance']     = [100, "Error tolerance for error estimator in adaptive range finding"]
 	parameters['range_block_size']        		= [5, "Block size used in range finder"]
+	parameters['rq_samples_for_naarf']        	= [100, "Number of partitions for RQ variance evaluation"]
 	parameters['hessian_low_rank']        		= [20, "Fixed rank for randomized eigenvalue decomposition"]
 	
 
@@ -58,7 +59,7 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 
 
 class LowRankSaddleFreeNewton(Optimizer):
-	def __init__(self,problem,regularization = None,sess = None,feed_dict = None,parameters = ParametersLowRankSaddleFreeNewton(),preconditioner = None):
+	def __init__(self,problem,regularization = None,sess = None,parameters = ParametersLowRankSaddleFreeNewton(),preconditioner = None):
 		if regularization is None:
 			_regularization = ZeroRegularization(problem)
 		else:
@@ -117,14 +118,20 @@ class LowRankSaddleFreeNewton(Optimizer):
 			Lmbda,U = eigensolver_from_range(H,Q)
 
 		elif self.parameters['range_finding'] == 'naarf':
-			n = self.problem.dimension
 			norm_g = np.linalg.norm(gradient)
 			tolerance = self.parameters['range_rel_error_tolerance']*norm_g
-			# Pass in data dictionary to be used for 
-			noise_tolerance = 1e-1
-
-			Q = noise_aware_adaptive_range_finder(self.H,n,hessian_feed_dict,noise_tolerance,tolerance,self.parameters['range_block_size'])
+			noise_tolerance = 0.1*tolerance
+			if rq_estimator_dict is None:
+				rq_estimator_dict_list = self.problem._partition_dictionaries(feed_dict,self.parameters['rq_samples_for_naarf'])
+			elif type(rq_estimator_dict) == list:
+				rq_estimator_dict_list = rq_estimator_dict
+			elif type(rq_estimator_dict) == dict:
+				rq_estimator_dict_list = self.problem._partition_dictionaries(rq_estimator_dict,self.parameters['rq_samples_for_naarf'])
+			else:
+				raise
+			Q = noise_aware_adaptive_range_finder(self.H,hessian_feed_dict,rq_estimator_dict_list,block_size = self.parameters['range_block_size'],noise_tolerance = noise_tolerance,epsilon = tolerance)
 			self._rank = Q.shape[1]
+			H = lambda x: self.H(x,hessian_feed_dict,verbose = self.parameters['verbose'])
 			Lmbda,U = eigensolver_from_range(H,Q)
 			pass
 		else:

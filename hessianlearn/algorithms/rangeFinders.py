@@ -46,6 +46,8 @@ def block_range_finder(A_op,n,epsilon,block_size,verbose = False,seed = 0):
         else:
             Q -= big_Q@(big_Q.T@Q)
             big_Q = np.concatenate((big_Q,Q),axis = 1)
+            # This QR gets slow after many iterations, only last columns
+            # need to be orthonormalized
             big_Q,_ = np.linalg.qr(big_Q)
         # Error estimation
         Approximate_Error = Action - big_Q@(big_Q.T@Action)
@@ -65,8 +67,8 @@ def block_range_finder(A_op,n,epsilon,block_size,verbose = False,seed = 0):
 
 
 
-def noise_aware_adaptive_range_finder(A_op,n,hessian_feed_dict,noise_tolerance,\
-                    epsilon,block_size,rq_estimator_dict = None, partitions = 100,verbose = True,seed = 0):
+def noise_aware_adaptive_range_finder(Hessian,hessian_feed_dict,rq_estimator_dict_list,\
+        block_size = None,noise_tolerance = 1e-1,epsilon = 1e-1, verbose = False,seed = 0):
     # A_op(w_hat,feed_dict) is a function that implements the action of the [n x n] 
     # symmetric finite sum operator A on an [n x k] ndarray
     # the second argument is the data dictionary for the finite sum operator
@@ -87,45 +89,68 @@ def noise_aware_adaptive_range_finder(A_op,n,hessian_feed_dict,noise_tolerance,\
     # If its greater than noise tolerance, stop and use binary search to work backwards for 
     # vector with RQ variance below noise tolerance, and return only these first columns
     ###################################################################################
+    assert type(rq_estimator_dict_list) is list
+    n = Hessian.dimension
+    if block_size is None:
+        block_size = int(0.01*n)
     my_state = np.random.RandomState(seed=seed)
     w = my_state.randn(n,1)
 
-    A_op_range = lambda x: A_op(x,hessian_feed_dict,verbose = verbose)
-    Action = A_op_range(w)
+    H = lambda x: Hessian(x,hessian_feed_dict,verbose = verbose)
+    Action = H(w)
     big_Q = None
     converged = False
     iteration = 0
-
-    if rq_estimator_dict is None:
-        rq_estimator_dict = hessian_feed_dict
-    print('rq_estimator_dict.keys() = ',rq_estimator_dict.keys())
-
-    exit()
+    rq_noise = 0.
 
     while not converged:
         # Sample Gaussian random matrix
         Omega = my_state.randn(n,block_size)
         # Perform QR on action
-        Q,_ = np.linalg.qr(A_op_range(Omega))
+        Q,_ = np.linalg.qr(H(Omega))
         # Update basis
         if big_Q is None:
             big_Q = Q
         else:
             Q -= big_Q@(big_Q.T@Q)
             big_Q = np.concatenate((big_Q,Q),axis = 1)
+            # This QR gets slow after many iterations, only last columns
+            # need to be orthonormalized
             big_Q,_ = np.linalg.qr(big_Q)
         # Error estimation is both for operator error
         # as well as spectral noise
         # Operator error estimation
         Approximate_Error = Action - big_Q@(big_Q.T@Action)
         operator_error = np.linalg.norm(Approximate_Error)
-        # Noise error estimation   
-        
+        # Noise error estimation    
+        rq_direction = big_Q[:,-block_size:]
+        try:
+            RQ_samples = np.zeros((len(rq_estimator_dict_list),rq_direction.shape[1]))
+        except:
+            RQ_samples = np.zeros(len(rq_estimator_dict_list))
+        if verbose:
+            try:
+                from tqdm import tqdm
+                for samp_i,sample_dictionary in enumerate(tqdm(rq_estimator_dict_list)):
+                    RQ_samples[samp_i] = Hessian.quadratics(rq_direction,sample_dictionary)
+            except:
+                print('Issue with tqdm')
+                for samp_i,sample_dictionary in enumerate(rq_estimator_dict_list):
+                    RQ_samples[samp_i] = Hessian.quadratics(rq_direction,sample_dictionary)
+        else:
+            for samp_i,sample_dictionary in enumerate(rq_estimator_dict_list):
+                RQ_samples[samp_i] = Hessian.quadratics(rq_direction,sample_dictionary)
+
+        rq_noise = np.max(np.std(RQ_samples,axis = 0))
+        # print(80*'#')
+        # print('Rayleigh quotient noise for the last direction is ',rq_noise)
+        # print(80*'#')
 
         converged = (operator_error < epsilon) or (rq_noise > noise_tolerance)
         iteration+=1 
         if verbose:
-            print('At iteration', iteration, ' error is ',error,' converged = ',converged)
+            print('At iteration', iteration, 'operator error is ',operator_error,' convergence = ',(operator_error < epsilon))
+            print('At iteration', iteration, 'RQ noise is ',rq_noise,' exit condition = ',(rq_noise > noise_tolerance))
 
         if iteration > n//block_size:
             break

@@ -108,10 +108,6 @@ class Problem(ABC):
 		# Define Hessian action Hdw
 		self._H_action = my_flatten(tf.gradients(self._g_inner_w_hat,self._w,stop_gradients = self._w_hat,name = 'hessian_action'))
 		self._H_quadratic = tf.tensordot(self._w_hat,self._H_action,axes = [[0],[0]])
-		print(80*'#')
-		print('H_action.shape = ',self.H_action.shape)
-		print('_H_quadratic.shape = ',self._H_quadratic.shape)
-		print(80*'#')
 		# Define operations for updating and assigment used during training
 		self._update_placeholder = tf.placeholder(self.dtype,[self._dimension],name = 'update_placeholder')
 		self._assignment_placeholder = tf.placeholder(self.dtype,[self._dimension],name = 'assignment_placeholder')
@@ -298,7 +294,7 @@ class Problem(ABC):
 		array_like_w[indices[0]:indices[1]] = array_like_layer
 		return array_like_w
 
-	def _parition_dictionaries(self,data_dictionary,n_partitions):
+	def _partition_dictionaries(self,data_dictionary,n_partitions):
 		raise NotImplementedError("Child class should implement method _parition_dictionaries") 
 
 
@@ -319,8 +315,23 @@ class ClassificationProblem(Problem):
 			correct_prediction = tf.cast(correct_prediction, self.dtype)
 			self.accuracy = tf.reduce_mean(correct_prediction)
 
-	def _parition_dictionaries(self,data_dictionary,n_partitions):
-		raise NotImplementedError("Child class should implement method _parition_dictionaries") 
+	def _partition_dictionaries(self,data_dictionary,n_partitions):
+		assert type(n_partitions) == int
+		data_xs = data_dictionary[self.x]
+		data_ys = data_dictionary[self.y_true]
+		if n_partitions > len(data_xs):
+			n_partitions = len(data_xs)
+		chunk_size = int(data_xs.shape[0]/n_partitions)
+		dictionary_partitions = []
+		for chunk_i in range(n_partitions):
+			# Array slicing should be a view, not a copy
+			# So this should not be a memory issue
+			my_chunk_x = data_xs[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
+			my_chunk_y = data_ys[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
+			dictionary_partitions.append({self.x:my_chunk_x, self.y_true: my_chunk_y})
+		return dictionary_partitions
+
+
 
 
 class LeastSquaresClassificationProblem(Problem):
@@ -340,8 +351,21 @@ class LeastSquaresClassificationProblem(Problem):
 			correct_prediction = tf.cast(correct_prediction, self.dtype)
 			self.accuracy = tf.reduce_mean(correct_prediction)
 
-	def _parition_dictionaries(self,data_dictionary,n_partitions):
-		raise NotImplementedError("Child class should implement method _parition_dictionaries") 
+	def _partition_dictionaries(self,data_dictionary,n_partitions):
+		assert type(n_partitions) == int
+		data_xs = data_dictionary[self.x]
+		data_ys = data_dictionary[self.y_true]
+		if n_partitions > len(data_xs):
+			n_partitions = len(data_xs)
+		chunk_size = int(data_xs.shape[0]/n_partitions)
+		dictionary_partitions = []
+		for chunk_i in range(n_partitions):
+			# Array slicing should be a view, not a copy
+			# So this should not be a memory issue
+			my_chunk_x = data_xs[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
+			my_chunk_y = data_ys[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
+			dictionary_partitions.append({self.x:my_chunk_x, self.y_true: my_chunk_y})
+		return dictionary_partitions
 
 
 class RegressionProblem(Problem):
@@ -371,8 +395,21 @@ class RegressionProblem(Problem):
 			except:
 				self.mad = None
 
-	def _parition_dictionaries(self,data_dictionary,n_partitions):
-		raise NotImplementedError("Child class should implement method _parition_dictionaries") 
+	def _partition_dictionaries(self,data_dictionary,n_partitions):
+		assert type(n_partitions) == int
+		data_xs = data_dictionary[self.x]
+		data_ys = data_dictionary[self.y_true]
+		if n_partitions > len(data_xs):
+			n_partitions = len(data_xs)
+		chunk_size = int(data_xs.shape[0]/n_partitions)
+		dictionary_partitions = []
+		for chunk_i in range(n_partitions):
+			# Array slicing should be a view, not a copy
+			# So this should not be a memory issue
+			my_chunk_x = data_xs[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
+			my_chunk_y = data_ys[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
+			dictionary_partitions.append({self.x:my_chunk_x, self.y_true: my_chunk_y})
+		return dictionary_partitions
 
 
 class AutoencoderProblem(Problem):
@@ -388,8 +425,19 @@ class AutoencoderProblem(Problem):
 							/tf.reduce_mean(tf.pow(self.x,2)))
 			self.accuracy = 1. - self.rel_error
 
-	def _parition_dictionaries(self,data_dictionary,n_partitions):
-		raise NotImplementedError("Child class should implement method _parition_dictionaries") 
+	def _partition_dictionaries(self,data_dictionary,n_partitions):
+		assert type(n_partitions) == int
+		data_xs = data_dictionary[self.x]
+		if n_partitions > len(data_xs):
+			n_partitions = len(data_xs)
+		chunk_size = int(data_xs.shape[0]/n_partitions)
+		dictionary_partitions = []
+		for chunk_i in range(n_partitions):
+			# Array slicing should be a view, not a copy
+			# So this should not be a memory issue
+			my_chunk_x = data_xs[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
+			dictionary_partitions.append({self.x:my_chunk_x})
+		return dictionary_partitions
 			
 
 
@@ -416,10 +464,19 @@ class VariationalAutoencoderProblem(Problem):
 								/tf.reduce_mean(tf.pow(self.x,2)))
 				self.accuracy = 1. - self.rel_error
 
-	def _parition_dictionaries(self,data_dictionary,n_partitions):
-		raise NotImplementedError("Child class should implement method _parition_dictionaries") 
-			
-
+	def _partition_dictionaries(self,data_dictionary,n_partitions):
+		assert type(n_partitions) == int
+		data_xs = data_dictionary[self.x]
+		if n_partitions > len(data_xs):
+			n_partitions = len(data_xs)
+		chunk_size = int(data_xs.shape[0]/n_partitions)
+		dictionary_partitions = []
+		for chunk_i in range(n_partitions):
+			# Array slicing should be a view, not a copy
+			# So this should not be a memory issue
+			my_chunk_x = data_xs[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
+			dictionary_partitions.append({self.x:my_chunk_x})
+		return dictionary_partitions
 
 
 
