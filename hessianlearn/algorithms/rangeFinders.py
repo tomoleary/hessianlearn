@@ -120,7 +120,7 @@ def noise_aware_adaptive_range_finder(A_op,n,hessian_feed_dict,noise_tolerance,\
         Approximate_Error = Action - big_Q@(big_Q.T@Action)
         operator_error = np.linalg.norm(Approximate_Error)
         # Noise error estimation   
-
+        
 
         converged = (operator_error < epsilon) or (rq_noise > noise_tolerance)
         iteration+=1 

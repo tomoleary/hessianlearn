@@ -186,6 +186,7 @@ class Problem(ABC):
 	@property
 	def H_quadratic(self):
 		return self._H_quadratic
+
 	
 
 	@property
@@ -297,6 +298,8 @@ class Problem(ABC):
 		array_like_w[indices[0]:indices[1]] = array_like_layer
 		return array_like_w
 
+	def _parition_dictionaries(self,data_dictionary,n_partitions):
+		raise NotImplementedError("Child class should implement method _parition_dictionaries") 
 
 
 
@@ -316,6 +319,9 @@ class ClassificationProblem(Problem):
 			correct_prediction = tf.cast(correct_prediction, self.dtype)
 			self.accuracy = tf.reduce_mean(correct_prediction)
 
+	def _parition_dictionaries(self,data_dictionary,n_partitions):
+		raise NotImplementedError("Child class should implement method _parition_dictionaries") 
+
 
 class LeastSquaresClassificationProblem(Problem):
 	def __init__(self,NeuralNetwork,y_mean = None,dtype = tf.float32):
@@ -333,6 +339,9 @@ class LeastSquaresClassificationProblem(Problem):
 			correct_prediction = tf.equal(tf.argmax(self.y_prediction, 1), tf.argmax(self.y_true,1))
 			correct_prediction = tf.cast(correct_prediction, self.dtype)
 			self.accuracy = tf.reduce_mean(correct_prediction)
+
+	def _parition_dictionaries(self,data_dictionary,n_partitions):
+		raise NotImplementedError("Child class should implement method _parition_dictionaries") 
 
 
 class RegressionProblem(Problem):
@@ -362,6 +371,9 @@ class RegressionProblem(Problem):
 			except:
 				self.mad = None
 
+	def _parition_dictionaries(self,data_dictionary,n_partitions):
+		raise NotImplementedError("Child class should implement method _parition_dictionaries") 
+
 
 class AutoencoderProblem(Problem):
 	def __init__(self,NeuralNetwork,inputs = None,dtype = tf.float32):
@@ -375,6 +387,9 @@ class AutoencoderProblem(Problem):
 			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
 							/tf.reduce_mean(tf.pow(self.x,2)))
 			self.accuracy = 1. - self.rel_error
+
+	def _parition_dictionaries(self,data_dictionary,n_partitions):
+		raise NotImplementedError("Child class should implement method _parition_dictionaries") 
 			
 
 
@@ -400,6 +415,9 @@ class VariationalAutoencoderProblem(Problem):
 				self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
 								/tf.reduce_mean(tf.pow(self.x,2)))
 				self.accuracy = 1. - self.rel_error
+
+	def _parition_dictionaries(self,data_dictionary,n_partitions):
+		raise NotImplementedError("Child class should implement method _parition_dictionaries") 
 			
 
 

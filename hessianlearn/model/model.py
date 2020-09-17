@@ -311,6 +311,7 @@ class HessianlearnModel(ABC):
 					print('{0:7} {1:9} {2:10} {3:10} {4:10} {5:11} {6:10} {7:10}'.format(\
 										'Sweeps'.center(8),'Loss'.center(8),'acc train'.center(8),'||g||'.center(8),\
 															'Loss_test'.center(8), 'acc test'.center(8),'max test'.center(8), 'alpha'.center(8)))
+			
 			x_test, y_test = next(iter(self.data.test))
 			if self.problem.is_autoencoder:
 				test_dict = {self.problem.x: x_test}
@@ -408,6 +409,8 @@ class HessianlearnModel(ABC):
 					self.optimizer.minimize(train_dict,hessian_feed_dict=hess_dict)
 				except:
 					self.optimizer.minimize(train_dict)
+
+
 
 				# If LRSFN used with range_finding need to record rank at each iteration
 				# If LRSFN used with range_finding need to record rank at each iteration
