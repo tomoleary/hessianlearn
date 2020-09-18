@@ -98,11 +98,11 @@ class InexactNewtonCG(Optimizer):
 
 
 		if self.parameters['globalization'] is None:
-			alpha = self.parameters['alpha']
+			self.alpha = self.parameters['alpha']
 			p,on_boundary = self.cg_solver.solve(-self.gradient,hessian_feed_dict)
 			self._sweeps += [1,2*self.cg_solver.iter]
 			self.p = p
-			update = alpha*p
+			update = self.alpha*p
 			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 
 		if self.parameters['globalization'] == 'line_search':

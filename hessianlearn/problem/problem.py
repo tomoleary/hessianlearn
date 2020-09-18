@@ -445,7 +445,7 @@ class VariationalAutoencoderProblem(Problem):
 	def __init__(self,NeuralNetwork,z_mean,z_log_sigma,inputs,dtype = tf.float32):
 		self.z_mean = z_mean
 		self.z_log_sigma = z_log_sigma
-		super(VariationalAutoencoderProblem,self).__init__(NeuralNetwork,inputs,dtype)
+		super(VariationalAutoencoderProblem,self).__init__(NeuralNetwork,inputs = inputs,dtype = dtype)
 		self._is_autoencoder = True
 
 	def _initialize_loss(self,cross_entropy = False):

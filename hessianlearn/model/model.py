@@ -50,6 +50,10 @@ def HessianlearnModelSettings(settings = {}):
 	settings['problem_name']         		= [None, "string for name used in file naming"]
 	settings['title']         				= [None, "string for name used in plotting"]
 	settings['logger_outname']         		= [None, "string for name used in logger file naming"]
+	settings['printing_items']				= [{'sweeps':'sweeps','Loss':'loss_train','acc train':'accuracy_train',\
+												'||g||':'||g||','Loss test':'loss_train','acc test':'accuracy_test',\
+												'maxacc test':'max_accuracy_test','alpha':'alpha'},\
+																			"Dictionary of items for printing"]
 
 	settings['verbose']         			= [True, "Boolean for printing"]
 
@@ -65,9 +69,9 @@ def HessianlearnModelSettings(settings = {}):
 	# Range finding settings for LRSFN
 	settings['range_finding']				= [None,"Range finding, if None then r = hessian_low_rank\
 	 														Choose from None, 'arf', 'naarf'"]
-	settings['range_rel_error_tolerance']   = [50, "Error tolerance for error estimator in adaptive range finding"]
+	settings['range_rel_error_tolerance']   = [5, "Error tolerance for error estimator in adaptive range finding"]
 	settings['range_abs_error_tolerance']   = [50, "Error tolerance for error estimator in adaptive range finding"]
-	settings['range_block_size']        	= [5, "Block size used in range finder"]
+	settings['range_block_size']        	= [10, "Block size used in range finder"]
 
 
 	settings['max_sweeps']					= [10,"Maximum number of times through the data (measured in epoch equivalents"]
@@ -104,6 +108,7 @@ class HessianlearnModel(ABC):
 
 		# self._sess = None
 		self._optimizer = None
+
 
 
 
@@ -169,12 +174,12 @@ class HessianlearnModel(ABC):
 				print('Using inexact Newton CG optimizer with fixed step'.center(80))
 				print(('Batch size = '+str(self.data._batch_size)).center(80))
 				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
-				optimizer = InexactNewtonCG(self.problem,self.regularization,sess)
+				optimizer = InexactNewtonCG(self.problem,LowRankSaddleFreeNewton.regularization,sess)
 				optimizer.parameters['globalization'] = 'None'
 				optimizer.alpha = settings['alpha']
 				self._logger['alpha'] = settings['alpha']
 		elif settings['optimizer'] == 'lrsfn':
-
+			self.settings['printing_items']['rank'] = 'hessian_low_rank'
 			if not settings['fixed_step']:
 				print('Using low rank SFN optimizer with line search'.center(80))
 				print(('Batch size = '+str(self.data._batch_size)).center(80))
@@ -240,6 +245,9 @@ class HessianlearnModel(ABC):
 		logger['accuracy_test'] = {}
 		logger['accuracy_train'] = {}
 
+		logger['max_accuracy_test'] = {}
+		logger['alpha'] = {}
+
 		if self.settings['record_spectrum']:
 			logger['full_train_eigenvalues'] = {}
 			logger['train_eigenvalues'] = {}
@@ -301,16 +309,7 @@ class HessianlearnModel(ABC):
 				# sess.run(problem._assignment_ops,feed_dict = {problem._assignment_placeholder:w_0})
 
 			if self.settings['verbose']:
-				print(80*'#')
-				# First print
-				if self.settings['optimizer'] == 'lrsfn':
-					print('{0:7} {1:9} {2:10} {3:10} {4:10} {5:11} {6:10} {7:10} {8:10}'.format(\
-										'Sweeps'.center(8),'Loss'.center(8),'acc train'.center(8),'||g||'.center(8),\
-															'Loss_test'.center(8), 'acc test'.center(8),'max test'.center(8), 'alpha'.center(8),'rank'.center(8)))
-				else:
-					print('{0:7} {1:9} {2:10} {3:10} {4:10} {5:11} {6:10} {7:10}'.format(\
-										'Sweeps'.center(8),'Loss'.center(8),'acc train'.center(8),'||g||'.center(8),\
-															'Loss_test'.center(8), 'acc test'.center(8),'max test'.center(8), 'alpha'.center(8)))
+				self.print(first_print = True)
 
 			x_test, y_test = next(iter(self.data.test))
 			if self.problem.is_autoencoder:
@@ -359,6 +358,10 @@ class HessianlearnModel(ABC):
 				self._logger['loss_test'][iteration] = loss_test
 				min_test_loss = min(min_test_loss,loss_test)
 				max_test_acc = max(max_test_acc,accuracy_test)
+				self._logger['max_accuracy_test'][iteration] = max_test_acc
+				self._logger['alpha'][iteration] = self.optimizer.alpha
+				if self.settings['optimizer'] == 'lrsfn':
+					self._logger['hessian_low_rank'][iteration] = self.optimizer.rank
 
 				if accuracy_test == max_test_acc:
 					self._best_weights = sess.run(self.problem._w)
@@ -370,36 +373,8 @@ class HessianlearnModel(ABC):
 				sweeps = np.dot(self.data.batch_factor,self.optimizer.sweeps)
 				if self.settings['verbose'] and iteration % 1 == 0:
 					# Print once each epoch
-					try:
-						if self.settings['optimizer'] == 'lrsfn':
-							if accuracy_test < 0 or accuracy_test > 10.:
-								print(' {0:^8.2f} {1:1.4e} {2:.2%} {3:1.4e} {4:1.4e} {5:.2%} {6:.3%} {7:1.4e} {8:8}'.format(\
-									sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha,str(self.optimizer.rank)))
-							else:
-								print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:1.4e} {8:8}'.format(\
-								sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha,str(self.optimizer.rank)))
-						else:
-							if accuracy_test < 0 or accuracy_test > 10.:
-								print(' {0:^8.2f} {1:1.4e} {2:.2%} {3:1.4e} {4:1.4e} {5:.2%} {6:.3%} {7:1.4e}'.format(\
-									sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
-							else:
-								print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:1.4e}'.format(\
-									sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
-					except:	
-						if self.settings['optimizer'] == 'lrsfn':
-							if accuracy_test < 0 or accuracy_test > 10.:
-								print(' {0:^8.2f} {1:1.4e} {2:.2%} {3:1.4e} {4:1.4e} {5:.2%} {6:.3%} {7:11} {8:8}'.format(\
-									sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha,str(self.optimizer.rank)))
-							else:
-								print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:11} {8:8}'.format(\
-									sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha,str(self.optimizer.rank)))
-						else:
-							if accuracy_test < 0 or accuracy_test > 10.:
-								print(' {0:^8.2f} {1:1.4e} {2:.2%} {3:1.4e} {4:1.4e} {5:.2%} {6:.3%} {7:11}'.format(\
-									sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
-							else:
-								print(' {0:^8.2f} {1:1.4e} {2:.3%} {3:1.4e} {4:1.4e} {5:.3%} {6:.3%} {7:11}'.format(\
-									sweeps, loss_train,accuracy_train,norm_g,loss_test,accuracy_test,max_test_acc,self.optimizer.alpha))
+					self.print(iteration = iteration)
+
 				if np.isnan(loss_train) or np.isnan(norm_g):
 					print(80*'#')
 					print('Encountered nan, exiting'.center(80))
@@ -489,7 +464,34 @@ class HessianlearnModel(ABC):
 
 
 
-
-
+	def print(self,first_print = False,iteration = None):
+		for key in self.settings['printing_items'].keys():
+			assert self.settings['printing_items'][key] in self._logger.keys(), 'item '+str(self.settings['printing_items'][key])+' not in logger'
+		if first_print:
+			print(80*'#')
+			format_string = ''
+			for i in range(len(self.settings['printing_items'].keys())):
+				if i == 0:
+					format_string += '{0:7} '
+				else:
+					format_string += '{'+str(i)+':10} '
+			string_tuples = (print_string.center(8) for print_string in self.settings['printing_items'].keys())
+			print(format_string.format(*string_tuples))
+		else:
+			format_string = ''
+			for i,key in enumerate(self.settings['printing_items'].keys()):
+				if 'sweeps' in key:
+					format_string += '{'+str(i)+':^8.2f} '
+				elif 'acc' in key:
+					if False:
+						pass
+					else:
+						format_string += '{'+str(i)+':.3%} '
+				elif 'rank' in key: 
+					format_string += '{'+str(i)+':10} '
+				else:
+					format_string += '{'+str(i)+':1.4e} '
+			value_tuples = (self._logger[self.settings['printing_items'][item]][iteration] for item in self.settings['printing_items'])
+			print(format_string.format(*value_tuples))
 
 

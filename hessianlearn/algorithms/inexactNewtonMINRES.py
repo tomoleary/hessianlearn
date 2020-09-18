@@ -64,7 +64,7 @@ class InexactNewtonMINRES(Optimizer):
 		self.grad = self.problem.gradient + self.regularization.gradient
 		self.minres_solver = MINRESSolver(self.problem,self.regularization,\
 			self.sess,parameters= self.parameters['minres_parameters'])
-		self.alpha = (8*'-').center(10)
+		self.alpha = 0.0
 		
 
 	def minimize(self,feed_dict = None,hessian_feed_dict = None):

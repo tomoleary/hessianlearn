@@ -44,7 +44,7 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 	 														Choose from None, 'arf', 'naarf'"]
 	parameters['range_rel_error_tolerance']     = [100, "Error tolerance for error estimator in adaptive range finding"]
 	parameters['range_abs_error_tolerance']     = [100, "Error tolerance for error estimator in adaptive range finding"]
-	parameters['range_block_size']        		= [5, "Block size used in range finder"]
+	parameters['range_block_size']        		= [10, "Block size used in range finder"]
 	parameters['rq_samples_for_naarf']        	= [100, "Number of partitions for RQ variance evaluation"]
 	parameters['hessian_low_rank']        		= [20, "Fixed rank for randomized eigenvalue decomposition"]
 	
@@ -69,8 +69,8 @@ class LowRankSaddleFreeNewton(Optimizer):
 		if self.parameters['globalization'] == 'trust_region':
 			self.trust_region = TrustRegion()
 		self._sweeps = np.zeros(2)
-		self.alpha = (8*'-').center(10)
-		self._rank = None
+		self.alpha = 0.0
+		self._rank = 0
 
 	@property
 	def rank(self):
@@ -120,7 +120,7 @@ class LowRankSaddleFreeNewton(Optimizer):
 		elif self.parameters['range_finding'] == 'naarf':
 			norm_g = np.linalg.norm(gradient)
 			tolerance = self.parameters['range_rel_error_tolerance']*norm_g
-			noise_tolerance = 0.1*tolerance
+			noise_tolerance = 0.01*tolerance
 			if rq_estimator_dict is None:
 				rq_estimator_dict_list = self.problem._partition_dictionaries(feed_dict,self.parameters['rq_samples_for_naarf'])
 			elif type(rq_estimator_dict) == list:
@@ -165,7 +165,7 @@ class LowRankSaddleFreeNewton(Optimizer):
 
 		if self.parameters['globalization'] is None:
 			alpha = self.parameters['alpha']
-			self._sweeps += [1,2*rank]
+			self._sweeps += [1,2*self._rank]
 			update = alpha*self.p
 			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 
