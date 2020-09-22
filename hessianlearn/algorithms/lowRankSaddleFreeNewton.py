@@ -69,6 +69,7 @@ class LowRankSaddleFreeNewton(Optimizer):
 		if self.parameters['globalization'] == 'trust_region':
 			self.trust_region = TrustRegion()
 		self._sweeps = np.zeros(2)
+
 		self.alpha = 0.0
 		self._rank = 0
 
@@ -164,9 +165,9 @@ class LowRankSaddleFreeNewton(Optimizer):
 
 
 		if self.parameters['globalization'] is None:
-			alpha = self.parameters['alpha']
+			self.alpha = self.parameters['alpha']
 			self._sweeps += [1,2*self._rank]
-			update = alpha*self.p
+			update = self.alpha*self.p
 			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 
 

@@ -102,8 +102,16 @@ class HessianlearnModel(ABC):
 			print(('Size of configuration space:  '+str(self.problem.dimension)).center(80))
 			print(('Size of training data: '+str(self.data.train_data_size)).center(80))
 			# Approximate data needed is d_W / output
+			if len(self.problem.y_prediction.shape) >2:
+				output_dimension = 1.
+				for shape in self.problem.y_prediction.shape[1:]:
+					output_dimension *= shape.value
+				# print('Shape = ',self.problem.y_prediction.shape[1:].value)
+				# output_dimension = None
+			else:
+				output_dimension = float(self.problem.y_prediction.shape[-1].value)
 			print(('Approximate data cardinality needed: '\
-				+str(int(float(self.problem.dimension)/float(self.problem.y_prediction.shape[-1].value)))).center(80))
+				+str(int(float(self.problem.dimension)/output_dimension	))).center(80))
 			print(80*'#')
 
 		# self._sess = None
@@ -152,7 +160,7 @@ class HessianlearnModel(ABC):
 			optimizer = Adam(self.problem,self.regularization,sess)
 			optimizer.parameters['alpha'] = settings['alpha']
 			optimizer.alpha = settings['alpha']
-			self._logger['alpha'] = settings['alpha']
+			self._logger['alpha'][0] = settings['alpha']
 
 		elif settings['optimizer'] == 'gd':
 			print('Using gradient descent optimizer with line search'.center(80))
@@ -175,9 +183,9 @@ class HessianlearnModel(ABC):
 				print(('Batch size = '+str(self.data._batch_size)).center(80))
 				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
 				optimizer = InexactNewtonCG(self.problem,LowRankSaddleFreeNewton.regularization,sess)
-				optimizer.parameters['globalization'] = 'None'
+				optimizer.parameters['globalization'] = None
 				optimizer.alpha = settings['alpha']
-				self._logger['alpha'] = settings['alpha']
+				self._logger['alpha'][0] = settings['alpha']
 		elif settings['optimizer'] == 'lrsfn':
 			self.settings['printing_items']['rank'] = 'hessian_low_rank'
 			if not settings['fixed_step']:
@@ -200,14 +208,14 @@ class HessianlearnModel(ABC):
 				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
 				print(('Hessian low rank = '+str(settings['hessian_low_rank'])).center(80))
 				optimizer = LowRankSaddleFreeNewton(self.problem,self.regularization,sess)
-				optimizer.parameters['globalization'] = 'None'
+				optimizer.parameters['globalization'] = None
 				optimizer.parameters['hessian_low_rank'] = settings['hessian_low_rank']
 				optimizer.parameters['alpha'] = settings['alpha']
 				optimizer.parameters['range_finding'] = settings['range_finding']
 				optimizer.parameters['range_rel_error_tolerance'] =	settings['range_rel_error_tolerance']
 				optimizer.parameters['range_block_size'] =	settings['range_block_size']
 				optimizer.alpha = settings['alpha']
-				self._logger['alpha'] = settings['alpha']
+				self._logger['alpha'][0] = settings['alpha']
 			if self.settings['range_finding'] is None:
 				self._logger['hessian_low_rank'][0] = settings['hessian_low_rank']
 		elif settings['optimizer'] == 'sgd':
@@ -216,7 +224,7 @@ class HessianlearnModel(ABC):
 			optimizer = GradientDescent(self.problem,self.regularization,sess)
 			optimizer.parameters['alpha'] = settings['alpha']
 			optimizer.alpha = settings['alpha']
-			self._logger['alpha'] = settings['alpha']
+			self._logger['alpha'][0] = settings['alpha']
 		else:
 			raise
 		self._optimizer = optimizer
@@ -492,6 +500,8 @@ class HessianlearnModel(ABC):
 				else:
 					format_string += '{'+str(i)+':1.4e} '
 			value_tuples = (self._logger[self.settings['printing_items'][item]][iteration] for item in self.settings['printing_items'])
+
+
 			print(format_string.format(*value_tuples))
 
 
