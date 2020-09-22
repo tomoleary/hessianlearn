@@ -22,12 +22,6 @@ from .problem import Problem, ClassificationProblem, RegressionProblem, Autoenco
 
 from .hessian import Hessian
 
-from .neuralNetwork import NeuralNetwork, GenericDNN, GenericCDNN, GenericCAE,\
-							 GenericDAE, GenericCED, ProjectedGenericDNN, \
-							 ProjectedDenseEncoderDecoder, ProjectedResidualEncoderDecoder,\
-							 ProjectedLowRankResidualEncoderDecoder,\
-							 ConvResNet, ConvResNetClassifier
-
 from .preconditioner import Preconditioner, IdentityPreconditioner
 
 from .regularization import ZeroRegularization, L2Regularization
