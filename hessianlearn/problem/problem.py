@@ -200,9 +200,21 @@ class Problem(ABC):
 		return self._is_autoencoder		
 
 	def _initialize_loss(self):
+		"""
+		This method defines the loss as a function of the neural network and 
+		placeholder variable for the true data.
+		Child class of Problem must implement this method
+		"""
 		raise NotImplementedError("Child class must implement method initialize_loss") 
 
 	def _zero_layers(self,array_like_w,list_of_layer_names):
+		"""
+		This method takes an array like w, and names of layers 
+		which are to be zeroed. This is useful for example in zeroing
+		biases when one wants to use a simple Gaussian for initializing weights
+			-array_like_w: the array which is to be modified
+			-list_of_layer_names: list of layer names to be zeroed.
+		"""
 		assert array_like_w.shape == self._flat_w.shape
 		# Make sure that each layer name is in the layer_descriptors dictionary
 		for layer_name in list_of_layer_names:
@@ -215,6 +227,13 @@ class Problem(ABC):
 		return array_like_w
 
 	def _set_layer(self,array_like_w,array_like_layer,layer_name):
+		"""
+		This method takes an array like w, and name of a layers to be set,
+		and the data which it is to be set to. Useful when one wants to set 
+		specific layers to good initial guesses
+			-array_like_w: the array which is to be modified
+			-list_of_layer_names: list of layer names to be zeroed.
+		"""
 		assert array_like_w.shape == self._flat_w.shape
 		assert layer_name in self.layer_descriptors.keys()
 		indices = self.layer_descriptors[layer_name]['indices']
@@ -223,6 +242,11 @@ class Problem(ABC):
 		return array_like_w
 
 	def _partition_dictionaries(self,data_dictionary,n_partitions):
+		"""
+		This method partitions one data dictionary into n_partitions.
+		The data that are used in the child class are problem specific 
+		and for this reason the child class implements this method.
+		"""
 		raise NotImplementedError("Child class should implement method _parition_dictionaries") 
 
 
