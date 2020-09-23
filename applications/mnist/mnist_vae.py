@@ -118,7 +118,7 @@ vae = tf.keras.models.Model(inputs, outputs, name='vae_mlp')
 # Instantiate the problem, regularization.
 
 # problem = AutoencoderProblem(vae,inputs = inputs,dtype=tf.float32)
-problem = VariationalAutoencoderProblem(vae,z_mean,z_log_var,inputs,dtype=tf.float32)
+problem = VariationalAutoencoderProblem(vae,z_mean,z_log_var,dtype=tf.float32)
 
 settings['tikhonov_gamma'] = 1e-2
 regularization = L2Regularization(problem,gamma = settings['tikhonov_gamma'])

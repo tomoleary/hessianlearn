@@ -188,12 +188,13 @@ class Problem(ABC):
 	def H_quadratic(self):
 		return self._H_quadratic
 
-	
-
 	@property
 	def loss(self):
 		return self._loss
-	
+
+	@property
+	def accuracy(self):
+		return self._accuracy
 
 	@property
 	def is_autoencoder(self):
@@ -204,6 +205,8 @@ class Problem(ABC):
 		This method defines the loss as a function of the neural network and 
 		placeholder variable for the true data.
 		Child class of Problem must implement this method
+
+		This method implements self._loss and self._accuracy
 		"""
 		raise NotImplementedError("Child class must implement method initialize_loss") 
 
@@ -252,22 +255,65 @@ class Problem(ABC):
 
 
 class ClassificationProblem(Problem):
+	"""
+	This class implements the description of basic classification problems. 
+
+	"""
 	def __init__(self,NeuralNetwork,loss_type = 'cross_entropy',dtype = tf.float32):
+		"""
+		The class constructor is like that of the parent except it takes an additional flag 
+		for the type of the loss function to be employed.
+			-NeuralNetwork: the neural network represented as a keras Model
+			-loss_type: a string for the loss type used in classification
+			-dtype: the data type used.
+
+		"""
+		assert loss_type in ['cross_entropy','categorical_cross_entropy','least_squares','mixed']
+		self._loss_type = loss_type
 		super(ClassificationProblem,self).__init__(NeuralNetwork,dtype = dtype)
 
+	@property
+	def loss_type(self):
+		return self._loss_type
+	
+	@property
+	def accuracy(self):
+		return self._accuracy
+	
+
 	def _initialize_loss(self):
-		with tf.name_scope('loss'):
-			# scce = tf.keras.losses.SparseCategoricalCrossentropy()
-			# self._loss = scce(self.y_true,self.y_prediction)
-			self._loss = tf.reduce_mean(-tf.reduce_sum(self.y_true*tf.nn.log_softmax(self.y_prediction), [1]))
+		"""
+		This method is called during the construction of the problem class.
+		The member variable self.loss_type decides what type of loss function
+		is instantiated.
+		Regardless of the loss type this function also defines classification
+		accuracy to be used to monitor training.
+		"""
+		if self.loss_type == 'cross_entropy':
+			with tf.name_scope('loss'):
+				self._loss = tf.reduce_mean(-tf.reduce_sum(self.y_true*tf.nn.log_softmax(self.y_prediction), [1]))
+		elif self.loss_type == 'categorical_cross_entropy':
+			raise 'Have not implemented this yet'
+
+		elif self.loss_type == 'least_squares':
+			with tf.name_scope('loss'):
+				self._loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
+			with tf.name_scope('rel_error'):
+				self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
+								/tf.reduce_mean(tf.pow(self.y_true,2)))
 
 		with tf.name_scope('accuracy'):
 			y_prediction_sm = tf.nn.softmax(self.y_prediction)
 			correct_prediction = tf.equal(tf.argmax(self.y_prediction, 1), tf.argmax(self.y_true,1))
 			correct_prediction = tf.cast(correct_prediction, self.dtype)
-			self.accuracy = tf.reduce_mean(correct_prediction)
+			self._accuracy = tf.reduce_mean(correct_prediction)
+
 
 	def _partition_dictionaries(self,data_dictionary,n_partitions):
+		"""
+		This method partitions one data dictionary into n_partitions.
+		For classification this is just inputs to outputs.
+		"""
 		assert type(n_partitions) == int
 		data_xs = data_dictionary[self.x]
 		data_ys = data_dictionary[self.y_true]
@@ -283,71 +329,64 @@ class ClassificationProblem(Problem):
 			dictionary_partitions.append({self.x:my_chunk_x, self.y_true: my_chunk_y})
 		return dictionary_partitions
 
-
-
-
-class LeastSquaresClassificationProblem(Problem):
-	def __init__(self,NeuralNetwork,dtype = tf.float32):
-		super(LeastSquaresClassificationProblem,self).__init__(NeuralNetwork,dtype = dtype)
-		
-
-	def _initialize_loss(self):
-		with tf.name_scope('loss'):
-			self._loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
-		with tf.name_scope('rel_error'):
-			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
-							/tf.reduce_mean(tf.pow(self.y_true,2)))
-		with tf.name_scope('accuracy'):
-			y_prediction_sm = tf.nn.softmax(self.y_prediction)
-			correct_prediction = tf.equal(tf.argmax(self.y_prediction, 1), tf.argmax(self.y_true,1))
-			correct_prediction = tf.cast(correct_prediction, self.dtype)
-			self.accuracy = tf.reduce_mean(correct_prediction)
-
-	def _partition_dictionaries(self,data_dictionary,n_partitions):
-		assert type(n_partitions) == int
-		data_xs = data_dictionary[self.x]
-		data_ys = data_dictionary[self.y_true]
-		if n_partitions > len(data_xs):
-			n_partitions = len(data_xs)
-		chunk_size = int(data_xs.shape[0]/n_partitions)
-		dictionary_partitions = []
-		for chunk_i in range(n_partitions):
-			# Array slicing should be a view, not a copy
-			# So this should not be a memory issue
-			my_chunk_x = data_xs[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
-			my_chunk_y = data_ys[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
-			dictionary_partitions.append({self.x:my_chunk_x, self.y_true: my_chunk_y})
-		return dictionary_partitions
 
 
 class RegressionProblem(Problem):
+	"""
+	This class implements the description of basic regression problems. 
+
+	"""
 	def __init__(self,NeuralNetwork,y_mean = None,dtype = tf.float32):
+		"""
+		The constructor for this class takes:
+			-NeuralNetwork: the neural network represented as a tf.keras Model
+
+		"""
 		if y_mean is not None:
 			self.y_mean = tf.constant(y_mean,dtype = dtype)
 		else:
 			self.y_mean = None
 		super(RegressionProblem,self).__init__(NeuralNetwork,dtype = dtype)
-		
+
+	@property
+	def variance_reduction(self):
+		return self._variance_reduction
+
+	@property
+	def rel_error(self):
+		return self._rel_error
+	
+	
 
 	def _initialize_loss(self):
+		"""
+		This method defines the least squares loss function as well as relative error and accuracy
+		"""
 		with tf.name_scope('loss'):
 			self._loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
 		with tf.name_scope('rel_error'):
 			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
 							/tf.reduce_mean(tf.pow(self.y_true,2)))
-		with tf.name_scope('improvement'):
-			assert self.y_mean is not None
-			self.improvement = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
-							/tf.reduce_mean(tf.pow(self.y_true - self.y_mean,2)))
-		with tf.name_scope('mad'):
-			try:
-				import tensorflow_probability as tfp
-				absolute_deviation = tf.math.abs(self.y_true - self.y_prediction)
-				self.mad = tfp.stats.percentile(absolute_deviation,50.0,interpolation = 'midpoint')
-			except:
-				self.mad = None
+		self._accuracy = 1. - self._rel_error
+		# with tf.name_scope('variance_reduction'):
+		# 	# For use in constructing a regressor to serve as a control variate.
+		# 	# 
+		# 	assert self.y_mean is not None
+		# 	self._variance_reduction = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
+		# 					/tf.reduce_mean(tf.pow(self.y_true - self.y_mean,2)))
+		# with tf.name_scope('mad'):
+		# 	try:
+		# 		import tensorflow_probability as tfp
+		# 		absolute_deviation = tf.math.abs(self.y_true - self.y_prediction)
+		# 		self.mad = tfp.stats.percentile(absolute_deviation,50.0,interpolation = 'midpoint')
+		# 	except:
+		# 		self.mad = None
 
 	def _partition_dictionaries(self,data_dictionary,n_partitions):
+		"""
+		This method partitions one data dictionary into n_partitions.
+		For regression this is just inputs to outputs.
+		"""
 		assert type(n_partitions) == int
 		data_xs = data_dictionary[self.x]
 		data_ys = data_dictionary[self.y_true]
@@ -365,19 +404,34 @@ class RegressionProblem(Problem):
 
 
 class AutoencoderProblem(Problem):
-	def __init__(self,NeuralNetwork,inputs = None,dtype = tf.float32):
+	"""
+	This class implements the description of basic autoencoder problems. 
+
+	"""
+	def __init__(self,NeuralNetwork,dtype = tf.float32):
+		"""
+		The constructor for this class takes:
+			-NeuralNetwork: the tf.keras Model representation of the neural network
+		"""
 		super(AutoencoderProblem,self).__init__(NeuralNetwork,dtype = dtype)
 		self._is_autoencoder = True
 
 
 	def _initialize_loss(self):
+		"""
+		This method defines the least squares loss function as well as relative error and accuracy
+		"""
 		with tf.name_scope('loss'): # 
 			self._loss = tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)) 
 			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
 							/tf.reduce_mean(tf.pow(self.x,2)))
-			self.accuracy = 1. - self.rel_error
+			self._accuracy = 1. - self.rel_error
 
 	def _partition_dictionaries(self,data_dictionary,n_partitions):
+		"""
+		This method partitions one data dictionary into n_partitions.
+		For autoencoders this is just inputs.
+		"""
 		assert type(n_partitions) == int
 		data_xs = data_dictionary[self.x]
 		if n_partitions > len(data_xs):
@@ -394,29 +448,56 @@ class AutoencoderProblem(Problem):
 
 
 class VariationalAutoencoderProblem(Problem):
-	def __init__(self,NeuralNetwork,z_mean,z_log_sigma,inputs,dtype = tf.float32):
+	"""
+	This class implements the description of basic variational autoencoder problems. 
+
+	"""
+	def __init__(self,NeuralNetwork,z_mean,z_log_sigma,loss_type = 'least_squares',dtype = tf.float32):
+		"""
+		The constructor for this class takes:
+			-NeuralNetwork: the tf.keras Model representation of the neural network
+			-z_mean: The mean for the Gaussian latent variable probability model
+						to be learned during VAE training
+			-z_log_sigma: The diagonal covariance for the Gaussian latent variable 
+							probability distribution model to be learned during VAE training
+			-loss_type: the loss type used for the VAE model
+		"""
+		assert loss_type in ['cross_entropy','least_squares']
+		self._loss_type = loss_type
 		self.z_mean = z_mean
 		self.z_log_sigma = z_log_sigma
+		
 		super(VariationalAutoencoderProblem,self).__init__(NeuralNetwork,dtype = dtype)
 		self._is_autoencoder = True
 
-	def _initialize_loss(self,cross_entropy = False):
+
+
+	def _initialize_loss(self):
+		"""
+		This method initializes the loss function used for variational autoencoder training
+
+		"""
 		with tf.name_scope('loss'): # 
-			if cross_entropy:
+			if self.loss_type == 'cross_entropy':
 				pass
-			else:
+			elif self.loss_type == 'least_squares':
 				# VAE tutorials rescale the mse by the input dimension
 				least_squares_loss = np.prod(self.NN.input_shape[1:])*tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)) 
 				kl_loss = tf.reduce_mean(-0.5*tf.reduce_sum(1 + self.z_log_sigma - tf.pow(self.z_mean,2) - tf.exp(self.z_log_sigma),axis = -1))
 				# kl_loss = 0.0
-
 				self._loss = least_squares_loss + kl_loss
+			else:
+				raise
 
-				self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
-								/tf.reduce_mean(tf.pow(self.x,2)))
-				self.accuracy = 1. - self.rel_error
+		self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
+						/tf.reduce_mean(tf.pow(self.x,2)))
+		self._accuracy = 1. - self.rel_error
 
 	def _partition_dictionaries(self,data_dictionary,n_partitions):
+		"""
+		This method partitions one data dictionary into n_partitions.
+		For autoencoders this is just inputs.
+		"""
 		assert type(n_partitions) == int
 		data_xs = data_dictionary[self.x]
 		if n_partitions > len(data_xs):
