@@ -24,12 +24,23 @@ if int(tf.__version__[0]) > 1:
 from abc import ABC, abstractmethod
 
 def my_flatten(tensor_list):
+	"""
+	This function flattens a list of tensors into a single numpy vector
+		-tensor_list: list of tensors stored as numpy arrays
+	"""
 	flattened_list = []
 	for tensor in tensor_list:
 		flattened_list.append(tf.reshape(tensor,[np.prod(tensor.shape)]))
 	return tf.concat(flattened_list,axis=0)
 
 def initialize_indices(shapes):
+	"""
+	This function takes a list of shapes and creates an indexing scheme
+	used for mapping lists of tensors to contiguous chunks of a vector
+		-shapes: list of tensor shapes
+	returns:
+		-indices: list of indices
+	"""
 	indices = []
 	index = 0
 	for shape in shapes:
@@ -37,42 +48,36 @@ def initialize_indices(shapes):
 		indices.append(index)
 	return indices
 
-def tensor_to_vec(x,shapes):
-	# Inputs x a tensor
-	storage = None
-	for x,shape  in zip(x,shapes):
-
-		x_flat = np.reshape(x,int(np.prod(shape)))
-		if storage is None:
-			storage = x_flat
-		else:
-			storage = np.concatenate((storage,x_flat))
-	return storage
-
-def vec_to_tensor(x,shapes,indices):
-	x = np.squeeze(x)
-	storage = []
-	index_1 = 0
-	for index_2,shape in zip(indices,shapes):
-		chunk = x[index_1:index_2]
-		index_1 = index_2
-		reshaped = np.reshape(chunk,shape)
-		storage.append(reshaped)
-	return storage
-
-def placeholder_like(shapes,name,dtype):
-	placeholder = []
-	for shape in shapes:
-		placeholder.append(tf.placeholder(dtype,shape,name=name))
-	return placeholder
-
 
 
 class Problem(ABC):
-	def __init__(self,NeuralNetwork,inputs = None, outputs = None,dtype = tf.float32):
+	"""
+	This class implements the description of the neural network training problem.
+
+	It takes a neural network model and defines loss function and derivatives
+	Also defines update operations.
+	"""
+	def __init__(self,NeuralNetwork,dtype = tf.float32):
+		"""
+		The Problem parent class constructor takes a neural network model (typically from tf.keras.Model)
+		Children class implement different loss functions which are implemented by the method _initialize_loss
+
+			-NeuralNetwork: keras model for neural network
+		"""
+
 		self._dtype = dtype
 
-		self._initialize_neural_network(NeuralNetwork,inputs = inputs, outputs = outputs)
+		self._NN = NeuralNetwork
+		self.x = self.NN.inputs[0]
+		
+		self.y_prediction = self.NN(self.x)
+
+		# Why does the following not work:
+		# self.y_true = self.NN.outputs[0]
+		# Instead I have to use a placeholder for true output
+
+		output_shape = self.NN.output_shape
+		self.y_true = tf.placeholder(self.dtype, output_shape,name='output_placeholder')
 
 		# Assign trainable variables to member variable w "weights"
 		self._w = tf.trainable_variables()
@@ -192,87 +197,10 @@ class Problem(ABC):
 
 	@property
 	def is_autoencoder(self):
-		return self._is_autoencoder
-
-	def _initialize_neural_network(self, NeuralNetwork, inputs = None, outputs = None):
-		# Initializiation for generic neural network
-		# Classes with more complicated neural networks must implement 
-		# case specific neural network 
-		self._NN = NeuralNetwork
-		# Initialize inputs and outputs
-		if inputs is None:
-			input_shape = self.NN.input_shape
-			self.x = tf.placeholder(self.dtype,input_shape,name = 'input_placeholder')
-		else:
-			# For more complex models like VAE, inputs are used to evaluate intermediate quantities
-			# In this case they must be explicitly passed in
-			# Alternatively could use keras.models.Model.get_layer method and enforce input naming convention
-			self.x = inputs 
-		# placeholder for true output
-		output_shape = self.NN.output_shape
-		self.y_true = tf.placeholder(self.dtype, output_shape,name='output_placeholder')
-
-
-		# For neural network prediction
-		# Assumes neural network is callable function of just x
-		self.y_prediction = self.NN(self.x)
-		
+		return self._is_autoencoder		
 
 	def _initialize_loss(self):
 		raise NotImplementedError("Child class must implement method initialize_loss") 
-
-
-
-	def _initialize_indices(self):
-		assert self.gradient is not None
-		shapes = []
-		indices = []
-		index = 0
-		for g in self.gradient:
-			shape = list(g.shape)
-			shapes.append(shape)
-			# print(type(np.prod(shape)),type(index))
-			index += int(np.prod(shape))
-			indices.append(index)
-		self.w_dim = index
-		self.shapes = shapes
-		self.indices = indices
-
-
-	def tensor_to_vec(self,x):
-		# Inputs x a tensor
-		storage = None
-		for x,shape  in zip(x,self.shapes):
-
-			x_flat = np.reshape(x,int(np.prod(shape)))
-			if storage is None:
-				storage = x_flat
-			else:
-				storage = np.concatenate((storage,x_flat))
-		return storage
-
-	def vec_to_tensor(self,x):
-		storage = []
-		index_1 = 0
-		for index_2,shape in zip(self.indices,self.shapes):
-			chunk = x[index_1:index_2]
-			index_1 = index_2
-			reshaped = np.reshape(chunk,shape)
-			storage.append(reshaped)
-		return storage
-
-	def zeros_like_g(self):
-		zeros = []
-		for shape in self.shapes:
-			zeros.append(np.zeros(shape))
-		return zeros
-
-	def placeholder_like_g(self,name ):
-
-		placeholder = []
-		for shape in self.shapes:
-			placeholder.append(tf.placeholder(self.dtype,shape,name=name))
-		return placeholder
 
 	def _zero_layers(self,array_like_w,list_of_layer_names):
 		assert array_like_w.shape == self._flat_w.shape
@@ -300,8 +228,8 @@ class Problem(ABC):
 
 
 class ClassificationProblem(Problem):
-	def __init__(self,NeuralNetwork,dtype = tf.float32):
-		super(ClassificationProblem,self).__init__(NeuralNetwork,dtype)
+	def __init__(self,NeuralNetwork,loss_type = 'cross_entropy',dtype = tf.float32):
+		super(ClassificationProblem,self).__init__(NeuralNetwork,dtype = dtype)
 
 	def _initialize_loss(self):
 		with tf.name_scope('loss'):
@@ -335,8 +263,8 @@ class ClassificationProblem(Problem):
 
 
 class LeastSquaresClassificationProblem(Problem):
-	def __init__(self,NeuralNetwork,y_mean = None,dtype = tf.float32):
-		super(LeastSquaresClassificationProblem,self).__init__(NeuralNetwork,dtype)
+	def __init__(self,NeuralNetwork,dtype = tf.float32):
+		super(LeastSquaresClassificationProblem,self).__init__(NeuralNetwork,dtype = dtype)
 		
 
 	def _initialize_loss(self):
@@ -374,7 +302,7 @@ class RegressionProblem(Problem):
 			self.y_mean = tf.constant(y_mean,dtype = dtype)
 		else:
 			self.y_mean = None
-		super(RegressionProblem,self).__init__(NeuralNetwork,dtype)
+		super(RegressionProblem,self).__init__(NeuralNetwork,dtype = dtype)
 		
 
 	def _initialize_loss(self):
@@ -414,7 +342,7 @@ class RegressionProblem(Problem):
 
 class AutoencoderProblem(Problem):
 	def __init__(self,NeuralNetwork,inputs = None,dtype = tf.float32):
-		super(AutoencoderProblem,self).__init__(NeuralNetwork,inputs = inputs,dtype = dtype)
+		super(AutoencoderProblem,self).__init__(NeuralNetwork,dtype = dtype)
 		self._is_autoencoder = True
 
 
@@ -445,7 +373,7 @@ class VariationalAutoencoderProblem(Problem):
 	def __init__(self,NeuralNetwork,z_mean,z_log_sigma,inputs,dtype = tf.float32):
 		self.z_mean = z_mean
 		self.z_log_sigma = z_log_sigma
-		super(VariationalAutoencoderProblem,self).__init__(NeuralNetwork,inputs = inputs,dtype = dtype)
+		super(VariationalAutoencoderProblem,self).__init__(NeuralNetwork,dtype = dtype)
 		self._is_autoencoder = True
 
 	def _initialize_loss(self,cross_entropy = False):

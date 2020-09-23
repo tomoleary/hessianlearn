@@ -41,7 +41,7 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 	
 	# Hessian approximation parameters
 	parameters['range_finding']					= [None,"Range finding, if None then r = hessian_low_rank\
-	 														Choose from None, 'arf', 'naarf'"]
+															Choose from None, 'arf', 'naarf'"]
 	parameters['range_rel_error_tolerance']     = [100, "Error tolerance for error estimator in adaptive range finding"]
 	parameters['range_abs_error_tolerance']     = [100, "Error tolerance for error estimator in adaptive range finding"]
 	parameters['range_block_size']        		= [10, "Block size used in range finder"]
@@ -54,6 +54,7 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 	parameters['max_backtracking_iter']			= [5, 'Max backtracking iterations for armijo line search']
 
 	parameters['verbose']                       = [False, "Printing"]
+	parameters['record_last_rq_std']			= [True, "Record the last eigenvector RQ variance"]
 
 	return ParameterList(parameters)
 
@@ -73,9 +74,16 @@ class LowRankSaddleFreeNewton(Optimizer):
 		self.alpha = 0.0
 		self._rank = 0
 
+		self._rq_std = 0.0
+
 	@property
 	def rank(self):
 		return self._rank
+
+	@property
+	def rq_variance(self):
+		return self._rq_variance
+	
 	
 
 
@@ -141,6 +149,31 @@ class LowRankSaddleFreeNewton(Optimizer):
 			self._rank = self.parameters['hessian_low_rank']
 			Lmbda,U = randomized_eigensolver(H, n, self._rank,verbose=False)
 			self.lambdas = Lmbda
+		rq_direction = U[:,-1]
+		# Log the variance of the last eigenvector
+		if self.parameters['record_last_rq_std'] :
+			if rq_estimator_dict is None:
+				rq_estimator_dict_list = self.problem._partition_dictionaries(feed_dict,self.parameters['rq_samples_for_naarf'])
+			elif type(rq_estimator_dict) == list:
+				rq_estimator_dict_list = rq_estimator_dict
+			elif type(rq_estimator_dict) == dict:
+				rq_estimator_dict_list = self.problem._partition_dictionaries(rq_estimator_dict,self.parameters['rq_samples_for_naarf'])
+			else:
+				raise	
+			
+			try:
+				RQ_samples = np.zeros((len(rq_estimator_dict_list),rq_direction.shape[1]))
+			except:
+				RQ_samples = np.zeros(len(rq_estimator_dict_list))
+
+			for samp_i,sample_dictionary in enumerate(rq_estimator_dict_list):
+				RQ_samples[samp_i] = self.H.quadratics(rq_direction,sample_dictionary)
+
+			self._rq_std = np.std(RQ_samples)
+
+			# print('RQ_std = ',self._rq_std)
+
+
 
 		# Saddle free inversion via Woodbury
 		Lmbda_abs = np.abs(Lmbda)

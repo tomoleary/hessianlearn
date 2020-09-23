@@ -51,7 +51,7 @@ def HessianlearnModelSettings(settings = {}):
 	settings['title']         				= [None, "string for name used in plotting"]
 	settings['logger_outname']         		= [None, "string for name used in logger file naming"]
 	settings['printing_items']				= [{'sweeps':'sweeps','Loss':'loss_train','acc train':'accuracy_train',\
-												'||g||':'||g||','Loss test':'loss_train','acc test':'accuracy_test',\
+												'||g||':'||g||','Loss test':'loss_test','acc test':'accuracy_test',\
 												'maxacc test':'max_accuracy_test','alpha':'alpha'},\
 																			"Dictionary of items for printing"]
 
@@ -78,6 +78,7 @@ def HessianlearnModelSettings(settings = {}):
 
 	#Settings for recording spectral information during training
 	settings['record_spectrum']         	= [False, "Boolean for recording spectrum during training"]
+	settings['record_last_rq_std']         	= [False, "Boolean for recording last RQ std for last eigenvector of LRSFN"]
 	settings['spec_frequency'] 				= [10, "Frequency for recording of spectrum"]
 	settings['rayleigh_quotients']         	= [True, "Boolean for recording of spectral variance during training"]
 	settings['rq_data_size'] 				= [None,"Amount of training data to be used, None means all"]
@@ -261,6 +262,8 @@ class HessianlearnModel(ABC):
 			logger['train_eigenvalues'] = {}
 			logger['test_eigenvalues'] = {}
 			logger['rq_std'] = {}
+		elif self.settings['record_last_rq_std']:
+			logger['last_rq_std'] = {}
 
 		self._logger = logger
 
@@ -413,6 +416,8 @@ class HessianlearnModel(ABC):
 
 				if self.settings['record_spectrum'] and iteration%self.settings['spec_frequency'] ==0:
 					self._record_spectrum(iteration)
+				elif self.settings['record_last_rq_std'] and self.settings['optimizer'] == 'lrsfn':
+					logger['last_rq_std'][iteration] = self.optimizer._rq_std
 				with open(self.settings['problem_name']+'_logging/'+ self.logger_outname +'.pkl', 'wb+') as f:
 					pickle.dump(self.logger, f, pickle.HIGHEST_PROTOCOL)
 

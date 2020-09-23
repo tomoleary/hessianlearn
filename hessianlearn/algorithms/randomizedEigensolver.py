@@ -138,19 +138,6 @@ def eigensolver_from_range(Aop, Q,verbose = False):
         eigenvalues arranged in descending order
     U : ndarray, (n,k)
         eigenvectors arranged according to eigenvalues
-    
-    References:
-    -----------
-    .. [1] Halko, Nathan, Per-Gunnar Martinsson, and Joel A. Tropp. "Finding structure with randomness: Probabilistic algorithms for constructing approximate matrix decompositions." SIAM review 53.2 (2011): 217-288.
-    Examples:
-    ---------
-    >>> import numpy as np
-    >>> n = 100
-    >>> A = np.diag(0.95**np.arange(n))
-    >>> Aop = lambda w_hat: np.dot(A,w_hat)
-    >>> k = 10
-    >>> p = 5
-    >>> lmbda, U = randomized_eigensolver(Aop, n, k, p)
     """
     m = Q.shape[1]
     T = np.zeros((m,m),dtype = 'd')

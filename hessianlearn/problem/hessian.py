@@ -27,7 +27,18 @@ from abc import ABC, abstractmethod
 
 
 class Hessian(ABC):
+	"""
+    This class implements methods for the neural network training Hessian.
+
+    Must have a problem and a sess in order to be evaluated
+    """
 	def __init__(self,problem=None,sess=None):
+		"""
+		Create a Hessian given:
+
+			- problem: the description of the neural network training problem
+			- sess: the tf.Session() needed for evaluation at run time
+		"""
 		self._problem = problem
 		self._sess = sess
 
@@ -42,7 +53,6 @@ class Hessian(ABC):
 	def dimension(self):
 		return self.problem.dimension
 	
-	
 
 	@property
 	def T(self):
@@ -55,6 +65,13 @@ class Hessian(ABC):
 		return self(x)
 
 	def __call__(self,x,feed_dict,verbose = False):
+		"""
+		This method implements Hessian action, must have a problem and sess
+		set before this method can be evaluated.
+			-x: numpy array to be multiplied one at a time
+			-feed_dict: data used in finite sum Hessian evaluation
+			-verbose: for printing
+		"""
 		assert self.problem is not None
 		assert self.sess is not None
 		x_shape = x.shape
@@ -83,6 +100,13 @@ class Hessian(ABC):
 			raise
 
 	def quadratics(self,x,feed_dict,verbose = False):
+		"""
+		This method implements Hessian quadratics, must have a problem and sess
+		set before this method can be evaluated.
+			-x: numpy array to be multiplied one at a time
+			-feed_dict: data used in finite sum Hessian evaluation
+			-verbose: for printing
+		"""
 		assert self.problem is not None
 		assert self.sess is not None
 		x_shape = x.shape

@@ -27,8 +27,22 @@ import time
 
 
 def block_range_finder(A_op,n,epsilon,block_size,verbose = False,seed = 0):
+    """
+    Randomized algorithm for block range finding    
+    
+    Parameters:
+    -----------
+    Aop : {Callable} n x n symmetric matrix
+          Hermitian matrix operator whose eigenvalues need to be estimated
+          y = Aop(w_hat) is the action of A in the direction w_hat 
+    n   : size of matrix A
+            
+    Returns:
+    --------
+    Q : range for Aop
+    """
     # Taken from http://people.maths.ox.ac.uk/martinsson/Pubs/2015_randQB.pdf
-    # Assumes A is symmetric
+
     my_state = np.random.RandomState(seed=seed)
     w = my_state.randn(n,1)
     Action = A_op(w)
@@ -69,25 +83,25 @@ def block_range_finder(A_op,n,epsilon,block_size,verbose = False,seed = 0):
 
 def noise_aware_adaptive_range_finder(Hessian,hessian_feed_dict,rq_estimator_dict_list,\
         block_size = None,noise_tolerance = 1e-1,epsilon = 1e-1, verbose = False,seed = 0):
-    # A_op(w_hat,feed_dict) is a function that implements the action of the [n x n] 
-    # symmetric finite sum operator A on an [n x k] ndarray
-    # the second argument is the data dictionary for the finite sum operator
-    # n is the dimension of A
-    # hessian_feed_dict is the data used in the Hessian action
-    # noise_tolerance is the truncation condition for spectral variance
-    # epsilon is the truncation condition for the operator error estimator
-    # block_size is the chunk size used in the iterative range estimator
-    # rq_estimator_dict is a secondary data dictionary used for estimation of the 
-    # spectral noise, if None then hessian_feed_dict will be used
-    # partitions is the number of partitions that will be used in the data
-    # for the spectral noise truncation condition
+    """
+    Randomized algorithm for noise aware block range finding  (N.A.A.R.F.)
+    
+    Parameters:
+    -----------
+    Hessian : 
+    hessian_feed_dict : 
+    rq_estimator_dict : 
+    block_size :
+    noise_tolerance :
+    epsilon : 
+    verbose : 
+    seed :
+            
+    Returns:
+    --------
+    Q : range for dominant eigenmodes of Hessian
+    """
 
-
-    # Check variance of last eigenvector
-    # If its less than noise_tolerance, and error is greater than tolerance then sample more
-    # If its less than noise_tolerance and error is less than tolerance then stop, return range
-    # If its greater than noise tolerance, stop and use binary search to work backwards for 
-    # vector with RQ variance below noise tolerance, and return only these first columns
     ###################################################################################
     assert type(rq_estimator_dict_list) is list
     n = Hessian.dimension
