@@ -28,5 +28,3 @@ from .mnist import load_mnist
 from .lfw import load_lfw
 
 from .cifar import load_cifar10
-
-from .ice import load_ice

@@ -28,15 +28,30 @@ from abc import ABC, abstractmethod
 
 
 class Data(ABC):
-	# Must pass in data = [x,y] where x and y are numpy arrays of the same length (but possibly different shapes)
-
+	"""
+	This class implements the data iterator construct used in hessianlearn
+	It takes data already prepartitioned into testing and training, or partitions 
+	the data as such and then implements iterators that are used in the training loop
+	"""
 	def __init__(self,data, batch_size,test_data = None,
-					test_data_size = None, max_epochs = 1000,hessian_batch_size = -1,\
+					test_data_size = None, max_epochs = np.inf,hessian_batch_size = -1,\
 					variable_batch = False,batch_increment = None,
 					shuffle = True,verbose = False,seed = 0):
-		# If `test_data is None`, then `data` will be assumed to be the entire corpus of data
-		# Otherwise `data` will be the training data, and `test_data` will be used for testing
-
+		""" 
+		The constructor for this class takes (x,y) data and partitions it into member iterators
+			-data: a list of two numpy arrays 
+			-batch_size: the initial batch size to be used during training
+			-test_data: if none then test and training data will be sampled and partitioned
+				from data, otherwise data will be used for training and test_data for testing
+			-max_epochs: maximum numbers of times through the the data during iteration
+			-hessian_batch_size: if positive then a Hessian data batch iterator will be instantiated,
+				otherwise it will not
+			-variable_batch: Boolean for variable batch size iterator
+			-shuffle: Boolean for whether the data should be shuffled or not during partitioning
+			-verbose: for printing
+			-seed: the random seed used for shuffling.
+		"""
+		assert data[0].shape[0] == data[1].shape[0]
 		self._batch_size = batch_size
 
 		if test_data is not None:
@@ -101,16 +116,19 @@ class Data(ABC):
 	def train_data_size(self):
 		return self._train_data_size
 	
-	
-
-	def _load_data(self):
-		# Collect Data in a reproducible way (same ordering)
-		# Put in numpy array
-		# return two numpy arrays x (input), y (output)
-		raise NotImplementedError('Child class must implement method _load_data')
 
 	def _partition(self,data,test_data = None, seed = 0):
-		# Shuffle and parition, instantiate self.train ,self.test
+		"""
+		This method partitions the data, if test_data is none
+		the method will shuffle and partition data when the boolean
+		self._shuffle is True, otherwise it will partition the data
+		as it is passed in.
+			-data: the corpus of data, if test_data is not None, then data
+			is just the training data
+			-test_data: Optional, pre determined testing data partition
+			-seed: random seed used for shuffling
+		This method instantiates the self.train and self.test data iterators
+		"""
 		if test_data is not None:
 			# Then the partition is giving implicitly by the user 
 			_test_data = xyData(test_data)
@@ -176,7 +194,19 @@ class Data(ABC):
 
 
 class BatchIterator(object):
-	def __init__(self,data,batch_size,max_epochs = 1000, seed = 0,verbose = False):
+	"""
+	This class implements a batch iterator object.
+	"""
+	def __init__(self,data,batch_size,max_epochs = np.inf, seed = 0,verbose = False):
+		"""
+		The constructor for this class takes pre-partitioned data and instantiates a 
+		batch data iterator
+			-data: the pre partitioned data
+			-batch_size: the fixed batch size for each iteration
+			-max_epochs: The maximum number of times to go through the data
+			-seed: the seed for shuffling during iteration
+			-verbose: Boolean for printing
+		"""
 		self._data = data
 		self._batch_size = batch_size
 		self._max_epochs = max_epochs
@@ -186,10 +216,16 @@ class BatchIterator(object):
 
 
 	def __iter__(self):
+		"""
+		Returns self (the iterator object)
+		"""
 		return self
 		
 
 	def __next__(self):
+		"""
+		This method defines the shuffling scheme for the iterator
+		"""
 		if self._epoch >= self._max_epochs:
 			print('Maximum epochs reached')
 			raise StopIteration
@@ -215,7 +251,19 @@ class BatchIterator(object):
 		return next_x, next_y
 
 class VariableBatchIterator(object):
+	"""
+	This class implements a variable batch iterator object
+	"""
 	def __init__(self,data,batch_size,max_epochs = 1000,batch_increment = None,seed = 0,verbose = False):
+		"""
+		The constructor for this class takes pre-partitioned data and instantiates a 
+		batch data iterator
+			-data: the pre partitioned data
+			-batch_size: the fixed batch size for each iteration
+			-max_epochs: The maximum number of times to go through the data
+			-seed: the seed for shuffling during iteration
+			-verbose: Boolean for printing
+		"""
 		self._data = data
 		self._batch_size = batch_size
 		self._max_epochs = max_epochs
@@ -229,10 +277,16 @@ class VariableBatchIterator(object):
 
 
 	def __iter__(self):
+		"""
+		Returns self (the iterator object)
+		"""
 		return self
 		
 
 	def __next__(self):
+		"""
+		This method defines the shuffling scheme for the iterator
+		"""
 		if self._epoch >= self._max_epochs:
 			print('Maximum epochs reached')
 			raise StopIteration
@@ -263,14 +317,27 @@ class VariableBatchIterator(object):
 
 
 class StaticIterator(object):
+	"""
+	This class implements a static data iterator object
+	"""
 	def __init__(self,data):
+		"""
+		The constructor for this class just takes the data (xyData object)
+		"""
 		self._data = data
 		self.index = 0
 
 	def __iter__(self):
+		"""
+		Returns self (the iterator object)
+		"""
 		return self
 
 	def __next__(self):
+		"""
+		This method defines the shuffling scheme for the iterator
+		Which just returns all of the data since its a static iterator
+		"""
 		# if self.index > 0:
 		# 	raise StopIteration
 		next_x = self._data.x
@@ -281,21 +348,18 @@ class StaticIterator(object):
 
 
 class xyData (object):
+	"""
+	This class implements a simple xy data pair object
+	"""
 	def __init__(self,data):
+		"""
+		The constructor for this class takes a list of xy data
+			-data: List of [x,y] data
+		"""
 		self.x = data[0]
 		self.y = data[1]
 		self.size = len(self.x)
 
 
-
-class DataIterator(object):
-	def __init__(self):
-		pass
-
-	def __iter__(self):
-		return self
-
-	def __next__(self):
-		pass
 
 
