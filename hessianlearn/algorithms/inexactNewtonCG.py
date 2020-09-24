@@ -57,10 +57,21 @@ def ParametersInexactNewtonCG(parameters = {}):
 
 
 class InexactNewtonCG(Optimizer):
+	"""
+	This class implements the inexact Newton CG optimizer
+	"""
 	def __init__(self,problem,regularization = None,sess = None,feed_dict = None,\
 			parameters = ParametersInexactNewtonCG(),preconditioner = None):
+		"""
+		The constructor for this class takes:
+			-problem: hessianlearn.problem.Problem
+			-regularization: hessianlearn.problem.Regularization
+			-sess: tf.Session()
+			-parameters: hyperparameters dictionary
+			-preconditioner: hessianlearn.problem.Preconditioner
+		"""
 		if regularization is None:
-			_regularization = ZeroRegularization(problem)
+			_regularization = L2Regularization(problem,gamma = 0.0)
 		else:
 			_regularization = regularization
 		super(InexactNewtonCG,self).__init__(problem,_regularization,sess,parameters)
@@ -77,6 +88,9 @@ class InexactNewtonCG(Optimizer):
 
 
 	def initialize_trust_region(self):
+		"""
+		Initializes trust region
+		"""
 		if not self.parameters['globalization'] == 'trust_region':
 			self.parameters['globalization'] = 'trust_region'
 		self.trust_region = TrustRegion()
@@ -86,7 +100,9 @@ class InexactNewtonCG(Optimizer):
 
 	def minimize(self,feed_dict = None,hessian_feed_dict = None):
 		r"""
-		w-=alpha*g
+		Solves using inexact Newton CG algorithm
+			-feed_dict: the data dictionary used for evaluating stochastic gradients and cost
+			-hessian_feed_dict: smaller data dictionary used for stochastic Hessian
 		"""
 		assert self.sess is not None
 		assert feed_dict is not None

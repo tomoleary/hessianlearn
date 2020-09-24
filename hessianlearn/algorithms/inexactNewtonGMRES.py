@@ -53,9 +53,20 @@ def ParametersInexactNewtonGMRES(parameters = {}):
 
 
 class InexactNewtonGMRES(Optimizer):
+	"""
+	This class implements the inexact Newton GMRES optimizer
+	"""
 	def __init__(self,problem,regularization = None,sess = None,feed_dict = None,parameters = ParametersInexactNewtonGMRES(),preconditioner = None):
+		"""
+		The constructor for this class takes:
+			-problem: hessianlearn.problem.Problem
+			-regularization: hessianlearn.problem.Regularization
+			-sess: tf.Session()
+			-parameters: hyperparameters dictionary
+			-preconditioner: hessianlearn.problem.Preconditioner
+		"""
 		if regularization is None:
-			_regularization = ZeroRegularization(problem)
+			_regularization = L2Regularization(problem,gamma = 0.0)
 		else:
 			_regularization = regularization
 		super(InexactNewtonGMRES,self).__init__(problem,_regularization,sess,parameters)
@@ -69,7 +80,7 @@ class InexactNewtonGMRES(Optimizer):
 
 	def minimize(self,feed_dict = None,hessian_feed_dict = None):
 		r"""
-		w-=alpha*g
+		Updates using inexact Newton GMRES
 		"""
 		assert self.sess is not None
 		assert feed_dict is not None

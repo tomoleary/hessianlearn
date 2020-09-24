@@ -60,9 +60,20 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 
 
 class LowRankSaddleFreeNewton(Optimizer):
+	"""
+	This class implements the Low Rank Saddle Free Newton (LRSFN) algorithm
+	"""
 	def __init__(self,problem,regularization = None,sess = None,parameters = ParametersLowRankSaddleFreeNewton(),preconditioner = None):
+		"""
+		The constructor for this class takes:
+			-problem: hessianlearn.problem.Problem
+			-regularization: hessianlearn.problem.Regularization
+			-sess: tf.Session()
+			-parameters: hyperparameters dictionary
+			-preconditioner: hessianlearn.problem.Preconditioner
+		"""
 		if regularization is None:
-			_regularization = ZeroRegularization(problem)
+			_regularization = L2Regularization(problem,gamma = 0.0)
 		else:
 			_regularization = regularization
 		super(LowRankSaddleFreeNewton,self).__init__(problem,_regularization,sess,parameters)
@@ -90,17 +101,14 @@ class LowRankSaddleFreeNewton(Optimizer):
 	def minimize(self,feed_dict = None,hessian_feed_dict = None,rq_estimator_dict = None):
 		r"""
 		Solves the saddle escape problem. Given a misfit (loss) Hessian operator (H)
-		Takes:
-		H_misfit operator (callable) : \mathbb{R}^n \rightarrow \mathbb{R}^n
-		alpha_damping -- if Tikhonov regularization is used then alpha is the regularization 
-			coefficient, otherwise it is a Levenberg-Marquardt style damping coefficient
-		n: the dimension of the weights
-		rank: dimension for low rank spectral decomposition
 		1. H = U_r Lambda_r U_r^T
 		2. Solve [U_r |Lambda_r| U_r^T + alpha I] p = -g for p via Woodbury formula:
 
 		[U_r Lambda_r U_r^T + alpha I]^{-1} = 1/alpha * I - 1/alpha * UDU^T
 		where D = diag(|lambda_i|/(|lambda_i| + alpha))
+			-feed_dict: data dictionary used for evaluating gradient and cost
+			-hessian_feed_dict: dictionary used for stochastic Hessian
+			-rq_estimator_dict: dictionary used for RQ variance calculations
 
 		"""
 		self._iter += 1

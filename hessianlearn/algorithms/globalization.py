@@ -24,6 +24,17 @@ import numpy as np
 
 
 def ArmijoLineSearch(w_dir,w_dir_inner_g,cost_at_candidate, initial_cost, c_armijo = 1e-4 ,alpha =1.0, max_backtracking_iter = 10,comm = None):
+	"""
+	This function implements Armijo line search given:
+		-w_dir: 
+		-w_dir_inner_g:
+		-cost_at_candidate:
+		-initial_cost:
+		-c_armijo:
+		-alpha:
+		-max_backtracking_iter:
+		-comm
+	"""
 	# Armijo Line Search
 	line_search, line_search_iter = ( True, 0 )
 	while line_search and (line_search_iter <max_backtracking_iter):
@@ -39,16 +50,28 @@ def ArmijoLineSearch(w_dir,w_dir_inner_g,cost_at_candidate, initial_cost, c_armi
 
 
 class TrustRegion(object):
-
+	"""
+	This class implements trust region globalization
+	"""
 	def __init__(self,delta_0 = 1.0,delta_hat = 1.0,eta = 0.05):
-		# delta_hat: maximum trust region radius
-		# delta_0: initial trust region radius
-		# eta: threshold for reduction acceptance (rho<eta means we should reject the step)
+		"""
+		The constructor for this class takes:
+			-delta_0: initial trust region radius
+			-delta_hat: maximum trust region radius
+			-eta: eta: threshold for reduction acceptance (rho<eta means we should reject the step)
+		"""
 		self.delta_hat = delta_hat
 		self.radius = delta_0
 		self.eta = eta
 		
 	def evaluate_step(self,actual_reduction = None,predicted_reduction = None,on_boundary = False):
+		"""
+		This method evaluates whether or not a candidate step should be taken.
+		This method takes:
+			-actual_reduction:
+			-predicted_reduction:
+			-on_boundary: 
+		"""
 		rho = actual_reduction/predicted_reduction
 		if rho < 0.25:
 			self.radius *= 0.5

@@ -44,9 +44,19 @@ def ParametersGradientDescent(parameters = {}):
 
 
 class GradientDescent(Optimizer):
+	"""
+	This class implements the gradient descent (and stochastic variant) optimizer
+	"""
 	def __init__(self,problem,regularization,sess = None,feed_dict = None,parameters = ParametersGradientDescent()):
+		"""
+		The constructor for this class takes:
+			-problem: hessianlearn.problem.Problem
+			-regularization: hessianlearn.problem.Regularization
+			-sess: tf.Session()
+			-parameters: hyperparameters dictionary
+		"""
 		if regularization is None:
-			_regularization = ZeroRegularization(problem)
+			_regularization = L2Regularization(problem,gamma = 0.0)
 		else:
 			_regularization = regularization
 		super(GradientDescent,self).__init__(problem,_regularization,sess,parameters)
@@ -65,7 +75,10 @@ class GradientDescent(Optimizer):
 
 	def minimize(self,feed_dict = None):
 		r"""
+		Implements the gradient update:
 		w-=alpha*g
+		Takes the parameter:
+			-feed_dict: data to be used to evaluate stochastic gradient and cost
 		"""
 		assert self.sess is not None
 		assert feed_dict is not None

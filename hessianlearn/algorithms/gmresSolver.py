@@ -57,10 +57,9 @@ def ParametersGMRESSolver(dictionary = {}):
 
 
 class GMRESSolver(ABC):
-
-
-
-
+	"""
+	This class implements a GMRES solver
+	"""
 	reason = ["Maximum Number of Iterations Reached",
 			  "Relative/Absolute residual less than tol",
 			  "Reached a negative direction",

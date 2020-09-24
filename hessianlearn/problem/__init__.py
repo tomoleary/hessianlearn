@@ -24,4 +24,4 @@ from .hessian import Hessian
 
 from .preconditioner import Preconditioner, IdentityPreconditioner
 
-from .regularization import ZeroRegularization, L2Regularization
+from .regularization import Regularization, L2Regularization

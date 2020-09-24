@@ -25,25 +25,33 @@ if int(tf.__version__[0]) > 1:
 
 
 class Preconditioner(object):
-	def __init__(self):
+	"""
+	This class describes a preconditioner, currently it is empty
 
-
-
-		# Define loss function and accuracy in __init__
-		pass
-
-
-
-
-
+	Child class should implement method __call__ which implements
+	the preconditioner approximation of the (Hessian) inverse
+	"""
 
 
 class IdentityPreconditioner(Preconditioner):
+	"""
+	This class describes identity preconditioning, which means doing nothing
+	"""
 	def __init__(self,problem,dtype = tf.float32):
+		"""
+		The constructor for this class takes:
+			-problem: hessianlearn.problem.Problem class
+			-dtype: data type
+		"""
+		# Rethink this later and improve for Krylov methods.
 		self.x = tf.placeholder(dtype,problem.gradient.shape,name='vec_for_prec_apply')
 
 
 	def __call__(self):
+		"""
+		The call method simply returns vector which must be passed to
+		the sess at runtime. self.x is a placeholder variable.
+		"""
 		return self.x
 
 

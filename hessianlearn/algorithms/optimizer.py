@@ -30,19 +30,27 @@ def ParametersOptimizer(dictionary = {}):
 	parameters['alpha']                         = [1.0, "Initial steplength, or learning rate"]
 	parameters['rel_tolerance']                 = [1e-3, "Relative convergence when sqrt(g,g)/sqrt(g_0,g_0) <= rel_tolerance"]
 	parameters['abs_tolerance']                 = [1e-4,"Absolute converge when sqrt(g,g) <= abs_tolerance"]
-	parameters['max_NN_evals_per_batch']        = [10000, "Scale constant for maximum neural network evaluations per datum"]
-	parameters['max_NN_evals']                  = [None, "Maximum number of neural network evaluations"]
-
 	parameters['globalization']					= [None, 'Choose from trust_region, line_search or none']
-	# Reasons for convergence failure
-	parameters['reasons'] = [[], 'list of reasons for termination']
 
 
 	return ParameterList(parameters)
 
 
 class Optimizer(ABC):
+	"""
+	This class describes the optimizer used during training
+
+	All children must implement the method minimize, which implements 
+	one step of the optimizers weight update scheme
+	"""
 	def __init__(self,problem = None,regularization = None, sess = None,parameters = ParametersOptimizer(),comm = None):
+		"""
+		The constructor for this class takes:
+			-problem: hessianlearn.problem.Problem class
+			-regularization: hessianlearn.problem.Regularization class
+			-sess: the tf.Session() used to evaluate the computational graph
+			-parameters: the dictionary of hyperparameters for the optimizer.
+		"""
 		self._problem = problem
 		self._regularization = regularization
 		self._sess = sess
@@ -96,6 +104,11 @@ class Optimizer(ABC):
 
 
 	def _loss_at_candidate(self,p,feed_dict):
+		"""
+		This method implements a function to assist with Armijo line search
+			-p: candidate update to be evaluated in Armijo line search producedure
+			-feed_dict: data dictionary used to evaluate cost at candidate
+		"""
 		self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:p})
 		# self.sess.run(self.problem._update_w(p))
 		misfit = self.sess.run((self.problem.loss),feed_dict)

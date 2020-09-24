@@ -57,9 +57,9 @@ def ParametersMINRESSolver(dictionary = {}):
 
 
 class MINRESSolver(ABC):
-
-
-
+	"""
+	This class implements a basic MINRES Solver
+	"""
 
 	reason = ["Maximum Number of Iterations Reached",
 			  "Relative/Absolute residual less than tol",
@@ -68,6 +68,13 @@ class MINRESSolver(ABC):
 			  ]
 	def __init__(self,problem,regularization,sess = None,preconditioner = None,\
 		x = None,parameters = ParametersMINRESSolver()):
+		"""
+		The constructor for this class takes:
+			-problem: hessianlearn.problem.Problem
+			-regularization: hessianlearn.problem.Regularization
+			-sess: tf.Session()
+			-preconditioner: hessianlearn.problem.Preconditioner
+		"""
 		self.sess = sess
 		self.problem = problem
 		self.regularization = regularization
@@ -86,7 +93,6 @@ class MINRESSolver(ABC):
 		# 	self.Minv = IdentityPreconditioner(problem,self.problem.dtype)
 		# else:
 		# 	self.Minv = preconditioner
-
 
 
 
