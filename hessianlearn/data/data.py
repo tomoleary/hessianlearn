@@ -250,6 +250,7 @@ class BatchIterator(object):
 			self._index += self._batch_size
 		return next_x, next_y
 
+
 class VariableBatchIterator(object):
 	"""
 	This class implements a variable batch iterator object

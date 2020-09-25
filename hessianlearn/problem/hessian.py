@@ -36,7 +36,8 @@ class Hessian(ABC):
 		"""
 		Create a Hessian given:
 
-			- problem: the description of the neural network training problem
+			- problem: the description of the neural network training problem 
+				(hessianlearn.problem.Problem)
 			- sess: the tf.Session() needed for evaluation at run time
 		"""
 		self._problem = problem
@@ -101,8 +102,8 @@ class Hessian(ABC):
 
 	def quadratics(self,x,feed_dict,verbose = False):
 		"""
-		This method implements Hessian quadratics, must have a problem and sess
-		set before this method can be evaluated.
+		This method implements Hessian quadratics xTHx. 
+		Must have self._problem and self._sess set before this method can be evaluated.
 			-x: numpy array to be multiplied one at a time
 			-feed_dict: data used in finite sum Hessian evaluation
 			-verbose: for printing

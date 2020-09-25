@@ -20,4 +20,5 @@ import os
 # Run randomized eigenvalue test
 os.system('python hessianlearn/test/test_randomizedEigensolver.py')
 os.system('python hessianlearn/test/test_rangeFinders.py')
+os.system('python hessianlearn/test/test_HessianlearnModel.py')
 

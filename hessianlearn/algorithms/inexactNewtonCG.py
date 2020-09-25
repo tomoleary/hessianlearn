@@ -83,7 +83,7 @@ class InexactNewtonCG(Optimizer):
 		self.trust_region_initialized = False
 		if self.parameters['globalization'] == 'trust_region':
 			self.initialize_trust_region()
-		self.alpha = (8*'-').center(10)
+		self.alpha = 0.0
 
 
 

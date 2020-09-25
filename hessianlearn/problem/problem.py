@@ -29,8 +29,20 @@ def my_flatten(tensor_list):
 		-tensor_list: list of tensors stored as numpy arrays
 	"""
 	flattened_list = []
+	num_issues = 0
 	for tensor in tensor_list:
-		flattened_list.append(tf.reshape(tensor,[np.prod(tensor.shape)]))
+			print('tensor name = ',tensor.name)
+			print('tensor type = ',type(tensor))
+			print('tensor shape = ',tensor.shape)
+			try:
+				flattened_list.append(tf.reshape(tensor,[np.prod(tensor.shape)]))
+			except:
+				print(80*'#')
+				print('For this layer there is an issue!!')
+				print(80*'#')
+				num_issues += 1
+	print(80*'#')
+	print('Total issues = ',num_issues)
 	return tf.concat(flattened_list,axis=0)
 
 def initialize_indices(shapes):
@@ -99,12 +111,38 @@ class Problem(ABC):
 
 		dims = [np.prod(shape) for shape in self.shapes]
 		self._dimension = np.sum(dims)
+		print('dimension = ',self._dimension)
 
 		# Define loss function and accuracy in initialize_loss
 		self._initialize_loss()
 		# Once loss is defined gradients can be instantiated
 
-		self._gradient = my_flatten(tf.gradients(self.loss,self._w, name = 'gradient'))
+		grad_list = tf.gradients(self.loss,self._w, name = 'gradient')
+
+		for (wi,gi) in zip(self._w,grad_list):
+			print('wi.name = ',wi.name)
+			print('shape wi = ',wi.shape)
+			print('wi shape product = ',np.prod(wi.shape))
+			print('gi.name = ',gi.name)
+			try:
+				print('shape gi = ',gi.shape)
+			except:
+				print('There is an issue with the gradient shape for this layer')
+
+		# exit()
+
+		grad_shapes = [tuple(int(wii) for wii in wi.shape) for wi in grad_list]
+
+		grad_dimensions = [np.prod(shape) for shape in grad_shapes]
+		grad_dimension = np.sum(grad_dimensions)
+
+		for grad in grad_list:
+			print('grad name = ',grad.name)
+			print('grad type = ',type(grad))
+			print('grad shape = ',grad.shape)
+		self._gradient = my_flatten(grad_list)
+
+		# self._gradient = my_flatten(tf.gradients(self.loss,self._w, name = 'gradient'))
 		self._norm_g = tf.sqrt(tf.reduce_sum(self.gradient*self.gradient))
 		# Initialize vector for Hessian mat-vecs
 		self._w_hat = tf.placeholder(self.dtype,self.dimension )
@@ -268,7 +306,7 @@ class ClassificationProblem(Problem):
 			-dtype: the data type used.
 
 		"""
-		assert loss_type in ['cross_entropy','categorical_cross_entropy','least_squares','mixed']
+		assert loss_type in ['cross_entropy','least_squares','mixed']
 		self._loss_type = loss_type
 		super(ClassificationProblem,self).__init__(NeuralNetwork,dtype = dtype)
 
@@ -290,17 +328,24 @@ class ClassificationProblem(Problem):
 		accuracy to be used to monitor training.
 		"""
 		if self.loss_type == 'cross_entropy':
+			# print('self.y_true.shape = ',self.y_true.shape)
 			with tf.name_scope('loss'):
-				self._loss = tf.reduce_mean(-tf.reduce_sum(self.y_true*tf.nn.log_softmax(self.y_prediction), [1]))
-		elif self.loss_type == 'categorical_cross_entropy':
-			raise 'Have not implemented this yet'
-
+				# self._loss = tf.reduce_mean(-tf.reduce_sum(self.y_true*tf.nn.log_softmax(self.y_prediction), [1]))
+				# self._loss = tf.reduce_mean(-tf.reduce_sum(self.y_true*tf.nn.log_softmax(self.y_prediction)+
+															# (tf.ones_like(self.y_true)-self.y_true)*tf.nn.log_softmax(tf.ones_like(self.y_prediction) - self.y_prediction), [1]))
+				self._loss = tf.reduce_mean(tf.keras.losses.categorical_crossentropy(self.y_true, self.y_prediction,from_logits=True))											
 		elif self.loss_type == 'least_squares':
 			with tf.name_scope('loss'):
 				self._loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
-			with tf.name_scope('rel_error'):
-				self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
-								/tf.reduce_mean(tf.pow(self.y_true,2)))
+		elif self.loss_type == 'mixed':
+			mse = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
+			xe = tf.reduce_mean(tf.keras.losses.categorical_crossentropy(self.y_true, self.y_prediction,from_logits=True))	
+			self._loss = mse + xe
+		else:
+			raise
+		with tf.name_scope('rel_error'):
+			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
+							/tf.reduce_mean(tf.pow(self.y_true,2)))
 
 		with tf.name_scope('accuracy'):
 			y_prediction_sm = tf.nn.softmax(self.y_prediction)

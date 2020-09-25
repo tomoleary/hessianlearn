@@ -35,7 +35,7 @@ from ..utilities.parameterList import ParameterList
 from ..algorithms.adam import Adam
 from ..algorithms.gradientDescent import GradientDescent
 # from ..algorithms.cgSolver import CGSolver
-# from ..algorithms.inexactNewtonCG import InexactNewtonCG
+from ..algorithms.inexactNewtonCG import InexactNewtonCG
 # from ..algorithms.gmresSolver import GMRESSolver 
 # from ..algorithms.inexactNewtonGMRES import InexactNewtonGMRES
 # from ..algorithms.minresSolver import MINRESSolver
@@ -47,7 +47,7 @@ from ..algorithms.lowRankSaddleFreeNewton import LowRankSaddleFreeNewton
 
 
 def HessianlearnModelSettings(settings = {}):
-	settings['problem_name']         		= [None, "string for name used in file naming"]
+	settings['problem_name']         		= ['', "string for name used in file naming"]
 	settings['title']         				= [None, "string for name used in plotting"]
 	settings['logger_outname']         		= [None, "string for name used in logger file naming"]
 	settings['printing_items']				= [{'sweeps':'sweeps','Loss':'loss_train','acc train':'accuracy_train',\
@@ -63,9 +63,10 @@ def HessianlearnModelSettings(settings = {}):
 	# Optimizer settings
 	settings['optimizer']                	= ['lrsfn', "String to denote choice of optimizer"]
 	settings['alpha']                		= [5e-2, "Initial steplength, or learning rate"]
-	settings['hessian_low_rank']			= [10, "Low rank to be used for LRSFN / SFN"]
+	settings['hessian_low_rank']			= [20, "Low rank to be used for LRSFN / SFN"]
 	settings['fixed_step']					= [False, " True means steps of length alpha will be taken at each iteration"]
 	settings['max_backtrack']				= [10, "Maximum number of backtracking iterations for each line search"]
+
 	# Range finding settings for LRSFN
 	settings['range_finding']				= [None,"Range finding, if None then r = hessian_low_rank\
 	 														Choose from None, 'arf', 'naarf'"]
@@ -152,6 +153,8 @@ class HessianlearnModel(ABC):
 	def _initialize_optimizer(self, sess,settings = None):
 		if settings == None:
 			settings = self.settings
+		if 'rank' in self.settings['printing_items'].keys():
+			_ = self.settings['printing_items'].pop('rank',None)
 
 		self._logger['optimizer'] = settings['optimizer']
 		# assert self.sess is not None
@@ -264,6 +267,7 @@ class HessianlearnModel(ABC):
 			logger['rq_std'] = {}
 		elif self.settings['record_last_rq_std']:
 			logger['last_rq_std'] = {}
+
 
 		self._logger = logger
 
@@ -504,6 +508,7 @@ class HessianlearnModel(ABC):
 					format_string += '{'+str(i)+':10} '
 				else:
 					format_string += '{'+str(i)+':1.4e} '
+
 			value_tuples = (self._logger[self.settings['printing_items'][item]][iteration] for item in self.settings['printing_items'])
 
 

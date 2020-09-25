@@ -27,4 +27,4 @@ from .mnist import load_mnist
 
 from .lfw import load_lfw
 
-from .cifar import load_cifar10
+from .cifar10 import load_cifar10

@@ -77,7 +77,9 @@ class LowRankSaddleFreeNewton(Optimizer):
 		else:
 			_regularization = regularization
 		super(LowRankSaddleFreeNewton,self).__init__(problem,_regularization,sess,parameters)
+
 		self.grad = self.problem.gradient + self.regularization.gradient
+
 		if self.parameters['globalization'] == 'trust_region':
 			self.trust_region = TrustRegion()
 		self._sweeps = np.zeros(2)
@@ -102,10 +104,10 @@ class LowRankSaddleFreeNewton(Optimizer):
 		r"""
 		Solves the saddle escape problem. Given a misfit (loss) Hessian operator (H)
 		1. H = U_r Lambda_r U_r^T
-		2. Solve [U_r |Lambda_r| U_r^T + alpha I] p = -g for p via Woodbury formula:
+		2. Solve [U_r |Lambda_r| U_r^T + gamma I] p = -g for p via Woodbury formula:
 
-		[U_r Lambda_r U_r^T + alpha I]^{-1} = 1/alpha * I - 1/alpha * UDU^T
-		where D = diag(|lambda_i|/(|lambda_i| + alpha))
+		[U_r Lambda_r U_r^T + gamma I]^{-1} = 1/gamma * I - 1/gamma * UDU^T
+		where D = diag(|lambda_i|/(|lambda_i| + gamma))
 			-feed_dict: data dictionary used for evaluating gradient and cost
 			-hessian_feed_dict: dictionary used for stochastic Hessian
 			-rq_estimator_dict: dictionary used for RQ variance calculations
@@ -157,9 +159,10 @@ class LowRankSaddleFreeNewton(Optimizer):
 			self._rank = self.parameters['hessian_low_rank']
 			Lmbda,U = randomized_eigensolver(H, n, self._rank,verbose=False)
 			self.lambdas = Lmbda
-		rq_direction = U[:,-1]
+		
 		# Log the variance of the last eigenvector
 		if self.parameters['record_last_rq_std'] :
+			rq_direction = U[:,-1]
 			if rq_estimator_dict is None:
 				rq_estimator_dict_list = self.problem._partition_dictionaries(feed_dict,self.parameters['rq_samples_for_naarf'])
 			elif type(rq_estimator_dict) == list:
@@ -180,19 +183,26 @@ class LowRankSaddleFreeNewton(Optimizer):
 			self._rq_std = np.std(RQ_samples)
 
 			# print('RQ_std = ',self._rq_std)
-
+			# norm_g = np.linalg.norm(gradient)
+			# print('rq_std/||g|| = ',self._rq_std/norm_g)
 
 
 		# Saddle free inversion via Woodbury
 		Lmbda_abs = np.abs(Lmbda)
-		Lmbda_diags = diags(Lmbda_abs)
+		
 
 		if self.regularization.parameters['gamma'] < 1e-4:
-			alpha_damping = self.parameters['default_damping']
+			gamma_damping = self.parameters['default_damping']
+			# Using this condition instead of fixed gamma allows one to take larger step sizes
+			# but does not appear to improve accuracy
+			# gamma_damping = max(0.9*Lmbda_abs[-1],self.parameters['default_damping'])
 		else:
-			alpha_damping = self.regularization.parameters['gamma']
+			gamma_damping = self.regularization.parameters['gamma']
+
+		Lmbda_diags = diags(Lmbda_abs)
+
 		# Build terms for Woodbury inversion
-		D_denominator = Lmbda_abs + alpha_damping*np.ones_like(Lmbda_abs)
+		D_denominator = Lmbda_abs + gamma_damping*np.ones_like(Lmbda_abs)
 
 		D = np.divide(Lmbda_abs,D_denominator)
 
@@ -200,7 +210,7 @@ class LowRankSaddleFreeNewton(Optimizer):
 		UTg = np.dot(U.T,gradient)
 		DUTg = np.multiply(D,UTg)
 		UDUTg = np.dot(U,DUTg)
-		minus_p = (gradient - UDUTg)/alpha_damping
+		minus_p = (gradient - UDUTg)/gamma_damping
 		self.p = -minus_p
 		
 
