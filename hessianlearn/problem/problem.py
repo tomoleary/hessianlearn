@@ -29,20 +29,9 @@ def my_flatten(tensor_list):
 		-tensor_list: list of tensors stored as numpy arrays
 	"""
 	flattened_list = []
-	num_issues = 0
+
 	for tensor in tensor_list:
-			print('tensor name = ',tensor.name)
-			print('tensor type = ',type(tensor))
-			print('tensor shape = ',tensor.shape)
-			try:
-				flattened_list.append(tf.reshape(tensor,[np.prod(tensor.shape)]))
-			except:
-				print(80*'#')
-				print('For this layer there is an issue!!')
-				print(80*'#')
-				num_issues += 1
-	print(80*'#')
-	print('Total issues = ',num_issues)
+		flattened_list.append(tf.reshape(tensor,[np.prod(tensor.shape)]))
 	return tf.concat(flattened_list,axis=0)
 
 def initialize_indices(shapes):
@@ -76,110 +65,26 @@ class Problem(ABC):
 
 			-NeuralNetwork: keras model for neural network
 		"""
-
+		# Boolean to indicate if only input data should be passed into loss function
+		self._is_autoencoder = False
+		# Data type
 		self._dtype = dtype
 
-		self._NN = NeuralNetwork
-		self.x = self.NN.inputs[0]
-		
-		self.y_prediction = self.NN(self.x)
-
-		# Why does the following not work:
-		# self.y_true = self.NN.outputs[0]
-		# Instead I have to use a placeholder for true output
-
-		output_shape = self.NN.output_shape
-		self.y_true = tf.placeholder(self.dtype, output_shape,name='output_placeholder')
-
-		# Assign trainable variables to member variable w "weights"
-		self._w = tf.trainable_variables()
-
-		self._flat_w = my_flatten(self._w)
-
-		self._shapes = [tuple(int(wii) for wii in wi.shape) for wi in self._w]
-		self._indices = initialize_indices(self.shapes)
-
-		layer_descriptors = {}
-		first_indices = [0]+self.indices[:-1]
-		for wi,shape,first_index,second_index in zip(self._w,self._shapes,first_indices,self._indices):
-			layer_dict = {}
-			layer_dict['shape'] = shape
-			layer_dict['indices'] = (first_index,second_index)
-			layer_descriptors[wi.name] = layer_dict
-
-		self.layer_descriptors = layer_descriptors
-
-		dims = [np.prod(shape) for shape in self.shapes]
-		self._dimension = np.sum(dims)
-		print('dimension = ',self._dimension)
+		# Initialize the neural network(s)
+		self._initialize_network(NeuralNetwork)
 
 		# Define loss function and accuracy in initialize_loss
 		self._initialize_loss()
-		# Once loss is defined gradients can be instantiated
 
-		grad_list = tf.gradients(self.loss,self._w, name = 'gradient')
+		# Define derivative quantities for output
+		self._initialize_derivatives()
 
-		for (wi,gi) in zip(self._w,grad_list):
-			print('wi.name = ',wi.name)
-			print('shape wi = ',wi.shape)
-			print('wi shape product = ',np.prod(wi.shape))
-			print('gi.name = ',gi.name)
-			try:
-				print('shape gi = ',gi.shape)
-			except:
-				print('There is an issue with the gradient shape for this layer')
+		# Define assignment operations
+		self._initialize_assignment_ops()
 
-		# exit()
-
-		grad_shapes = [tuple(int(wii) for wii in wi.shape) for wi in grad_list]
-
-		grad_dimensions = [np.prod(shape) for shape in grad_shapes]
-		grad_dimension = np.sum(grad_dimensions)
-
-		for grad in grad_list:
-			print('grad name = ',grad.name)
-			print('grad type = ',type(grad))
-			print('grad shape = ',grad.shape)
-		self._gradient = my_flatten(grad_list)
-
-		# self._gradient = my_flatten(tf.gradients(self.loss,self._w, name = 'gradient'))
-		self._norm_g = tf.sqrt(tf.reduce_sum(self.gradient*self.gradient))
-		# Initialize vector for Hessian mat-vecs
-		self._w_hat = tf.placeholder(self.dtype,self.dimension )
-		# Define (g,dw) inner product
-		self._g_inner_w_hat = tf.tensordot(self._w_hat,self._gradient,axes = [[0],[0]])
-		# Define Hessian action Hdw
-		self._H_action = my_flatten(tf.gradients(self._g_inner_w_hat,self._w,stop_gradients = self._w_hat,name = 'hessian_action'))
-		self._H_quadratic = tf.tensordot(self._w_hat,self._H_action,axes = [[0],[0]])
-		# Define operations for updating and assigment used during training
-		self._update_placeholder = tf.placeholder(self.dtype,[self._dimension],name = 'update_placeholder')
-		self._assignment_placeholder = tf.placeholder(self.dtype,[self._dimension],name = 'assignment_placeholder')
-		split_indices = []
-		index0 = 0
-		for index in self._indices:
-			split_indices.append(index - index0)
-			index0 = index
-
-		unpacked_update = tf.split(self._update_placeholder,split_indices,axis = 0)
-		unpacked_assignment = tf.split(self._assignment_placeholder,split_indices,axis = 0)
-		update = [tf.reshape(update_,shape) for update_,shape in zip(unpacked_update,self.shapes)]
-		assignment = [tf.reshape(assignment_,shape) for assignment_,shape in zip(unpacked_assignment,self.shapes)]
-
-		update_ops = []
-		update_and_w = list(zip(update,self._w))
-		for v, w in reversed(update_and_w):
-			with tf.control_dependencies(update_ops):
-				update_ops.append(tf.assign_add(w,v))
-		self._update_ops = tf.group(*update_ops)
-
-		assignment_ops = []
-		assignment_and_w = list(zip(assignment,self._w))
-		for v, w in reversed(assignment_and_w):
-			with tf.control_dependencies(assignment_ops):
-				assignment_ops.append(tf.assign(w,v))
-		self._assignment_ops = tf.group(*assignment_ops)
-		# Boolean to indicate if only input data should be passed into loss function
-		self._is_autoencoder = False
+		
+		
+		
 
 
 	@property
@@ -238,6 +143,23 @@ class Problem(ABC):
 	def is_autoencoder(self):
 		return self._is_autoencoder		
 
+	def _initialize_network(self,NeuralNetwork):
+		"""
+		This method defines the neural network model
+			-NeuralNetwork: the neural network as a tf.keras.model.Model
+		"""
+		self._NN = NeuralNetwork
+		self.x = self.NN.inputs[0]
+		
+		self.y_prediction = self.NN(self.x)
+
+		# Why does the following not work:
+		# self.y_true = self.NN.outputs[0]
+		# Instead I have to use a placeholder for true output
+
+		output_shape = self.NN.output_shape
+		self.y_true = tf.placeholder(self.dtype, output_shape,name='output_placeholder')
+
 	def _initialize_loss(self):
 		"""
 		This method defines the loss as a function of the neural network and 
@@ -247,6 +169,75 @@ class Problem(ABC):
 		This method implements self._loss and self._accuracy
 		"""
 		raise NotImplementedError("Child class must implement method initialize_loss") 
+
+	def _initialize_derivatives(self):
+		"""
+		This method defines derivative quantities for the loss function
+		"""
+		# Assign trainable variables to member variable w "weights"
+		self._w = tf.trainable_variables()
+		self._flat_w = my_flatten(self._w)
+
+		self._shapes = [tuple(int(wii) for wii in wi.shape) for wi in self._w]
+		self._indices = initialize_indices(self.shapes)
+
+		layer_descriptors = {}
+		first_indices = [0]+self.indices[:-1]
+		for wi,shape,first_index,second_index in zip(self._w,self._shapes,first_indices,self._indices):
+			layer_dict = {}
+			layer_dict['shape'] = shape
+			layer_dict['indices'] = (first_index,second_index)
+			layer_descriptors[wi.name] = layer_dict
+
+		self.layer_descriptors = layer_descriptors
+
+		dims = [np.prod(shape) for shape in self.shapes]
+		self._dimension = np.sum(dims)
+
+		# Once loss is defined gradients can be instantiated
+		self._gradient = my_flatten(tf.gradients(self.loss,self._w, name = 'gradient'))
+		# self._gradient = my_flatten(tf.gradients(self.loss,self._w, name = 'gradient'))
+		self._norm_g = tf.sqrt(tf.reduce_sum(self.gradient*self.gradient))
+		# Initialize vector for Hessian mat-vecs
+		self._w_hat = tf.placeholder(self.dtype,self.dimension )
+		# Define (g,dw) inner product
+		self._g_inner_w_hat = tf.tensordot(self._w_hat,self._gradient,axes = [[0],[0]])
+		# Define Hessian action Hdw
+		self._H_action = my_flatten(tf.gradients(self._g_inner_w_hat,self._w,stop_gradients = self._w_hat,name = 'hessian_action'))
+		# Define Hessian quadratic forms
+		self._H_quadratic = tf.tensordot(self._w_hat,self._H_action,axes = [[0],[0]])
+
+	def _initialize_assignment_ops(self):
+		"""
+		This method defines operations for updating and assigment used during training
+		"""
+		self._update_placeholder = tf.placeholder(self.dtype,[self._dimension],name = 'update_placeholder')
+		self._assignment_placeholder = tf.placeholder(self.dtype,[self._dimension],name = 'assignment_placeholder')
+		split_indices = []
+		index0 = 0
+		for index in self._indices:
+			split_indices.append(index - index0)
+			index0 = index
+
+		unpacked_update = tf.split(self._update_placeholder,split_indices,axis = 0)
+		unpacked_assignment = tf.split(self._assignment_placeholder,split_indices,axis = 0)
+		update = [tf.reshape(update_,shape) for update_,shape in zip(unpacked_update,self.shapes)]
+		assignment = [tf.reshape(assignment_,shape) for assignment_,shape in zip(unpacked_assignment,self.shapes)]
+
+		update_ops = []
+		update_and_w = list(zip(update,self._w))
+		for v, w in reversed(update_and_w):
+			with tf.control_dependencies(update_ops):
+				update_ops.append(tf.assign_add(w,v))
+		self._update_ops = tf.group(*update_ops)
+
+		assignment_ops = []
+		assignment_and_w = list(zip(assignment,self._w))
+		for v, w in reversed(assignment_and_w):
+			with tf.control_dependencies(assignment_ops):
+				assignment_ops.append(tf.assign(w,v))
+		self._assignment_ops = tf.group(*assignment_ops)
+
 
 	def _zero_layers(self,array_like_w,list_of_layer_names):
 		"""
@@ -306,7 +297,7 @@ class ClassificationProblem(Problem):
 			-dtype: the data type used.
 
 		"""
-		assert loss_type in ['cross_entropy','least_squares','mixed']
+		assert loss_type in ['cross_entropy','least_squares','mixed','squared_hinge']
 		self._loss_type = loss_type
 		super(ClassificationProblem,self).__init__(NeuralNetwork,dtype = dtype)
 
@@ -341,6 +332,9 @@ class ClassificationProblem(Problem):
 			mse = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
 			xe = tf.reduce_mean(tf.keras.losses.categorical_crossentropy(self.y_true, self.y_prediction,from_logits=True))	
 			self._loss = mse + xe
+		elif self.loss_type == 'squared_hinge':
+			with tf.name_scope('loss'):
+				self._loss = tf.reduce_mean(tf.keras.losses.SquaredHinge()(self.y_true,self.y_prediction))
 		else:
 			raise
 		with tf.name_scope('rel_error'):
@@ -555,6 +549,21 @@ class VariationalAutoencoderProblem(Problem):
 			my_chunk_x = data_xs[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
 			dictionary_partitions.append({self.x:my_chunk_x})
 		return dictionary_partitions
+
+
+class GenerativeAdversarialNetworkProblem(Problem):
+	"""
+	This class implements the description of basic generative adversarial network problems. 
+
+	"""
+	def __init__(self,generator,discriminator,loss_type = 'least_squares',dtype = tf.float32):
+		"""
+		The constructor for this class takes:
+			-NeuralNetwork: the tf.keras Model representation of the neural network
+			
+		"""
+		pass
+
 
 
 

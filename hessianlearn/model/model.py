@@ -230,7 +230,7 @@ class HessianlearnModel(ABC):
 			optimizer.alpha = settings['alpha']
 			self._logger['alpha'][0] = settings['alpha']
 		else:
-			raise
+			raise NotImplementedError('Unsupported choice of optimizer')
 		self._optimizer = optimizer
 
 
