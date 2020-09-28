@@ -175,28 +175,13 @@ class Problem(ABC):
 		This method defines derivative quantities for the loss function
 		"""
 		# Assign trainable variables to member variable w "weights"
-		self._w = tf.trainable_variables()
+		self._w = self._NN.trainable_weights
 		self._flat_w = my_flatten(self._w)
 
-		self._shapes = [tuple(int(wii) for wii in wi.shape) for wi in self._w]
-		self._indices = initialize_indices(self.shapes)
-
-		layer_descriptors = {}
-		first_indices = [0]+self.indices[:-1]
-		for wi,shape,first_index,second_index in zip(self._w,self._shapes,first_indices,self._indices):
-			layer_dict = {}
-			layer_dict['shape'] = shape
-			layer_dict['indices'] = (first_index,second_index)
-			layer_descriptors[wi.name] = layer_dict
-
-		self.layer_descriptors = layer_descriptors
-
-		dims = [np.prod(shape) for shape in self.shapes]
-		self._dimension = np.sum(dims)
-
+		self._dimension = self._flat_w.shape[0].value
 		# Once loss is defined gradients can be instantiated
 		self._gradient = my_flatten(tf.gradients(self.loss,self._w, name = 'gradient'))
-		# self._gradient = my_flatten(tf.gradients(self.loss,self._w, name = 'gradient'))
+
 		self._norm_g = tf.sqrt(tf.reduce_sum(self.gradient*self.gradient))
 		# Initialize vector for Hessian mat-vecs
 		self._w_hat = tf.placeholder(self.dtype,self.dimension )
@@ -211,6 +196,19 @@ class Problem(ABC):
 		"""
 		This method defines operations for updating and assigment used during training
 		"""
+		self._shapes = [tuple(int(wii) for wii in wi.shape) for wi in self._w]
+		self._indices = initialize_indices(self.shapes)
+
+		layer_descriptors = {}
+		first_indices = [0]+self.indices[:-1]
+		for wi,shape,first_index,second_index in zip(self._w,self._shapes,first_indices,self._indices):
+			layer_dict = {}
+			layer_dict['shape'] = shape
+			layer_dict['indices'] = (first_index,second_index)
+			layer_descriptors[wi.name] = layer_dict
+
+		self.layer_descriptors = layer_descriptors
+
 		self._update_placeholder = tf.placeholder(self.dtype,[self._dimension],name = 'update_placeholder')
 		self._assignment_placeholder = tf.placeholder(self.dtype,[self._dimension],name = 'assignment_placeholder')
 		split_indices = []
@@ -556,15 +554,155 @@ class GenerativeAdversarialNetworkProblem(Problem):
 	This class implements the description of basic generative adversarial network problems. 
 
 	"""
-	def __init__(self,generator,discriminator,loss_type = 'least_squares',dtype = tf.float32):
+	def __init__(self,generator,discriminator,loss_type = 'cross_entropy',dtype = tf.float32):
 		"""
 		The constructor for this class takes:
-			-NeuralNetwork: the tf.keras Model representation of the neural network
-			
+			-generator: the tf.keras.model.Model description of the generator neural network
+			-discriminator: the tf.keras.model.Model description of the discriminator neural network
 		"""
-		pass
+		assert loss_type in ['cross_entropy']
+		self._loss_type = loss_type
+
+		super(GenerativeAdversarialNetworkProblem,self).__init__([generator,discriminator],dtype = dtype)
+
+	@property
+	def loss_type(self):
+		return self._loss_type
+
+	@property
+	def generator(self):
+		return self._generator
+	
+	@property
+	def discriminator(self):
+		return self._discriminator
+
+	@property
+	def noise(self):
+		return self._noise
+	
+	@property
+	def generated_images(self):
+		return self._generated_images
+	
+	@property
+	def input_images(self):
+		return self._input_images
+	
+	@property
+	def real_predictions(self):
+		return self._real_predictions
+	
+	@property
+	def fake_predictions(self):
+		return self._fake_predictions
+
+	@property
+	def generator_loss(self):
+		return self._generator_loss
+	
+	@property
+	def discriminator_loss(self):
+		return self._discriminator_loss
+	
+	@property
+	def generator_w(self):
+		return self._generator_w
+	
+	@property
+	def discriminator_w(self):
+		return self._discriminator_w
+	
+	
+
+	def _initialize_network(self, NeuralNetworks):
+		"""
+		This method defines the neural network model
+			-NeuralNetworks: list of [generator,discriminator] as tf.keras.model.Model 
+		"""
+		self._generator, self._discriminator = NeuralNetworks
+
+		self._noise = self.generator.inputs[0]
+
+		self._generated_images = self.generator(self._noise)
+
+		self._input_images = self.discriminator.inputs[0]
+
+		self._real_predictions = self.discriminator(self._input_images)
+
+		self._fake_predictions = self.discriminator(self._generated_images)
 
 
+
+	def _initialize_loss(self):
+		"""
+		This method initializes the loss function used for variational autoencoder training
+
+		"""
+		with tf.name_scope('loss'): # 
+			if self.loss_type == 'cross_entropy':
+				self._generator_loss = tf.reduce_mean(tf.keras.losses.categorical_crossentropy(\
+							tf.ones_like(self._fake_predictions), self._fake_predictions,from_logits=True))
+				self._discriminator_loss = tf.reduce_mean(tf.keras.losses.categorical_crossentropy(\
+							tf.ones_like(self._real_predictions), self._real_predictions,from_logits=True))+\
+							 tf.reduce_mean(tf.keras.losses.categorical_crossentropy(\
+							tf.zeros_like(self._fake_predictions), self._fake_predictions,from_logits=True))
+
+			elif self.loss_type == 'least_squares':
+				pass
+
+	def _initialize_derivatives(self):
+		"""
+		This method defines derivative quantities for the loss function
+
+		The convention here will be w = [generator_w,discriminator_w]
+		"""
+		# Assign trainable variables to member variable w "weights"
+		self._generator_w = self._generator.trainable_weights
+
+		self._discriminator_w = self._discriminator.trainable_weights
+		# w = [generator_w,discriminator_w]
+		self._w = self._generator.trainable_weights + self._discriminator.trainable_weights
+
+		self._flat_w = my_flatten(self._w)
+
+		self._dimension = self._flat_w.shape[0].value
+
+		# Gradients are partials wrt each loss and network respectively
+		self._generator_gradient = my_flatten(tf.gradients(self._generator_loss,self._generator_w,name = 'generator_gradient'))
+		self._generator_dimension = self._generator_gradient.shape[0].value
+
+		self._discriminator_gradient = my_flatten(tf.gradients(self._discriminator_loss,self._discriminator_w,name = 'generator_gradient'))
+		self._discriminator_dimension = self._discriminator_gradient.shape[0].value
+
+		# Concatenate partial gradients into one gradient 
+		self._gradient = tf.concat([self._generator_gradient,self._discriminator_gradient],axis = 0)
+
+		self._norm_g = tf.sqrt(tf.reduce_sum(self.gradient*self.gradient))
+
+		# Hessian mat-vecs
+		self._generator_w_hat = tf.placeholder(self.dtype,self._generator_dimension )
+		# Define generator (g,dw) inner product
+		self._generator_g_inner_w_hat = tf.tensordot(self._generator_w_hat,self._generator_gradient,axes = [[0],[0]])
+
+		# Hessian mat-vecs
+		self._discriminator_w_hat = tf.placeholder(self.dtype,self._discriminator_dimension )
+		# Define generator (g,dw) inner product
+		self._discriminator_g_inner_w_hat = tf.tensordot(self._discriminator_w_hat,self._discriminator_gradient,axes = [[0],[0]])
+
+		self._w_hat = tf.concat([self._generator_w_hat,self._discriminator_w_hat],axis = 0)
+
+		# Define Hessian action Hdw
+		self._generator_H_action = my_flatten(tf.gradients(self._generator_g_inner_w_hat,self._generator_w,\
+										stop_gradients = self._generator_w_hat,name = 'generator_hessian_action'))
+
+		self._discriminator_H_action = my_flatten(tf.gradients(self._discriminator_g_inner_w_hat,self._discriminator_w,\
+										stop_gradients = self._discriminator_w_hat,name = 'discriminator_hessian_action'))
+
+		self._H_action = tf.concat([self._generator_H_action,self._discriminator_H_action],axis = 0)
+
+		# Define Hessian quadratic forms
+		self._H_quadratic = tf.tensordot(self._w_hat,self._H_action,axes = [[0],[0]])
 
 
 
