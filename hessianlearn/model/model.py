@@ -103,15 +103,6 @@ class HessianlearnModel(ABC):
 			print(80*'#')
 			print(('Size of configuration space:  '+str(self.problem.dimension)).center(80))
 			print(('Size of training data: '+str(self.data.train_data_size)).center(80))
-			# Approximate data needed is d_W / output
-			# if len(self.problem.y_prediction.shape) >2:
-			# 	output_dimension = 1.
-			# 	for shape in self.problem.y_prediction.shape[1:]:
-			# 		output_dimension *= shape.value
-			# 	# print('Shape = ',self.problem.y_prediction.shape[1:].value)
-			# 	# output_dimension = None
-			# else:
-			# 	output_dimension = float(self.problem.y_prediction.shape[-1].value)
 			print(('Approximate data cardinality needed: '\
 				+str(int(float(self.problem.dimension)/self.problem.output_dimension	))).center(80))
 			print(80*'#')
@@ -151,13 +142,13 @@ class HessianlearnModel(ABC):
 		return self._logger
 
 	def _initialize_optimizer(self, sess,settings = None):
+		assert sess is not None
 		if settings == None:
 			settings = self.settings
 		if 'rank' in self.settings['printing_items'].keys():
 			_ = self.settings['printing_items'].pop('rank',None)
 
 		self._logger['optimizer'] = settings['optimizer']
-		# assert self.sess is not None
 		if settings['optimizer'] == 'adam':
 			print(('Using Adam optimizer').center(80))
 			print(('Batch size = '+str(self.data._batch_size)).center(80))
@@ -294,10 +285,6 @@ class HessianlearnModel(ABC):
 
 
 	def _fit(self,options = None, w_0 = None):
-		# Consider doing scope managed sess
-		# For now I will use the sess as a member variable
-		# self._sess = tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=self.settings['intra_threads'],\
-		# 									inter_op_parallelism_threads=self.settings['inter_threads']))
 		with tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=self.settings['intra_threads'],\
 											inter_op_parallelism_threads=self.settings['inter_threads'])) as sess:
 			# Initialize logging:
@@ -316,12 +303,7 @@ class HessianlearnModel(ABC):
 					except:
 						print(80*'#')
 						print('Issue setting weights manually'.center(80))
-						print('tf.global_variables_initializer used to initial instead'.center(80))		
-			else:
-				pass
-				# random_state = np.random.RandomState(seed = 0)
-				# w_0 = random_state.randn(problem.dimension)
-				# sess.run(problem._assignment_ops,feed_dict = {problem._assignment_placeholder:w_0})
+						print('tf.global_variables_initializer() used to initial instead'.center(80))		
 
 			if self.settings['verbose']:
 				self.print(first_print = True)
@@ -335,8 +317,6 @@ class HessianlearnModel(ABC):
 				test_dict = {self.problem.x: x_test,self.problem.noise : noise}
 			else:
 				test_dict = {self.problem.x: x_test,self.problem.y_true: y_test}
-
-
 
 			# Iteration Loop
 			max_sweeps = self.settings['max_sweeps']
@@ -419,24 +399,6 @@ class HessianlearnModel(ABC):
 				except:
 					self.optimizer.minimize(train_dict)
 
-
-
-				# If LRSFN used with range_finding need to record rank at each iteration
-				# If LRSFN used with range_finding need to record rank at each iteration
-				# If LRSFN used with range_finding need to record rank at each iteration
-				# If LRSFN used with range_finding need to record rank at each iteration
-				# If LRSFN used with range_finding need to record rank at each iteration
-				# If LRSFN used with range_finding need to record rank at each iteration
-				# If LRSFN used with range_finding need to record rank at each iteration
-				# If LRSFN used with range_finding need to record rank at each iteration
-				# If LRSFN used with range_finding need to record rank at each iteration
-				# If LRSFN used with range_finding need to record rank at each iteration
-				# If LRSFN used with range_finding need to record rank at each iteration
-				# If LRSFN used with range_finding need to record rank at each iteration
-				# If LRSFN used with range_finding need to record rank at each iteration
-				# If LRSFN used with range_finding need to record rank at each iteration
-				# print('Fix this recording thing for LRSFN with adaptive range finding')
-
 				if self.settings['record_spectrum'] and iteration%self.settings['spec_frequency'] ==0:
 					self._record_spectrum(iteration)
 				elif self.settings['record_last_rq_std'] and self.settings['optimizer'] == 'lrsfn':
@@ -446,8 +408,6 @@ class HessianlearnModel(ABC):
 
 				if sweeps > max_sweeps:
 					break
-
-				
 
 		# The weights need to be manually set once the session scope is closed.
 		try:
