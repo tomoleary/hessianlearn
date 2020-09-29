@@ -67,6 +67,7 @@ class Problem(ABC):
 		"""
 		# Boolean to indicate if only input data should be passed into loss function
 		self._is_autoencoder = False
+		self._is_gan = False
 		# Data type
 		self._dtype = dtype
 
@@ -143,10 +144,22 @@ class Problem(ABC):
 	def is_autoencoder(self):
 		return self._is_autoencoder		
 
+	@property
+	def is_gan(self):
+		return self._is_gan
+	
+
+	@property
+	def output_dimension(self):
+		return self._output_dimension
+	
+
 	def _initialize_network(self,NeuralNetwork):
 		"""
 		This method defines the neural network model
 			-NeuralNetwork: the neural network as a tf.keras.model.Model
+
+		Must set member variable self._output_shape
 		"""
 		self._NN = NeuralNetwork
 		self.x = self.NN.inputs[0]
@@ -159,6 +172,14 @@ class Problem(ABC):
 
 		output_shape = self.NN.output_shape
 		self.y_true = tf.placeholder(self.dtype, output_shape,name='output_placeholder')
+
+
+		if len(self.y_prediction.shape) > 2:
+			self._output_shape =  1.
+			for shape in self.y_prediction.shape[1:]:
+				self._output_dimension *= shape.value
+		else:
+			self._output_dimension = self.y_prediction.shape[-1].value
 
 	def _initialize_loss(self):
 		"""
@@ -565,6 +586,8 @@ class GenerativeAdversarialNetworkProblem(Problem):
 
 		super(GenerativeAdversarialNetworkProblem,self).__init__([generator,discriminator],dtype = dtype)
 
+		self._is_gan = True
+
 	@property
 	def loss_type(self):
 		return self._loss_type
@@ -580,6 +603,11 @@ class GenerativeAdversarialNetworkProblem(Problem):
 	@property
 	def noise(self):
 		return self._noise
+
+	@property
+	def noise_dimension(self):
+		return self._noise_dimension
+	
 	
 	@property
 	def generated_images(self):
@@ -619,18 +647,29 @@ class GenerativeAdversarialNetworkProblem(Problem):
 		"""
 		This method defines the neural network model
 			-NeuralNetworks: list of [generator,discriminator] as tf.keras.model.Model 
+
+		Must set member variable self._output_shape
 		"""
 		self._generator, self._discriminator = NeuralNetworks
 
 		self._noise = self.generator.inputs[0]
 
+		self._noise_dimension = self._noise.shape[-1].value
+
 		self._generated_images = self.generator(self._noise)
 
-		self._input_images = self.discriminator.inputs[0]
+		self.x = self.discriminator.inputs[0]
 
-		self._real_predictions = self.discriminator(self._input_images)
+		self._real_prediction = self.discriminator(self.x)
 
-		self._fake_predictions = self.discriminator(self._generated_images)
+		self._fake_prediction = self.discriminator(self._generated_images)
+
+		if len(self._real_prediction.shape) > 2:
+			self._output_shape =  1.
+			for shape in self._real_prediction.shape[1:]:
+				self._output_dimension *= shape.value
+		else:
+			self._output_dimension = self._real_prediction.shape[-1].value
 
 
 
@@ -642,15 +681,16 @@ class GenerativeAdversarialNetworkProblem(Problem):
 		with tf.name_scope('loss'): # 
 			if self.loss_type == 'cross_entropy':
 				self._generator_loss = tf.reduce_mean(tf.keras.losses.categorical_crossentropy(\
-							tf.ones_like(self._fake_predictions), self._fake_predictions,from_logits=True))
+							tf.ones_like(self._fake_prediction), self._fake_prediction,from_logits=True))
 				self._discriminator_loss = tf.reduce_mean(tf.keras.losses.categorical_crossentropy(\
-							tf.ones_like(self._real_predictions), self._real_predictions,from_logits=True))+\
+							tf.ones_like(self._real_prediction), self._real_prediction,from_logits=True))+\
 							 tf.reduce_mean(tf.keras.losses.categorical_crossentropy(\
-							tf.zeros_like(self._fake_predictions), self._fake_predictions,from_logits=True))
+							tf.zeros_like(self._fake_prediction), self._fake_prediction,from_logits=True))
 
 			elif self.loss_type == 'least_squares':
 				pass
 
+			self._loss = self._generator_loss + self._discriminator_loss
 	def _initialize_derivatives(self):
 		"""
 		This method defines derivative quantities for the loss function

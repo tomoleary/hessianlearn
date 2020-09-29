@@ -115,6 +115,16 @@ class Data(ABC):
 	@property
 	def train_data_size(self):
 		return self._train_data_size
+
+	@property
+	def batch_size(self):
+		return self._batch_size
+
+	@property
+	def hessian_batch_size(self):
+		return self._hessian_batch_size
+	
+	
 	
 
 	def _partition(self,data,test_data = None, seed = 0):

@@ -104,16 +104,16 @@ class HessianlearnModel(ABC):
 			print(('Size of configuration space:  '+str(self.problem.dimension)).center(80))
 			print(('Size of training data: '+str(self.data.train_data_size)).center(80))
 			# Approximate data needed is d_W / output
-			if len(self.problem.y_prediction.shape) >2:
-				output_dimension = 1.
-				for shape in self.problem.y_prediction.shape[1:]:
-					output_dimension *= shape.value
-				# print('Shape = ',self.problem.y_prediction.shape[1:].value)
-				# output_dimension = None
-			else:
-				output_dimension = float(self.problem.y_prediction.shape[-1].value)
+			# if len(self.problem.y_prediction.shape) >2:
+			# 	output_dimension = 1.
+			# 	for shape in self.problem.y_prediction.shape[1:]:
+			# 		output_dimension *= shape.value
+			# 	# print('Shape = ',self.problem.y_prediction.shape[1:].value)
+			# 	# output_dimension = None
+			# else:
+			# 	output_dimension = float(self.problem.y_prediction.shape[-1].value)
 			print(('Approximate data cardinality needed: '\
-				+str(int(float(self.problem.dimension)/output_dimension	))).center(80))
+				+str(int(float(self.problem.dimension)/self.problem.output_dimension	))).center(80))
 			print(80*'#')
 
 		# self._sess = None
@@ -329,8 +329,14 @@ class HessianlearnModel(ABC):
 			x_test, y_test = next(iter(self.data.test))
 			if self.problem.is_autoencoder:
 				test_dict = {self.problem.x: x_test}
+			elif self.problem.is_gan:
+				random_state_gan = np.random.RandomState(seed = 0)
+				noise = random_state_gan.normal(size = (self.data.batch_size, self.problem.noise_dimension))
+				test_dict = {self.problem.x: x_test,self.problem.noise : noise}
 			else:
 				test_dict = {self.problem.x: x_test,self.problem.y_true: y_test}
+
+
 
 			# Iteration Loop
 			max_sweeps = self.settings['max_sweeps']
@@ -348,6 +354,11 @@ class HessianlearnModel(ABC):
 				if self.problem.is_autoencoder:
 					train_dict = {self.problem.x: x_batch}
 					hess_dict = {self.problem.x: x_hess}
+				elif self.problem.is_gan:
+					noise = random_state_gan.normal(size = (self.data.batch_size, self.problem.noise_dimension))
+					train_dict = {self.problem.x: x_batch,self.problem.noise : noise}
+					noise_hess = random_state_gan.normal(size = (self.data.hessian_batch_size, self.problem.noise_dimension))
+					hess_dict = {self.problem.x: x_hess, self.problem.noise: noise_hess}
 				else:
 					train_dict = {self.problem.x: x_batch, self.problem.y_true: y_batch}
 					hess_dict = {self.problem.x: x_hess, self.problem.y_true: y_hess}
@@ -368,22 +379,30 @@ class HessianlearnModel(ABC):
 				if hasattr(self.problem,'accuracy'):
 					loss_test,	accuracy_test = sess.run([self.problem.loss,self.problem.accuracy],test_dict)
 					self._logger['accuracy_test'][iteration] = accuracy_test
+					max_test_acc = max(max_test_acc,accuracy_test)
+					self._logger['max_accuracy_test'][iteration] = max_test_acc
 				else:
 					loss_test = sess.run(self.problem.loss,test_dict)
 				self._logger['loss_test'][iteration] = loss_test
 				min_test_loss = min(min_test_loss,loss_test)
-				max_test_acc = max(max_test_acc,accuracy_test)
-				self._logger['max_accuracy_test'][iteration] = max_test_acc
+
+				
 				self._logger['alpha'][iteration] = self.optimizer.alpha
 				if self.settings['optimizer'] == 'lrsfn':
 					self._logger['hessian_low_rank'][iteration] = self.optimizer.rank
 
-				if accuracy_test == max_test_acc:
+				if hasattr(self.problem,'accuracy') and accuracy_test == max_test_acc:
 					self._best_weights = sess.run(self.problem._w)
 					if len(self._logger['best_weight']) > 2:
 						self._logger['best_weight'].pop(0)
 					acc_weight_tuple = (accuracy_test,accuracy_train,sess.run(self.problem._flat_w))
 					self._logger['best_weight'].append(acc_weight_tuple) 
+				elif loss_test == min_test_loss:
+					self._best_weights = sess.run(self.problem._w)
+					if len(self._logger['best_weight']) > 2:
+						self._logger['best_weight'].pop(0)
+					loss_weight_tuple = (loss_test,loss_train,sess.run(self.problem._flat_w))
+					self._logger['best_weight'].append(loss_weight_tuple) 
 
 				sweeps = np.dot(self.data.batch_factor,self.optimizer.sweeps)
 				if self.settings['verbose'] and iteration % 1 == 0:
