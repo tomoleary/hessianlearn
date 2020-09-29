@@ -38,7 +38,7 @@ def ParametersAdam(parameters = {}):
 	parameters['max_NN_evals_per_batch']        = [10000, "Scale constant for maximum neural network evaluations per datum"]
 	parameters['max_NN_evals']                  = [None, "Maximum number of neural network evaluations"]
 
-	parameters['globalization']					= ['None', 'Choose from trust_region, line_search or none']
+	parameters['globalization']					= [None, 'Choose from trust_region, line_search or none']
 	# Reasons for convergence failure
 	parameters['reasons'] = [[], 'list of reasons for termination']
 
@@ -47,9 +47,19 @@ def ParametersAdam(parameters = {}):
 
 
 class Adam(Optimizer):
+	"""
+	This class implements the Adam optimizer
+	"""
 	def __init__(self,problem,regularization = None,sess = None,feed_dict= None,parameters = ParametersAdam()):
+		"""
+		The constructor for this class takes:
+			-problem: hessianlearn.problem.Problem
+			-regularization: hessianlearn.problem.Regularization
+			-sess: tf.Session()
+			-parameters: hyperparameters dictionary
+		"""
 		if regularization is None:
-			_regularization = ZeroRegularization(problem)
+			_regularization = L2Regularization(problem,gamma = 0.0)
 		else:
 			_regularization = regularization
 		super(Adam,self).__init__(problem,_regularization,sess,parameters)
@@ -67,7 +77,8 @@ class Adam(Optimizer):
 
 	def minimize(self,feed_dict = None):
 		r"""
-		w-=alpha*g
+		This method implements one step of the Adam algorithm:
+			-feed_dict: data dictionary used to evaluate gradient
 		"""
 		assert self.sess is not None
 		assert feed_dict is not None

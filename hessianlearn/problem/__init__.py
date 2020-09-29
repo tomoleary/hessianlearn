@@ -17,12 +17,11 @@
 
 from __future__ import absolute_import, division, print_function
 
-from .algorithms import *
+from .problem import Problem, ClassificationProblem, RegressionProblem, AutoencoderProblem,\
+						 VariationalAutoencoderProblem, GenerativeAdversarialNetworkProblem
 
-from .problem import *
+from .hessian import Hessian
 
-from .model import *
+from .preconditioner import Preconditioner, IdentityPreconditioner
 
-from .data import *
-
-from .utilities import *
+from .regularization import Regularization, L2Regularization

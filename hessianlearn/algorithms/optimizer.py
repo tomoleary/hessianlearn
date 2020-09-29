@@ -20,27 +20,37 @@ from __future__ import division
 from __future__ import print_function
 
 from abc import ABC, abstractmethod
+import numpy as np
 
 from ..utilities.parameterList import ParameterList
+from ..problem import Hessian
 
 def ParametersOptimizer(dictionary = {}):
 	parameters = dictionary
 	parameters['alpha']                         = [1.0, "Initial steplength, or learning rate"]
 	parameters['rel_tolerance']                 = [1e-3, "Relative convergence when sqrt(g,g)/sqrt(g_0,g_0) <= rel_tolerance"]
 	parameters['abs_tolerance']                 = [1e-4,"Absolute converge when sqrt(g,g) <= abs_tolerance"]
-	parameters['max_NN_evals_per_batch']        = [10000, "Scale constant for maximum neural network evaluations per datum"]
-	parameters['max_NN_evals']                  = [None, "Maximum number of neural network evaluations"]
-
-	parameters['globalization']					= ['None', 'Choose from trust_region, line_search or none']
-	# Reasons for convergence failure
-	parameters['reasons'] = [[], 'list of reasons for termination']
+	parameters['globalization']					= [None, 'Choose from trust_region, line_search or none']
 
 
 	return ParameterList(parameters)
 
 
 class Optimizer(ABC):
+	"""
+	This class describes the optimizer used during training
+
+	All children must implement the method minimize, which implements 
+	one step of the optimizers weight update scheme
+	"""
 	def __init__(self,problem = None,regularization = None, sess = None,parameters = ParametersOptimizer(),comm = None):
+		"""
+		The constructor for this class takes:
+			-problem: hessianlearn.problem.Problem class
+			-regularization: hessianlearn.problem.Regularization class
+			-sess: the tf.Session() used to evaluate the computational graph
+			-parameters: the dictionary of hyperparameters for the optimizer.
+		"""
 		self._problem = problem
 		self._regularization = regularization
 		self._sess = sess
@@ -48,6 +58,7 @@ class Optimizer(ABC):
 		self._sweeps = 0
 		self._comm = comm
 		self._iter = 0
+		self.H = Hessian(problem=problem,sess=sess)
 
 	@property
 	def problem(self):
@@ -90,24 +101,20 @@ class Optimizer(ABC):
 		"""
 		raise NotImplementedError("Child class should implement method minimize") 
 
-	# this will need to become H_w_hat
 
 
 	def _loss_at_candidate(self,p,feed_dict):
+		"""
+		This method implements a function to assist with Armijo line search
+			-p: candidate update to be evaluated in Armijo line search producedure
+			-feed_dict: data dictionary used to evaluate cost at candidate
+		"""
 		self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:p})
 		# self.sess.run(self.problem._update_w(p))
 		misfit = self.sess.run((self.problem.loss),feed_dict)
 		self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:-p})
 		# self.sess.run(self.problem._update_w(-p))
 		return misfit
-
-
-	def H_w_hat(self,x,feed_dict):
-		assert self.problem is not None
-		assert self.sess is not None
-
-		feed_dict[self.problem.w_hat] = x
-		H_w_hat = self.sess.run(self.problem.H_w_hat,feed_dict)
-		return H_w_hat
+		
 
 

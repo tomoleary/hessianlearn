@@ -25,8 +25,9 @@ from scipy.sparse import diags
 from ..utilities.parameterList import ParameterList
 from ..algorithms import Optimizer
 from ..algorithms.globalization import ArmijoLineSearch, TrustRegion
-from ..algorithms.randomizedEigensolver import randomized_eigensolver
-from ..modeling import L2Regularization
+from ..algorithms.randomizedEigensolver import randomized_eigensolver, eigensolver_from_range
+from ..algorithms.rangeFinders import block_range_finder, noise_aware_adaptive_range_finder
+from ..problem import L2Regularization
 
 
 
@@ -36,54 +37,87 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 	parameters['alpha']                         = [1e0, "Initial steplength, or learning rate"]
 	parameters['rel_tolerance']                 = [1e-3, "Relative convergence when sqrt(g,g)/sqrt(g_0,g_0) <= rel_tolerance"]
 	parameters['abs_tolerance']                 = [1e-4,"Absolute converge when sqrt(g,g) <= abs_tolerance"]
-	parameters['max_NN_evals_per_batch']        = [10000, "Scale constant for maximum neural network evaluations per datum"]
-	parameters['max_NN_evals']                  = [None, "Maximum number of neural network evaluations"]
-
-	parameters['hessian_low_rank']        		= [20, "Scale constant for maximum neural network evaluations per datum"]
 	parameters['default_damping']        		= [1e-3, "Levenberg-Marquardt damping when no regularization is used"]
+	
+	# Hessian approximation parameters
+	parameters['range_finding']					= [None,"Range finding, if None then r = hessian_low_rank\
+															Choose from None, 'arf', 'naarf'"]
+	parameters['range_rel_error_tolerance']     = [100, "Error tolerance for error estimator in adaptive range finding"]
+	parameters['range_abs_error_tolerance']     = [100, "Error tolerance for error estimator in adaptive range finding"]
+	parameters['range_block_size']        		= [10, "Block size used in range finder"]
+	parameters['rq_samples_for_naarf']        	= [100, "Number of partitions for RQ variance evaluation"]
+	parameters['hessian_low_rank']        		= [20, "Fixed rank for randomized eigenvalue decomposition"]
+	
 
-	parameters['globalization']					= ['None', 'Choose from trust_region, line_search or none']
+	# Globaliziation parameters
+	parameters['globalization']					= [None, 'Choose from trust_region, line_search or none']
 	parameters['max_backtracking_iter']			= [5, 'Max backtracking iterations for armijo line search']
 
-	# Reasons for convergence failure
-	parameters['reasons'] = [[], 'list of reasons for termination']
-
+	parameters['verbose']                       = [False, "Printing"]
+	parameters['record_last_rq_std']			= [True, "Record the last eigenvector RQ variance"]
 
 	return ParameterList(parameters)
 
 
 class LowRankSaddleFreeNewton(Optimizer):
-	def __init__(self,problem,regularization = None,sess = None,feed_dict = None,parameters = ParametersLowRankSaddleFreeNewton(),preconditioner = None):
+	"""
+	This class implements the Low Rank Saddle Free Newton (LRSFN) algorithm
+	"""
+	def __init__(self,problem,regularization = None,sess = None,parameters = ParametersLowRankSaddleFreeNewton(),preconditioner = None):
+		"""
+		The constructor for this class takes:
+			-problem: hessianlearn.problem.Problem
+			-regularization: hessianlearn.problem.Regularization
+			-sess: tf.Session()
+			-parameters: hyperparameters dictionary
+			-preconditioner: hessianlearn.problem.Preconditioner
+		"""
 		if regularization is None:
-			_regularization = ZeroRegularization(problem)
+			_regularization = L2Regularization(problem,gamma = 0.0)
 		else:
 			_regularization = regularization
 		super(LowRankSaddleFreeNewton,self).__init__(problem,_regularization,sess,parameters)
+
 		self.grad = self.problem.gradient + self.regularization.gradient
+
 		if self.parameters['globalization'] == 'trust_region':
 			self.trust_region = TrustRegion()
 		self._sweeps = np.zeros(2)
-		self.alpha = (8*'-').center(10)
+
+		self.alpha = 0.0
+		self._rank = 0
+
+		self._rq_std = 0.0
+
+	@property
+	def rank(self):
+		return self._rank
+
+	@property
+	def rq_variance(self):
+		return self._rq_variance
+	
+	
 
 
-	def minimize(self,feed_dict = None,hessian_feed_dict = None):
+	def minimize(self,feed_dict = None,hessian_feed_dict = None,rq_estimator_dict = None):
 		r"""
 		Solves the saddle escape problem. Given a misfit (loss) Hessian operator (H)
-		Takes:
-		H_misfit operator (callable) : \mathbb{R}^n \rightarrow \mathbb{R}^n
-		alpha_damping -- if Tikhonov regularization is used then alpha is the regularization 
-			coefficient, otherwise it is a Levenberg-Marquardt style damping coefficient
-		n: the dimension of the weights
-		rank: dimension for low rank spectral decomposition
 		1. H = U_r Lambda_r U_r^T
-		2. Solve [U_r |Lambda_r| U_r^T + alpha I] p = -g for p via Woodbury formula:
+		2. Solve [U_r |Lambda_r| U_r^T + gamma I] p = -g for p via Woodbury formula:
 
-		[U_r Lambda_r U_r^T + alpha I]^{-1} = 1/alpha * I - 1/alpha * UDU^T
-		where D = diag(|lambda_i|/(|lambda_i| + alpha))
+		[U_r Lambda_r U_r^T + gamma I]^{-1} = 1/gamma * I - 1/gamma * UDU^T
+		where D = diag(|lambda_i|/(|lambda_i| + gamma))
+			-feed_dict: data dictionary used for evaluating gradient and cost
+			-hessian_feed_dict: dictionary used for stochastic Hessian
+			-rq_estimator_dict: dictionary used for RQ variance calculations
 
 		"""
+		self._iter += 1
 		assert self.sess is not None
 		assert feed_dict is not None
+
+		assert self.parameters['range_finding'] in [None,'arf','naarf']
 
 		if hessian_feed_dict is None:
 			hessian_feed_dict = feed_dict
@@ -92,40 +126,99 @@ class LowRankSaddleFreeNewton(Optimizer):
 		gradient = self.sess.run(self.grad,feed_dict = feed_dict)
 
 		alpha = self.parameters['alpha']
-		rank = self.parameters['hessian_low_rank']
-		H = lambda x: self.H_w_hat(x,hessian_feed_dict)
-		n = self.problem.dimension
+		
+		if self.parameters['range_finding'] == 'arf':
+			H = lambda x: self.H(x,hessian_feed_dict,verbose = self.parameters['verbose'])
+			n = self.problem.dimension
+			norm_g = np.linalg.norm(gradient)
+			tolerance = self.parameters['range_rel_error_tolerance']*norm_g
+			Q = block_range_finder(H,n,tolerance,self.parameters['range_block_size'])
+			self._rank = Q.shape[1]
+			Lmbda,U = eigensolver_from_range(H,Q)
 
-		Lmbda,U = randomized_eigensolver(H, n, rank,verbose=False)
-		self.lambdas = Lmbda
+		elif self.parameters['range_finding'] == 'naarf':
+			norm_g = np.linalg.norm(gradient)
+			tolerance = self.parameters['range_rel_error_tolerance']*norm_g
+			noise_tolerance = 0.01*tolerance
+			if rq_estimator_dict is None:
+				rq_estimator_dict_list = self.problem._partition_dictionaries(feed_dict,self.parameters['rq_samples_for_naarf'])
+			elif type(rq_estimator_dict) == list:
+				rq_estimator_dict_list = rq_estimator_dict
+			elif type(rq_estimator_dict) == dict:
+				rq_estimator_dict_list = self.problem._partition_dictionaries(rq_estimator_dict,self.parameters['rq_samples_for_naarf'])
+			else:
+				raise
+			Q = noise_aware_adaptive_range_finder(self.H,hessian_feed_dict,rq_estimator_dict_list,block_size = self.parameters['range_block_size'],noise_tolerance = noise_tolerance,epsilon = tolerance)
+			self._rank = Q.shape[1]
+			H = lambda x: self.H(x,hessian_feed_dict,verbose = self.parameters['verbose'])
+			Lmbda,U = eigensolver_from_range(H,Q)
+			pass
+		else:
+			H = lambda x: self.H(x,hessian_feed_dict,verbose = self.parameters['verbose'])
+			n = self.problem.dimension
+			self._rank = self.parameters['hessian_low_rank']
+			Lmbda,U = randomized_eigensolver(H, n, self._rank,verbose=False)
+			self.lambdas = Lmbda
+		
+		# Log the variance of the last eigenvector
+		if self.parameters['record_last_rq_std'] :
+			rq_direction = U[:,-1]
+			if rq_estimator_dict is None:
+				rq_estimator_dict_list = self.problem._partition_dictionaries(feed_dict,self.parameters['rq_samples_for_naarf'])
+			elif type(rq_estimator_dict) == list:
+				rq_estimator_dict_list = rq_estimator_dict
+			elif type(rq_estimator_dict) == dict:
+				rq_estimator_dict_list = self.problem._partition_dictionaries(rq_estimator_dict,self.parameters['rq_samples_for_naarf'])
+			else:
+				raise	
+			
+			try:
+				RQ_samples = np.zeros((len(rq_estimator_dict_list),rq_direction.shape[1]))
+			except:
+				RQ_samples = np.zeros(len(rq_estimator_dict_list))
+
+			for samp_i,sample_dictionary in enumerate(rq_estimator_dict_list):
+				RQ_samples[samp_i] = self.H.quadratics(rq_direction,sample_dictionary)
+
+			self._rq_std = np.std(RQ_samples)
+
+			# print('RQ_std = ',self._rq_std)
+			# norm_g = np.linalg.norm(gradient)
+			# print('rq_std/||g|| = ',self._rq_std/norm_g)
+
+
+		# Saddle free inversion via Woodbury
 		Lmbda_abs = np.abs(Lmbda)
+		
+
+		if self.regularization.parameters['gamma'] < 1e-4:
+			gamma_damping = self.parameters['default_damping']
+			# Using this condition instead of fixed gamma allows one to take larger step sizes
+			# but does not appear to improve accuracy
+			# gamma_damping = max(0.9*Lmbda_abs[-1],self.parameters['default_damping'])
+		else:
+			gamma_damping = self.regularization.parameters['gamma']
+
 		Lmbda_diags = diags(Lmbda_abs)
 
-		if self.regularization.parameters['beta'] < 1e-4:
-			alpha_damping = self.parameters['default_damping']
-		else:
-			alpha_damping = self.regularization.parameters['beta']
 		# Build terms for Woodbury inversion
-		D_denominator = Lmbda_abs + alpha_damping*np.ones_like(Lmbda_abs)
+		D_denominator = Lmbda_abs + gamma_damping*np.ones_like(Lmbda_abs)
 
 		D = np.divide(Lmbda_abs,D_denominator)
-
-
-
 
 		# Invert by applying terms in Woodbury formula:
 		UTg = np.dot(U.T,gradient)
 		DUTg = np.multiply(D,UTg)
 		UDUTg = np.dot(U,DUTg)
-		minus_p = (gradient - UDUTg)/alpha_damping
+		minus_p = (gradient - UDUTg)/gamma_damping
 		self.p = -minus_p
 		
 
 
-		if self.parameters['globalization'] is 'None':
-			alpha = self.parameters['alpha']
-			self._sweeps += [1,2*rank]
-			update = alpha*self.p
+		if self.parameters['globalization'] is None:
+			self.alpha = self.parameters['alpha']
+			self._sweeps += [1,2*self._rank]
+			update = self.alpha*self.p
 			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 
 
@@ -137,7 +230,7 @@ class LowRankSaddleFreeNewton(Optimizer):
 														cost_at_candidate, initial_cost,
 														max_backtracking_iter = self.parameters['max_backtracking_iter'])
 			update = self.alpha*self.p
-			self._sweeps += [1+0.5*line_search_iter,2*rank]
+			self._sweeps += [1+0.5*line_search_iter,2*self._rank]
 			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 
 

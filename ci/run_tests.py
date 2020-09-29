@@ -1,4 +1,3 @@
-
 # This file is part of the hessianlearn package
 #
 # hessianlearn is free software: you can redistribute it and/or modify
@@ -16,35 +15,10 @@
 # Author: Tom O'Leary-Roseberry
 # Contact: tom.olearyroseberry@utexas.edu
 
-from __future__ import absolute_import, division, print_function
-import numpy as np
-import tensorflow as tf
-if int(tf.__version__[0]) > 1:
-	import tensorflow.compat.v1 as tf
-	tf.disable_v2_behavior()
+import os
 
-
-class Preconditioner(object):
-	def __init__(self):
-
-
-
-		# Define loss function and accuracy in __init__
-		pass
-
-
-
-
-
-
-
-class IdentityPreconditioner(Preconditioner):
-	def __init__(self,problem,dtype = tf.float32):
-		self.x = tf.placeholder(dtype,problem.gradient.shape,name='vec_for_prec_apply')
-
-
-	def __call__(self):
-		return self.x
-
-
+# Run randomized eigenvalue test
+os.system('python hessianlearn/test/test_randomizedEigensolver.py')
+os.system('python hessianlearn/test/test_rangeFinders.py')
+os.system('python hessianlearn/test/test_HessianlearnModel.py')
 

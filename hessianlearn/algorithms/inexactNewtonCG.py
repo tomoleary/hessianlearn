@@ -24,7 +24,7 @@ import numpy as np
 from ..utilities.parameterList import ParameterList
 from ..algorithms import Optimizer, CGSolver, ParametersCGSolver
 from ..algorithms.globalization import ArmijoLineSearch, TrustRegion
-from ..modeling import L2Regularization
+from ..problem import L2Regularization
 
 
 
@@ -42,7 +42,7 @@ def ParametersInexactNewtonCG(parameters = {}):
 	parameters['cg_coarse_tol']						= [0.5,'CG coarse solve tolerance']
 	parameters['cg_max_iter']						= [10,'CG maximum iterations']
 	parameters['eta_mode']							= [0, 'eta mode for E-W conditions:0,1,2']
-	parameters['globalization']						= ['None', 'Choose from trust_region, line_search or none']
+	parameters['globalization']						= [None, 'Choose from trust_region, line_search or none']
 	parameters['max_backtracking_iter']				= [10, 'max backtracking iterations for line search']
 
 	# Reasons for convergence failure
@@ -57,10 +57,21 @@ def ParametersInexactNewtonCG(parameters = {}):
 
 
 class InexactNewtonCG(Optimizer):
+	"""
+	This class implements the inexact Newton CG optimizer
+	"""
 	def __init__(self,problem,regularization = None,sess = None,feed_dict = None,\
 			parameters = ParametersInexactNewtonCG(),preconditioner = None):
+		"""
+		The constructor for this class takes:
+			-problem: hessianlearn.problem.Problem
+			-regularization: hessianlearn.problem.Regularization
+			-sess: tf.Session()
+			-parameters: hyperparameters dictionary
+			-preconditioner: hessianlearn.problem.Preconditioner
+		"""
 		if regularization is None:
-			_regularization = ZeroRegularization(problem)
+			_regularization = L2Regularization(problem,gamma = 0.0)
 		else:
 			_regularization = regularization
 		super(InexactNewtonCG,self).__init__(problem,_regularization,sess,parameters)
@@ -72,11 +83,14 @@ class InexactNewtonCG(Optimizer):
 		self.trust_region_initialized = False
 		if self.parameters['globalization'] == 'trust_region':
 			self.initialize_trust_region()
-		self.alpha = (8*'-').center(10)
+		self.alpha = 0.0
 
 
 
 	def initialize_trust_region(self):
+		"""
+		Initializes trust region
+		"""
 		if not self.parameters['globalization'] == 'trust_region':
 			self.parameters['globalization'] = 'trust_region'
 		self.trust_region = TrustRegion()
@@ -86,7 +100,9 @@ class InexactNewtonCG(Optimizer):
 
 	def minimize(self,feed_dict = None,hessian_feed_dict = None):
 		r"""
-		w-=alpha*g
+		Solves using inexact Newton CG algorithm
+			-feed_dict: the data dictionary used for evaluating stochastic gradients and cost
+			-hessian_feed_dict: smaller data dictionary used for stochastic Hessian
 		"""
 		assert self.sess is not None
 		assert feed_dict is not None
@@ -97,12 +113,12 @@ class InexactNewtonCG(Optimizer):
 
 
 
-		if self.parameters['globalization'] is 'None':
-			alpha = self.parameters['alpha']
+		if self.parameters['globalization'] is None:
+			self.alpha = self.parameters['alpha']
 			p,on_boundary = self.cg_solver.solve(-self.gradient,hessian_feed_dict)
 			self._sweeps += [1,2*self.cg_solver.iter]
 			self.p = p
-			update = alpha*p
+			update = self.alpha*p
 			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 
 		if self.parameters['globalization'] == 'line_search':

@@ -25,6 +25,15 @@ if int(tf.__version__[0]) > 1:
 
 
 def finite_difference_check(sess,problem, feed_dict, w = None, w_hat=None,verbose = False):
+	"""
+	This method implements finite difference checks for a given hessianlearn.problem.Problem 
+		-sess: tf.Session()
+		-problem: hessianlearn.problem.Problem
+		-feed_dict: data used for computation of cost, grad and hess
+		-w: the point the finite difference check is evaluated at
+		-w_hat: the direction for the finite difference check
+		-verbose: Boolean for printing
+	"""
 
 	if w is None:
 		w = sess.run(problem.w)

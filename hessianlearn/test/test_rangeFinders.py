@@ -14,36 +14,31 @@
 #
 # Author: Tom O'Leary-Roseberry
 # Contact: tom.olearyroseberry@utexas.edu
+from __future__ import absolute_import, division, print_function
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-import os
-import sys
+import unittest 
 import numpy as np
-import random
-from ..data.data import *
+import sys
 
-import math
-import time
+sys.path.append('../../')
+from hessianlearn import (block_range_finder)
 
-# from statsmodels import robust
+class TestRangeFinders(unittest.TestCase):
 
-def dir_check(dir):
-	try:
-		os.stat(dir)
-	except:
-		os.mkdir(dir)
+	def test_basic(self):
+		my_state = np.random.RandomState(seed=0)
+		n = 100
+		Q,_ = np.linalg.qr(my_state.randn(n,n))
+		d = np.concatenate((np.ones(10),np.exp(-np.arange(n-10))))
+		Aop = lambda x: Q@np.diag(d)@(Q.T@x)
 
-def load_ice(path_to_ice = ''):
-	# read from file
-	ms = np.load(path_to_ice+'ice_iid_all_m_fulls.npy')
-	qois = np.load(path_to_ice+'ice_iid_all_qois.npy')
-	return [ms,qois]
+		Q_range = block_range_finder(Aop,100,1e-5,10)
+		assert Q_range.shape[-1] <=40
+		w_action = my_state.randn(100,1)
+		action = Aop(w_action)
+		error = np.linalg.norm(action - Q_range@(Q_range.T@ action))
+		print(error)
+		assert error < 1e-5
 
-	
-
-
-
-
-
+if __name__ == '__main__':
+    unittest.main()

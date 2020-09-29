@@ -1,3 +1,4 @@
+
 # This file is part of the hessianlearn package
 #
 # hessianlearn is free software: you can redistribute it and/or modify
@@ -16,15 +17,42 @@
 # Contact: tom.olearyroseberry@utexas.edu
 
 from __future__ import absolute_import, division, print_function
+import numpy as np
 import tensorflow as tf
 if int(tf.__version__[0]) > 1:
 	import tensorflow.compat.v1 as tf
 	tf.disable_v2_behavior()
 
-from .data import *
 
-from .mnist import load_mnist
+class Preconditioner(object):
+	"""
+	This class describes a preconditioner, currently it is empty
 
-from .lfw import load_lfw
+	Child class should implement method __call__ which implements
+	the preconditioner approximation of the (Hessian) inverse
+	"""
 
-from .cifar10 import load_cifar10
+
+class IdentityPreconditioner(Preconditioner):
+	"""
+	This class describes identity preconditioning, which means doing nothing
+	"""
+	def __init__(self,problem,dtype = tf.float32):
+		"""
+		The constructor for this class takes:
+			-problem: hessianlearn.problem.Problem class
+			-dtype: data type
+		"""
+		# Rethink this later and improve for Krylov methods.
+		self.x = tf.placeholder(dtype,problem.gradient.shape,name='vec_for_prec_apply')
+
+
+	def __call__(self):
+		"""
+		The call method simply returns vector which must be passed to
+		the sess at runtime. self.x is a placeholder variable.
+		"""
+		return self.x
+
+
+

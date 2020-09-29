@@ -27,8 +27,8 @@ if int(tf.__version__[0]) > 1:
 
 from ..utilities.parameterList import ParameterList
 from ..algorithms import Optimizer
-from .. modeling import IdentityPreconditioner
-from ..modeling import L2Regularization
+from .. problem import IdentityPreconditioner
+from ..problem import L2Regularization
 from abc import ABC, abstractmethod
 
 class Identity(object):
@@ -57,10 +57,9 @@ def ParametersGMRESSolver(dictionary = {}):
 
 
 class GMRESSolver(ABC):
-
-
-
-
+	"""
+	This class implements a GMRES solver
+	"""
 	reason = ["Maximum Number of Iterations Reached",
 			  "Relative/Absolute residual less than tol",
 			  "Reached a negative direction",
@@ -79,7 +78,7 @@ class GMRESSolver(ABC):
 		self.parameters = parameters
 
 		
-		self.Aop = self.problem.H_w_hat + self.regularization.H_w_hat
+		self.Aop = self.problem.H_action + self.regularization.H_action
 
 		# # Define preconditioner 
 		# if preconditioner is None:

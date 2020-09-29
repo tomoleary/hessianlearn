@@ -14,15 +14,25 @@
 #
 # Author: Tom O'Leary-Roseberry
 # Contact: tom.olearyroseberry@utexas.edu
-
 from __future__ import absolute_import, division, print_function
 
-from .algorithms import *
+import unittest 
+import numpy as np
+import sys
 
-from .problem import *
+sys.path.append('../../')
+from hessianlearn import (randomized_eigensolver)
 
-from .model import *
+class TestRandomizedEigensolver(unittest.TestCase):
 
-from .data import *
+	def test_basic(self):
+		my_state = np.random.RandomState(seed=0)
+		n = 100
+		Q,_ = np.linalg.qr(my_state.randn(n,n))
+		d = np.concatenate((np.ones(10),np.exp(-np.arange(n-10))))
+		Aop = lambda x: Q@np.diag(d)@(Q.T@x)
+		d_hl, Q_hl = randomized_eigensolver(Aop,100, 100)
+		assert np.linalg.norm(d[:50] - d_hl[0:50]) < 1e-10
 
-from .utilities import *
+if __name__ == '__main__':
+    unittest.main()

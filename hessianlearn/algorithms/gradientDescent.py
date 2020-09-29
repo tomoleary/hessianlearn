@@ -36,7 +36,7 @@ def ParametersGradientDescent(parameters = {}):
 	parameters['max_NN_evals']                  = [None, "Maximum number of neural network evaluations"]
 	parameters['max_backtracking_iter']			= [10, 'max backtracking iterations for line search']
 
-	parameters['globalization']					= ['None', 'Choose from trust_region, line_search or none']
+	parameters['globalization']					= [None, 'Choose from trust_region, line_search or none']
 	# Reasons for convergence failure
 	parameters['reasons'] = [[], 'list of reasons for termination']
 
@@ -44,9 +44,19 @@ def ParametersGradientDescent(parameters = {}):
 
 
 class GradientDescent(Optimizer):
+	"""
+	This class implements the gradient descent (and stochastic variant) optimizer
+	"""
 	def __init__(self,problem,regularization,sess = None,feed_dict = None,parameters = ParametersGradientDescent()):
+		"""
+		The constructor for this class takes:
+			-problem: hessianlearn.problem.Problem
+			-regularization: hessianlearn.problem.Regularization
+			-sess: tf.Session()
+			-parameters: hyperparameters dictionary
+		"""
 		if regularization is None:
-			_regularization = ZeroRegularization(problem)
+			_regularization = L2Regularization(problem,gamma = 0.0)
 		else:
 			_regularization = regularization
 		super(GradientDescent,self).__init__(problem,_regularization,sess,parameters)
@@ -56,7 +66,7 @@ class GradientDescent(Optimizer):
 
 		self.trust_region_initialized = False
 		if self.parameters['globalization'] == 'trust_region':
-			self.alpha = (8*'-').center(10)
+			self.alpha = 0.0
 		else:
 			self.alpha = parameters['alpha']
 
@@ -65,7 +75,10 @@ class GradientDescent(Optimizer):
 
 	def minimize(self,feed_dict = None):
 		r"""
+		Implements the gradient update:
 		w-=alpha*g
+		Takes the parameter:
+			-feed_dict: data to be used to evaluate stochastic gradient and cost
 		"""
 		assert self.sess is not None
 		assert feed_dict is not None
@@ -83,7 +96,7 @@ class GradientDescent(Optimizer):
 			p = self.alpha*w_dir
 			self._sweeps += [1+0.5*line_search_iter,0]
 
-		elif self.parameters['globalization'] == 'None':
+		elif self.parameters['globalization'] == None:
 			self.alpha = self.parameters['alpha']
 			p = -self.parameters['alpha']*g
 			self._sweeps += [1,0]

@@ -24,7 +24,7 @@ import numpy as np
 from ..utilities.parameterList import ParameterList
 from ..algorithms import Optimizer, MINRESSolver, ParametersMINRESSolver
 from ..algorithms.globalization import ArmijoLineSearch, TrustRegion
-from ..modeling import L2Regularization
+from ..problem import L2Regularization
 
 
 
@@ -41,7 +41,7 @@ def ParametersInexactNewtonMINRES(parameters = {}):
 	parameters['cg_coarse_tol']					= [0.5,'CG coarse solve tolerance']
 	parameters['cg_max_iter']					= [1000,'CG maximum iterations']
 	parameters['eta_mode']						= [0, 'eta mode for E-W conditions:0,1,2']
-	parameters['globalization']					= ['None', 'Choose from trust_region, line_search or none']
+	parameters['globalization']					= [None, 'Choose from trust_region, line_search or none']
 	parameters['max_backtracking_iter']			= [10, 'max backtracking iterations for line search']
 
 
@@ -53,9 +53,21 @@ def ParametersInexactNewtonMINRES(parameters = {}):
 
 
 class InexactNewtonMINRES(Optimizer):
-	def __init__(self,problem,regularization = None,sess = None,feed_dict = None,parameters = ParametersInexactNewtonMINRES(),preconditioner = None):
+	"""
+	This class implements the Inexact Newton MINRES optimizer
+	"""
+
+	def __init__(self,problem,regularization = None,sess = None,parameters = ParametersInexactNewtonMINRES(),preconditioner = None):
+		"""
+		The constructor for this class takes:
+			-problem: hessianlearn.problem.Problem
+			-regularization: hessianlearn.problem.Regularization
+			-sess: tf.Session()
+			-parameters: hyperparameters dictionary
+			-preconditioner: hessianlearn.problem.Preconditioner
+		"""
 		if regularization is None:
-			_regularization = ZeroRegularization(problem)
+			_regularization = L2Regularization(problem,gamma = 0.0)
 		else:
 			_regularization = regularization
 		super(InexactNewtonMINRES,self).__init__(problem,_regularization,sess,parameters)
@@ -64,12 +76,12 @@ class InexactNewtonMINRES(Optimizer):
 		self.grad = self.problem.gradient + self.regularization.gradient
 		self.minres_solver = MINRESSolver(self.problem,self.regularization,\
 			self.sess,parameters= self.parameters['minres_parameters'])
-		self.alpha = (8*'-').center(10)
+		self.alpha = 0.0
 		
 
 	def minimize(self,feed_dict = None,hessian_feed_dict = None):
 		r"""
-		w-=alpha*g
+		Updates using inexact Newton MINRES
 		"""
 		assert self.sess is not None
 		assert feed_dict is not None
@@ -89,7 +101,7 @@ class InexactNewtonMINRES(Optimizer):
 			update = self.alpha*w_dir
 			self._sweeps += [1+0.5*line_search_iter,2*self.minres_solver.iter]
 			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
-		elif self.parameters['globalization'] == 'None':
+		elif self.parameters['globalization'] == None:
 			self.alpha = self.parameters['alpha']
 			p,converged = self.minres_solver.solve(-self.gradient,hessian_feed_dict)
 			# print(converged)

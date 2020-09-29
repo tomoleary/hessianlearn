@@ -17,7 +17,9 @@
 
 from __future__ import absolute_import, division, print_function
 
-from .randomizedEigensolver import *
+from .randomizedEigensolver import low_rank_hessian, randomized_eigensolver, eigensolver_from_range
+
+from .rangeFinders import block_range_finder, noise_aware_adaptive_range_finder
 
 from .optimizer import Optimizer, ParametersOptimizer
 
@@ -27,9 +29,9 @@ from .gmresSolver import GMRESSolver, ParametersGMRESSolver
 
 from .minresSolver import MINRESSolver, ParametersMINRESSolver
 
-from .gradientDescent import GradientDescent, ParametersGradientDescent
-
 from .adam import Adam, ParametersAdam
+
+from .gradientDescent import GradientDescent, ParametersGradientDescent
 
 from .inexactNewtonCG import InexactNewtonCG, ParametersInexactNewtonCG
 
@@ -38,5 +40,3 @@ from .inexactNewtonGMRES import InexactNewtonGMRES, ParametersInexactNewtonGMRES
 from .inexactNewtonMINRES import InexactNewtonMINRES, ParametersInexactNewtonMINRES
 
 from .lowRankSaddleFreeNewton import LowRankSaddleFreeNewton, ParametersLowRankSaddleFreeNewton
-
-

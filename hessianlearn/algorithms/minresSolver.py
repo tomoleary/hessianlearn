@@ -27,8 +27,8 @@ if int(tf.__version__[0]) > 1:
 
 from ..utilities.parameterList import ParameterList
 from ..algorithms import Optimizer
-from .. modeling import IdentityPreconditioner
-from ..modeling import L2Regularization
+from .. problem import IdentityPreconditioner
+from ..problem import L2Regularization
 from abc import ABC, abstractmethod
 
 class Identity(object):
@@ -57,9 +57,9 @@ def ParametersMINRESSolver(dictionary = {}):
 
 
 class MINRESSolver(ABC):
-
-
-
+	"""
+	This class implements a basic MINRES Solver
+	"""
 
 	reason = ["Maximum Number of Iterations Reached",
 			  "Relative/Absolute residual less than tol",
@@ -68,6 +68,13 @@ class MINRESSolver(ABC):
 			  ]
 	def __init__(self,problem,regularization,sess = None,preconditioner = None,\
 		x = None,parameters = ParametersMINRESSolver()):
+		"""
+		The constructor for this class takes:
+			-problem: hessianlearn.problem.Problem
+			-regularization: hessianlearn.problem.Regularization
+			-sess: tf.Session()
+			-preconditioner: hessianlearn.problem.Preconditioner
+		"""
 		self.sess = sess
 		self.problem = problem
 		self.regularization = regularization
@@ -79,14 +86,13 @@ class MINRESSolver(ABC):
 		self.parameters = parameters
 
 		
-		self.Aop = self.problem.H_w_hat + self.regularization.H_w_hat
+		self.Aop = self.problem.H_action + self.regularization.H_action
 
 		# # Define preconditioner 
 		# if preconditioner is None:
 		# 	self.Minv = IdentityPreconditioner(problem,self.problem.dtype)
 		# else:
 		# 	self.Minv = preconditioner
-
 
 
 

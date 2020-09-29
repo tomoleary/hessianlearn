@@ -27,17 +27,16 @@ from abc import ABC, abstractmethod
 
 def ParametersRegularization(dictionary = {}):
 	parameters = dictionary
-	parameters["beta"] = [1e1, "regularization parameter"]
+	parameters["gamma"] = [1e-1, "regularization parameter"]
 
 	return ParameterList(parameters)
 
 class Regularization (ABC):
-	def __init__(self):
+	"""
+	This class describes the components of regularization used during training.
 
-		# make all the things that get initialized
-		# Define loss function and accuracy in __init__
-
-		pass
+	The child class implements the specifics during construction
+	"""
 
 	@property
 	def cost(self):
@@ -48,40 +47,39 @@ class Regularization (ABC):
 		return self._gradient
 
 	@property
-	def H_w_hat(self):
-		return self._H_w_hat
-
-
-
-class ZeroRegularization(Regularization):
-	def __init__(self,problem,beta = None,parameters = ParametersRegularization(),dtype = tf.float32):
-		# Must implement hessian apply and gradient
-		self._problem = problem
-		self.parameters = parameters
-
-		self._cost = 0.0
-		# fix this
-		self._gradient = 0.0*self.problem._flat_w
-		# fix this
-		self._H_w_hat = 0.0*self.problem.w_hat
-
-
-
+	def H_action(self):
+		return self._H_action
 
 class L2Regularization(Regularization):
-	def __init__(self,problem, beta = None,parameters = ParametersRegularization(),dtype = tf.float32):
-		# Must implement hessian apply and gradient
+	"""
+	This class implements standard Tikhonov (L2) regularization
+	with regularization parameter gamma
+		(gamma/2)||w||^2
+	"""
+	def __init__(self,problem, gamma = None,parameters = ParametersRegularization(),dtype = tf.float32):
+		"""
+		The constructor for this class takes
+			-problem: The description of the training problem i.e. hessianlearn.problem.Problem variant
+			-gamma: The regularization parameter, can be found via Morozov discrepancy, trial and error etc.
+		"""
 		self.problem = problem
 		self.parameters = parameters
 
-		if beta is not None:
-			self.parameters['beta'] = beta
-		# fix this
-		self._cost = 0.5*self.parameters['beta']*tf.reduce_sum(self.problem._flat_w*self.problem._flat_w)
-		# fix this
-		self._gradient = self.parameters['beta']*self.problem._flat_w
-		# fix this
-		self._H_w_hat = self.parameters['beta']*self.problem.w_hat
+		if gamma is not None:
+			self.parameters['gamma'] = gamma
+
+		self._cost = 0.5*self.parameters['gamma']*tf.reduce_sum(self.problem._flat_w*self.problem._flat_w)
+		
+		self._gradient = self.parameters['gamma']*self.problem._flat_w
+
+		self._H_action = self.parameters['gamma']*self.problem.w_hat
+
+
+
+
+
+
+
 
 
 

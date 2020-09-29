@@ -27,8 +27,8 @@ if int(tf.__version__[0]) > 1:
 
 from ..utilities.parameterList import ParameterList
 from ..algorithms import Optimizer
-from .. modeling import IdentityPreconditioner
-from ..modeling import L2Regularization
+from .. problem import IdentityPreconditioner
+from ..problem import L2Regularization
 from abc import ABC, abstractmethod
 
 class Identity(object):
@@ -56,20 +56,28 @@ def ParametersCGSolver(dictionary = {}):
 
 
 class CGSolver(ABC):
-
-
-
-
+	"""
+	This class implements a custom CG solver to be used with Inexact Newton CG
+	"""
 	reason = ["Maximum Number of Iterations Reached",
 			  "Relative/Absolute residual less than tol",
 			  "Reached a negative direction",
 			  "Reached trust region boundary"
 			  ]
 	def __init__(self,problem,regularization,sess = None,Aop = None,preconditioner = None,x = None,parameters = ParametersCGSolver()):
+		"""
+		The constructor for this class takes:
+			-problem: hessianlearn.problem.Problem
+			-regularization: hessianlearn.problem.Regularization
+			-sess: tf.Session()
+			-Aop: matrix vector product callable
+			-precondition: hessianlearn.problem.Preconditioner
+			-parameters: solver hyperparameters
+		"""
 		self.sess = sess
 		self.problem = problem
-		if regularization.parameters['beta'] < 1e-4:
-			regularization = L2Regularization(self.problem,beta = parameters['default_damping'])
+		if regularization.parameters['gamma'] < 1e-4:
+			regularization = L2Regularization(self.problem,gamma = parameters['default_damping'])
 		self.regularization = regularization
 		if x is None:
 			# self.x = tf.Variable(self.problem.gradient.initialized_value())
@@ -78,7 +86,7 @@ class CGSolver(ABC):
 			self.x = x
 		self.parameters = parameters
 		if Aop is None:
-			self.Aop = self.problem.H_w_hat + self.regularization.H_w_hat
+			self.Aop = self.problem.H_action + self.regularization.H_action
 		else:
 			# be careful to note what the operator requires be passed into feed_dict 
 			self.Aop = Aop
@@ -92,23 +100,44 @@ class CGSolver(ABC):
 		self.B_op = None
 
 	def initialize_trust_region(self,coarse_tol = None):
+		"""
+		This method initializes the trust region parameters
+			-coarse_tol: coarse tolerance
+		"""
 		self.update_x = self.update_with_trust_region
 		if coarse_tol is not None:
 			self.parameters['coarse_tol'] = coarse_tol
 
 	def set_trust_region_radius(self,radius,operator = Identity()):
+		"""
+		This method sets the trust region radius when trust region is used
+		for globalization
+			-radius: trust region radius
+			-operator: for use in TR calculations
+		"""
 		assert self.parameters['zero_initial_guess']
 		self.trust_region_radius_squared = radius**2
 		self.B_op = operator
 
 	def update_without_trust_region(self,x,alpha,p):
-		# Returns False and x
+		"""
+		This method updates the approximation of x^* and returns False when
+		TR is not used
+			-x: solution at given iteration
+			-alpha: step length
+			-p: search direction
+		"""
 		x = x + alpha*p
 		return False, x
 
 	def update_with_trust_region(self,x,alpha,p):
-		# Returns a Boolean delineating whether the point was placed on the trust
-		# region boundary or not, and the updated x
+		"""
+		This method returns a Boolean delineating whether the point was placed
+		on the trust region boundary or not, as well as the updated x
+			-x: solution at given iteration
+			-alpha: step length
+			-p: search direction
+		"""
 		step = x + alpha*p
 		assert self.B_op is not None
 		step_length = np.dot(x,self.B_op(step))
@@ -136,6 +165,10 @@ class CGSolver(ABC):
 		r"""
 		Solve Ax=b by the preconditioned conjugate gradients method
 		as defined in Iterative Methods Ed. 2 by Yousef Saad p 263
+			-b: the right hand side
+			-feed_dict: the data dictionary used to evaluate stochastic 
+				operators
+			-x_0: the initial guess for CG
 		"""
 		assert self.sess is not None
 		assert feed_dict is not None
@@ -259,28 +292,30 @@ class CGSolver(ABC):
 
 
 class CGSolver_scipy(ABC):
-
-
-
-
+	"""
+	This class implements a wrapper for the scipy CG solver
+	"""
 	reason = ["Maximum Number of Iterations Reached",
 			  "Relative/Absolute residual less than tol",
 			  "Reached a negative direction",
 			  "Reached trust region boundary"
 			  ]
-	def __init__(self,problem,regularization,sess = None,Aop = None,preconditioner = None,\
-		x = None,parameters = ParametersCGSolver()):
+	def __init__(self,problem,regularization,sess = None,Aop = None,preconditioner = None,parameters = ParametersCGSolver()):
+		"""
+		The constructor for this class takes
+			-problem: hessianlearn.problem.Problem
+			-regularization: hessianlearn.problem.Regularization
+			-sees: tf.Session()
+			-Aop: matrix vector product callable
+			-preconditioner: hessianlearn.problem.Preconditioner (not currently even used)
+			-parameters: solver hyperparameters
+		"""
 		self.sess = sess
 		self.problem = problem
 		self.regularization = regularization
-		if x is None:
-			# self.x = tf.Variable(self.problem.gradient.initialized_value())
-			self.x = self.problem.gradient
-		else:
-			self.x = x
 		self.parameters = parameters
 		if Aop is None:
-			self.Aop = self.problem.H_w_hat + self.regularization.H_w_hat
+			self.Aop = self.problem.H_action + self.regularization.H_action
 		else:
 			# be careful to note what the operator requires be passed into feed_dict 
 			self.Aop = Aop
@@ -299,6 +334,9 @@ class CGSolver_scipy(ABC):
 		r"""
 		Solve Ax=b by the mines method
 		as defined in Iterative Methods Ed. 2 by Youssef Saad p 140
+			-b: right hand side
+			-feed_dict: data dictionary for 
+			-x_0: initial guess
 		"""
 		assert self.sess is not None
 		assert feed_dict is not None

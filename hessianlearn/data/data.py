@@ -28,16 +28,40 @@ from abc import ABC, abstractmethod
 
 
 class Data(ABC):
-	# Must pass in data = [x,y] where x and y are numpy arrays of the same length (but possibly different shapes)
-
-	def __init__(self,data,train_data_size, batch_size,test_data_size = 500,\
-					 validation_data_size = 0,total_population_size = None,max_epochs = 1000,\
-					variable_batch = False,hessian_batch_size = -1,batch_increment = None,
+	"""
+	This class implements the data iterator construct used in hessianlearn
+	It takes data already prepartitioned into testing and training, or partitions 
+	the data as such and then implements iterators that are used in the training loop
+	"""
+	def __init__(self,data, batch_size,test_data = None,
+					test_data_size = None, max_epochs = np.inf,hessian_batch_size = -1,\
+					variable_batch = False,batch_increment = None,
 					shuffle = True,verbose = False,seed = 0):
-		self._train_data_size = train_data_size
+		""" 
+		The constructor for this class takes (x,y) data and partitions it into member iterators
+			-data: a list of two numpy arrays 
+			-batch_size: the initial batch size to be used during training
+			-test_data: if none then test and training data will be sampled and partitioned
+				from data, otherwise data will be used for training and test_data for testing
+			-max_epochs: maximum numbers of times through the the data during iteration
+			-hessian_batch_size: if positive then a Hessian data batch iterator will be instantiated,
+				otherwise it will not
+			-variable_batch: Boolean for variable batch size iterator
+			-shuffle: Boolean for whether the data should be shuffled or not during partitioning
+			-verbose: for printing
+			-seed: the random seed used for shuffling.
+		"""
+		assert data[0].shape[0] == data[1].shape[0]
 		self._batch_size = batch_size
-		self._validation_data_size = validation_data_size
-		self._test_data_size = test_data_size
+
+		if test_data is not None:
+			self._test_data_size = len(test_data)
+		else:
+			assert test_data_size is not None
+			self._test_data_size = test_data_size
+
+		self._train_data_size = None
+
 		self._max_epochs = max_epochs
 		self.verbose = verbose
 		self._variable_batch = variable_batch
@@ -45,29 +69,32 @@ class Data(ABC):
 		self._batch_increment = batch_increment
 		self._shuffle = shuffle
 
+		# Check and make sure data and testing_data are compatible
+		if test_data is not None:
+			assert data[0][0].shape == test_data[0][0].shape
+			assert data[1][0].shape == test_data[1][0].shape
+
 		self._input_shape = [None] + list(data[0][0].shape)
 		self._output_shape = [None] + list(data[1][0].shape)
-
 
 		if len(self._input_shape) == 3:
 			self._input_shape += [1]
 		if len(self._output_shape) == 3:
 			self._output_shape += [1]
+
 		data_size = len(data[0])
-		if total_population_size is None:
-			self._total_population_size = data_size
+		if test_data is None:
+			test_data_size = 0
 		else:
-			self._total_population_size = min(data_size,total_population_size)
-		# Partition data and instantiate iterables for train, val test etc.
-		self._partition(data,seed = seed)
+			test_data_size = len(test_data[0])
+		self._total_population_size = data_size + test_data_size
+
+		# Partition data and instantiate iterables for training and testing data
+		self._partition(data,test_data = test_data,seed = seed)
 
 	@property
 	def test(self):
 		return self._test
-
-	@property
-	def validation(self):
-		return self._validation
 
 	@property
 	def train(self):
@@ -77,71 +104,119 @@ class Data(ABC):
 	def hess_train(self):
 		return self._hess_train
 
-	def _load_data(self):
-		# Collect Data in a reproducible way (same ordering)
-		# Put in numpy array
-		# return two numpy arrays x (input), y (output)
-		raise NotImplementedError('Child class must implement method _load_data')
+	@property
+	def batch_factor(self):
+		return self._batch_factor
 
-	def _partition(self,data,seed = 0):
-		# Shuffle and parition, instantiate self.train, self.validation ,self.test
+	@property
+	def test_data_size(self):
+		return self._test_data_size
+	
+	@property
+	def train_data_size(self):
+		return self._train_data_size
 
-		assert self._train_data_size + self._test_data_size + self._validation_data_size <= self._total_population_size,\
-													 'sizes for train/validation/test data sets exceed available data:'+\
-													 str(self._train_data_size + self._test_data_size + self._validation_data_size)+'<'+\
-													 str(self._total_population_size)
-		indices = range(self._total_population_size)
-		test_indices,\
-		validation_indices,\
-		train_indices 	= np.split(indices,[self._test_data_size,self._test_data_size + self._validation_data_size])
-		if self.verbose:
-			print('Shuffling data')
-			t0 = time.time()
-		all_x,all_y = data
-		if self._shuffle:
-			random.Random(seed).shuffle(all_x)
-			random.Random(seed).shuffle(all_y)
-		if self.verbose:
-			duration = time.time() - t0
-			print('Shuffling took ', duration,' s')
-			print('Partitioning data')
-			t0 = time.time()
-		test_data = xyData([all_x[test_indices],all_y[test_indices]])
-		validation_data = xyData([all_x[validation_indices],all_y[validation_indices]])
-		train_data = xyData([all_x[train_indices],all_y[train_indices]])
-		if self.verbose:
-			duration = time.time() - t0
-			print('Partitioning took ', duration,' s')			
-			print('Instantiating data iterables')
-			t0 = time.time()
-		self._test = StaticIterator(test_data)
-		self._validation = StaticIterator(validation_data)
+	@property
+	def batch_size(self):
+		return self._batch_size
+
+	@property
+	def hessian_batch_size(self):
+		return self._hessian_batch_size
+	
+	
+	
+
+	def _partition(self,data,test_data = None, seed = 0):
+		"""
+		This method partitions the data, if test_data is none
+		the method will shuffle and partition data when the boolean
+		self._shuffle is True, otherwise it will partition the data
+		as it is passed in.
+			-data: the corpus of data, if test_data is not None, then data
+			is just the training data
+			-test_data: Optional, pre determined testing data partition
+			-seed: random seed used for shuffling
+		This method instantiates the self.train and self.test data iterators
+		"""
+		if test_data is not None:
+			# Then the partition is giving implicitly by the user 
+			_test_data = xyData(test_data)
+			_train_data = xyData(data)
+		else:
+			# In this case we parititon from the entire dataset
+
+			indices = range(self._total_population_size)
+			test_indices,train_indices 	= np.split(indices,[self._test_data_size])
+
+			if self.verbose:
+				print('Shuffling data')
+				t0 = time.time()
+			all_x,all_y = data
+			if self._shuffle:
+				random.Random(seed).shuffle(all_x)
+				random.Random(seed).shuffle(all_y)
+			if self.verbose:
+				duration = time.time() - t0
+				print('Shuffling took ', duration,' s')
+				print('Partitioning data')
+				t0 = time.time()
+			_test_data = xyData([all_x[test_indices],all_y[test_indices]])
+			_train_data = xyData([all_x[train_indices],all_y[train_indices]])
+			if self.verbose:
+				duration = time.time() - t0
+				print('Partitioning took ', duration,' s')			
+				print('Instantiating data iterables')
+				t0 = time.time()
+
+		
+
+		# Instantiate the testing data static iterator
+		self._test = StaticIterator(_test_data)
+		# Instantiate the training data iterator
 		if self._variable_batch:
-			self._train = VariableBatchIterator(train_data,self._batch_size,\
+			self._train = VariableBatchIterator(_train_data,self._batch_size,\
 							batch_increment = self._batch_increment,max_epochs = self._max_epochs,\
 							verbose = self.verbose)
 			if self._hessian_batch_size > 0:
-				self._hess_train = VariableBatchIterator(train_data,self._hessian_batch_size,\
+				self._hess_train = VariableBatchIterator(_train_data,self._hessian_batch_size,\
 							batch_increment = self._hessian_batch_size,max_epochs = np.inf)
 			else:
 				self._hess_train = None
 		else:
-			self._train = BatchIterator(train_data,self._batch_size,max_epochs = self._max_epochs,\
+			self._train = BatchIterator(_train_data,self._batch_size,max_epochs = self._max_epochs,\
 										verbose = self.verbose)
 			if self._hessian_batch_size > 0:
-				self._hess_train = BatchIterator(train_data,self._hessian_batch_size,\
+				self._hess_train = BatchIterator(_train_data,self._hessian_batch_size,\
 													max_epochs = np.inf,verbose = self.verbose)
 			else:
 				self._hess_train = None
 
 		if self.verbose:
 			duration = time.time() - t0
-			print('Instantiating iterables took ', duration,' s')		
+			print('Instantiating iterables took ', duration,' s')
+
+		self._train_data_size = len(_train_data.x)
+
+		self._batch_factor = [float(self._batch_size)/float(self._train_data_size),\
+					 float(self._hessian_batch_size)/float(self._train_data_size)]		
 
 
 
 class BatchIterator(object):
-	def __init__(self,data,batch_size,max_epochs = 1000, seed = 0,verbose = False):
+	"""
+	This class implements a batch iterator object.
+	"""
+	def __init__(self,data,batch_size,max_epochs = np.inf, seed = 0,verbose = False):
+		"""
+		The constructor for this class takes pre-partitioned data and instantiates a 
+		batch data iterator
+			-data: the pre partitioned data
+			-batch_size: the fixed batch size for each iteration
+			-max_epochs: The maximum number of times to go through the data
+			-seed: the seed for shuffling during iteration
+			-verbose: Boolean for printing
+		"""
 		self._data = data
 		self._batch_size = batch_size
 		self._max_epochs = max_epochs
@@ -151,10 +226,16 @@ class BatchIterator(object):
 
 
 	def __iter__(self):
+		"""
+		Returns self (the iterator object)
+		"""
 		return self
 		
 
 	def __next__(self):
+		"""
+		This method defines the shuffling scheme for the iterator
+		"""
 		if self._epoch >= self._max_epochs:
 			print('Maximum epochs reached')
 			raise StopIteration
@@ -179,8 +260,21 @@ class BatchIterator(object):
 			self._index += self._batch_size
 		return next_x, next_y
 
+
 class VariableBatchIterator(object):
+	"""
+	This class implements a variable batch iterator object
+	"""
 	def __init__(self,data,batch_size,max_epochs = 1000,batch_increment = None,seed = 0,verbose = False):
+		"""
+		The constructor for this class takes pre-partitioned data and instantiates a 
+		batch data iterator
+			-data: the pre partitioned data
+			-batch_size: the fixed batch size for each iteration
+			-max_epochs: The maximum number of times to go through the data
+			-seed: the seed for shuffling during iteration
+			-verbose: Boolean for printing
+		"""
 		self._data = data
 		self._batch_size = batch_size
 		self._max_epochs = max_epochs
@@ -194,10 +288,16 @@ class VariableBatchIterator(object):
 
 
 	def __iter__(self):
+		"""
+		Returns self (the iterator object)
+		"""
 		return self
 		
 
 	def __next__(self):
+		"""
+		This method defines the shuffling scheme for the iterator
+		"""
 		if self._epoch >= self._max_epochs:
 			print('Maximum epochs reached')
 			raise StopIteration
@@ -228,16 +328,29 @@ class VariableBatchIterator(object):
 
 
 class StaticIterator(object):
+	"""
+	This class implements a static data iterator object
+	"""
 	def __init__(self,data):
+		"""
+		The constructor for this class just takes the data (xyData object)
+		"""
 		self._data = data
 		self.index = 0
 
 	def __iter__(self):
+		"""
+		Returns self (the iterator object)
+		"""
 		return self
 
 	def __next__(self):
-		if self.index > 0:
-			raise StopIteration
+		"""
+		This method defines the shuffling scheme for the iterator
+		Which just returns all of the data since its a static iterator
+		"""
+		# if self.index > 0:
+		# 	raise StopIteration
 		next_x = self._data.x
 		next_y = self._data.y
 		self.index += 1
@@ -246,21 +359,18 @@ class StaticIterator(object):
 
 
 class xyData (object):
+	"""
+	This class implements a simple xy data pair object
+	"""
 	def __init__(self,data):
+		"""
+		The constructor for this class takes a list of xy data
+			-data: List of [x,y] data
+		"""
 		self.x = data[0]
 		self.y = data[1]
 		self.size = len(self.x)
 
 
-
-class DataIterator(object):
-	def __init__(self):
-		pass
-
-	def __iter__(self):
-		return self
-
-	def __next__(self):
-		pass
 
 
