@@ -175,7 +175,7 @@ class Problem(ABC):
 
 
 		if len(self.y_prediction.shape) > 2:
-			self._output_shape =  1.
+			self._output_dimension =  1.
 			for shape in self.y_prediction.shape[1:]:
 				self._output_dimension *= shape.value
 		else:
