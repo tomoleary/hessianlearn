@@ -298,7 +298,7 @@ class Problem(ABC):
 		The data that are used in the child class are problem specific 
 		and for this reason the child class implements this method.
 		"""
-		raise NotImplementedError("Child class should implement method _parition_dictionaries") 
+		raise NotImplementedError("Child class should implement method _partition_dictionaries") 
 
 
 
@@ -575,13 +575,13 @@ class GenerativeAdversarialNetworkProblem(Problem):
 	This class implements the description of basic generative adversarial network problems. 
 
 	"""
-	def __init__(self,generator,discriminator,loss_type = 'cross_entropy',dtype = tf.float32):
+	def __init__(self,generator,discriminator,loss_type = 'least_squares',dtype = tf.float32):
 		"""
 		The constructor for this class takes:
 			-generator: the tf.keras.model.Model description of the generator neural network
 			-discriminator: the tf.keras.model.Model description of the discriminator neural network
 		"""
-		assert loss_type in ['cross_entropy']
+		assert loss_type in ['cross_entropy','least_squares']
 		self._loss_type = loss_type
 
 		super(GenerativeAdversarialNetworkProblem,self).__init__([generator,discriminator],dtype = dtype)
@@ -686,11 +686,16 @@ class GenerativeAdversarialNetworkProblem(Problem):
 							tf.ones_like(self._real_prediction), self._real_prediction,from_logits=True))+\
 							 tf.reduce_mean(tf.keras.losses.categorical_crossentropy(\
 							tf.zeros_like(self._fake_prediction), self._fake_prediction,from_logits=True))
+				self._loss = self._generator_loss + self._discriminator_loss
 
 			elif self.loss_type == 'least_squares':
-				pass
+				self._generator_loss = tf.losses.mean_squared_error(labels=tf.ones_like(self._fake_prediction), predictions=self._fake_prediction)
+				self._discriminator_loss = tf.losses.mean_squared_error(labels=tf.ones_like(self._real_prediction), predictions=self._real_prediction)+\
+											tf.losses.mean_squared_error(labels=tf.zeros_like(self._fake_prediction), predictions=self._fake_prediction)
+				self._loss = self._generator_loss + self._discriminator_loss
 
-			self._loss = self._generator_loss + self._discriminator_loss
+			# self._loss = self._generator_loss + self._discriminator_loss
+
 	def _initialize_derivatives(self):
 		"""
 		This method defines derivative quantities for the loss function
@@ -721,17 +726,14 @@ class GenerativeAdversarialNetworkProblem(Problem):
 		self._norm_g = tf.sqrt(tf.reduce_sum(self.gradient*self.gradient))
 
 		# Hessian mat-vecs
-		self._generator_w_hat = tf.placeholder(self.dtype,self._generator_dimension )
+		self._w_hat = tf.placeholder(self.dtype, self.dimension)
+		# Split the placeholder
+		self._generator_w_hat,self._discriminator_w_hat = tf.split(self._w_hat,[self._generator_dimension,self._discriminator_dimension])
+
 		# Define generator (g,dw) inner product
 		self._generator_g_inner_w_hat = tf.tensordot(self._generator_w_hat,self._generator_gradient,axes = [[0],[0]])
-
-		# Hessian mat-vecs
-		self._discriminator_w_hat = tf.placeholder(self.dtype,self._discriminator_dimension )
-		# Define generator (g,dw) inner product
+		# Define discriminator (g,dw) inner product
 		self._discriminator_g_inner_w_hat = tf.tensordot(self._discriminator_w_hat,self._discriminator_gradient,axes = [[0],[0]])
-
-		self._w_hat = tf.concat([self._generator_w_hat,self._discriminator_w_hat],axis = 0)
-
 		# Define Hessian action Hdw
 		self._generator_H_action = my_flatten(tf.gradients(self._generator_g_inner_w_hat,self._generator_w,\
 										stop_gradients = self._generator_w_hat,name = 'generator_hessian_action'))
@@ -743,6 +745,26 @@ class GenerativeAdversarialNetworkProblem(Problem):
 
 		# Define Hessian quadratic forms
 		self._H_quadratic = tf.tensordot(self._w_hat,self._H_action,axes = [[0],[0]])
+
+	def _partition_dictionaries(self,data_dictionary,n_partitions):
+		"""
+		This method partitions one data dictionary into n_partitions.
+		For GANs this is images being partitioned as well as noise
+		"""
+		assert type(n_partitions) == int
+		data_xs = data_dictionary[self.x]
+		data_noise = data_dictionary[self.noise]
+		if n_partitions > len(data_xs):
+			n_partitions = len(data_xs)
+		chunk_size = int(data_xs.shape[0]/n_partitions)
+		dictionary_partitions = []
+		for chunk_i in range(n_partitions):
+			# Array slicing should be a view, not a copy
+			# So this should not be a memory issue
+			my_chunk_x = data_xs[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
+			my_chunk_noise = data_noise[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
+			dictionary_partitions.append({self.x:my_chunk_x, self.noise: my_chunk_noise})
+		return dictionary_partitions
 
 
 
