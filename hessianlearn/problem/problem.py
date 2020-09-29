@@ -528,7 +528,10 @@ class VariationalAutoencoderProblem(Problem):
 		super(VariationalAutoencoderProblem,self).__init__(NeuralNetwork,dtype = dtype)
 		self._is_autoencoder = True
 
-
+	@property
+	def loss_type(self):
+		return self._loss_type
+	
 
 	def _initialize_loss(self):
 		"""
