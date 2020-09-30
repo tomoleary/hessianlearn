@@ -287,6 +287,8 @@ class HessianlearnModel(ABC):
 	def _fit(self,options = None, w_0 = None):
 		with tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=self.settings['intra_threads'],\
 											inter_op_parallelism_threads=self.settings['inter_threads'])) as sess:
+			# Re initialize data
+			self.data.reset()
 			# Initialize logging:
 			self._initialize_logging()
 			# Initialize the optimizer

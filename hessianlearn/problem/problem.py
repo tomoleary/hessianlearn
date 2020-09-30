@@ -327,6 +327,10 @@ class ClassificationProblem(Problem):
 	@property
 	def accuracy(self):
 		return self._accuracy
+
+	@property
+	def rel_error(self):
+		return self._rel_error
 	
 
 	def _initialize_loss(self):
@@ -357,7 +361,7 @@ class ClassificationProblem(Problem):
 		else:
 			raise
 		with tf.name_scope('rel_error'):
-			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
+			self._rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
 							/tf.reduce_mean(tf.pow(self.y_true,2)))
 
 		with tf.name_scope('accuracy'):
@@ -423,7 +427,7 @@ class RegressionProblem(Problem):
 		with tf.name_scope('loss'):
 			self._loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
 		with tf.name_scope('rel_error'):
-			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
+			self._rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
 							/tf.reduce_mean(tf.pow(self.y_true,2)))
 		self._accuracy = 1. - self._rel_error
 		# with tf.name_scope('variance_reduction'):
@@ -474,6 +478,10 @@ class AutoencoderProblem(Problem):
 		super(AutoencoderProblem,self).__init__(NeuralNetwork,dtype = dtype)
 		self._is_autoencoder = True
 
+	@property
+	def rel_error(self):
+		return self._rel_error
+
 
 	def _initialize_loss(self):
 		"""
@@ -481,7 +489,7 @@ class AutoencoderProblem(Problem):
 		"""
 		with tf.name_scope('loss'): # 
 			self._loss = tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)) 
-			self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
+			self._rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
 							/tf.reduce_mean(tf.pow(self.x,2)))
 			self._accuracy = 1. - self.rel_error
 
@@ -531,6 +539,10 @@ class VariationalAutoencoderProblem(Problem):
 	@property
 	def loss_type(self):
 		return self._loss_type
+
+	@property
+	def rel_error(self):
+		return self._rel_error
 	
 
 	def _initialize_loss(self):
@@ -550,7 +562,7 @@ class VariationalAutoencoderProblem(Problem):
 			else:
 				raise
 
-		self.rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
+		self._rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
 						/tf.reduce_mean(tf.pow(self.x,2)))
 		self._accuracy = 1. - self.rel_error
 

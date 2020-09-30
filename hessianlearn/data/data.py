@@ -202,6 +202,11 @@ class Data(ABC):
 					 float(self._hessian_batch_size)/float(self._train_data_size)]		
 
 
+	def reset(self):
+		self._train._index = 0
+		self._test._index = 0
+
+
 
 class BatchIterator(object):
 	"""
@@ -223,6 +228,11 @@ class BatchIterator(object):
 		self._index = 0
 		self._epoch = 0
 		self.verbose = verbose
+
+	@property
+	def index(self):
+		return self._index
+	
 
 
 	def __iter__(self):
@@ -286,6 +296,10 @@ class VariableBatchIterator(object):
 		else:
 			self._batch_increment = batch_increment
 
+	@property
+	def index(self):
+		return self._index
+	
 
 	def __iter__(self):
 		"""
@@ -336,7 +350,12 @@ class StaticIterator(object):
 		The constructor for this class just takes the data (xyData object)
 		"""
 		self._data = data
-		self.index = 0
+		self._index = 0
+
+	@property
+	def index(self):
+		return self._index
+	
 
 	def __iter__(self):
 		"""
@@ -353,7 +372,7 @@ class StaticIterator(object):
 		# 	raise StopIteration
 		next_x = self._data.x
 		next_y = self._data.y
-		self.index += 1
+		self._index += 1
 		return next_x,next_y
 
 
