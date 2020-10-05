@@ -430,19 +430,19 @@ class RegressionProblem(Problem):
 			self._rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
 							/tf.reduce_mean(tf.pow(self.y_true,2)))
 		self._accuracy = 1. - self._rel_error
-		# with tf.name_scope('variance_reduction'):
-		# 	# For use in constructing a regressor to serve as a control variate.
-		# 	# 
-		# 	assert self.y_mean is not None
-		# 	self._variance_reduction = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
-		# 					/tf.reduce_mean(tf.pow(self.y_true - self.y_mean,2)))
-		# with tf.name_scope('mad'):
-		# 	try:
-		# 		import tensorflow_probability as tfp
-		# 		absolute_deviation = tf.math.abs(self.y_true - self.y_prediction)
-		# 		self.mad = tfp.stats.percentile(absolute_deviation,50.0,interpolation = 'midpoint')
-		# 	except:
-		# 		self.mad = None
+		with tf.name_scope('variance_reduction'):
+			# For use in constructing a regressor to serve as a control variate.
+			# 
+			assert self.y_mean is not None
+			self._variance_reduction = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
+							/tf.reduce_mean(tf.pow(self.y_true - self.y_mean,2)))
+		with tf.name_scope('mad'):
+			try:
+				import tensorflow_probability as tfp
+				absolute_deviation = tf.math.abs(self.y_true - self.y_prediction)
+				self.mad = tfp.stats.percentile(absolute_deviation,50.0,interpolation = 'midpoint')
+			except:
+				self.mad = None
 
 	def _partition_dictionaries(self,data_dictionary,n_partitions):
 		"""

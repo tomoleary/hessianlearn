@@ -259,6 +259,9 @@ class HessianlearnModel(ABC):
 		elif self.settings['record_last_rq_std']:
 			logger['last_rq_std'] = {}
 
+		if hasattr(self.problem,'_variance_reduction'):
+			logger['variance_reduction'] = {}
+
 
 		self._logger = logger
 
@@ -359,7 +362,12 @@ class HessianlearnModel(ABC):
 				self._logger['loss_train'][iteration] = loss_train
 				# Log for test data
 				if hasattr(self.problem,'accuracy'):
-					loss_test,	accuracy_test = sess.run([self.problem.loss,self.problem.accuracy],test_dict)
+					if hasattr(self.problem,'_variance_reduction'):
+						loss_test,	accuracy_test, var_red_test =\
+						 sess.run([self.problem.loss,self.problem.accuracy,self.problem.variance_reduction],test_dict)
+						self._logger['variance_reduction'][iteration] = var_red_test
+					else:
+						loss_test,	accuracy_test = sess.run([self.problem.loss,self.problem.accuracy],test_dict)
 					self._logger['accuracy_test'][iteration] = accuracy_test
 					max_test_acc = max(max_test_acc,accuracy_test)
 					self._logger['max_accuracy_test'][iteration] = max_test_acc
