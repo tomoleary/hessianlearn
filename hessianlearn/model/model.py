@@ -73,11 +73,13 @@ def HessianlearnModelSettings(settings = {}):
 	settings['range_rel_error_tolerance']   = [5, "Error tolerance for error estimator in adaptive range finding"]
 	settings['range_abs_error_tolerance']   = [50, "Error tolerance for error estimator in adaptive range finding"]
 	settings['range_block_size']        	= [10, "Block size used in range finder"]
-
-
 	settings['max_sweeps']					= [10,"Maximum number of times through the data (measured in epoch equivalents"]
 
-	#Settings for recording spectral information during training
+	# Initial weights for specific layers 
+	settings['layer_weights'] 				= [{},"Dictionary of layer name key and weight \
+													values for weights set after global variable initialization "]
+
+	# Settings for recording spectral information during training
 	settings['record_spectrum']         	= [False, "Boolean for recording spectrum during training"]
 	settings['record_last_rq_std']         	= [False, "Boolean for recording last RQ std for last eigenvector of LRSFN"]
 	settings['spec_frequency'] 				= [10, "Frequency for recording of spectrum"]
@@ -308,7 +310,12 @@ class HessianlearnModel(ABC):
 					except:
 						print(80*'#')
 						print('Issue setting weights manually'.center(80))
-						print('tf.global_variables_initializer() used to initial instead'.center(80))		
+						print('tf.global_variables_initializer() used to initial instead'.center(80))
+
+			# This handles a corner case for weights that are not trainable,
+			# but still get set by the tf.global_variables_initializer()
+			for layer_name,weight in self.settings['layer_weights'].items():
+				self.problem._NN.get_layer(layer_name).set_weights(weight)
 
 			if self.settings['verbose']:
 				self.print(first_print = True)
