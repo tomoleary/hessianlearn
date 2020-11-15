@@ -241,7 +241,7 @@ class HessianlearnModel(ABC):
 		logger['||g||'] ={}
 		logger['sweeps'] = {}
 		logger['time'] = {}
-		logger['best_weight'] = []
+		logger['best_weights'] = None
 		logger['optimizer'] = None
 		logger['alpha'] = None
 		logger['globalization'] = None
@@ -389,17 +389,17 @@ class HessianlearnModel(ABC):
 					self._logger['hessian_low_rank'][iteration] = self.optimizer.rank
 
 				if hasattr(self.problem,'accuracy') and accuracy_test == max_test_acc:
-					self._best_weights = sess.run(self.problem._w)
-					if len(self._logger['best_weight']) > 2:
-						self._logger['best_weight'].pop(0)
-					acc_weight_tuple = (accuracy_test,accuracy_train,sess.run(self.problem._flat_w))
-					self._logger['best_weight'].append(acc_weight_tuple) 
+					weight_dictionary = {}
+					for layer in self.problem._NN.layers:
+						weight_dictionary[layer.name] = self.problem._NN.get_layer(layer.name).get_weights()
+					self._best_weights = weight_dictionary
+					self._logger['best_weights'] = weight_dictionary
 				elif loss_test == min_test_loss:
-					self._best_weights = sess.run(self.problem._w)
-					if len(self._logger['best_weight']) > 2:
-						self._logger['best_weight'].pop(0)
-					loss_weight_tuple = (loss_test,loss_train,sess.run(self.problem._flat_w))
-					self._logger['best_weight'].append(loss_weight_tuple) 
+					weight_dictionary = {}
+					for layer in self.problem._NN.layers:
+						weight_dictionary[layer.name] = self.problem._NN.get_layer(layer.name).get_weights()
+					self._best_weights = weight_dictionary
+					self._logger['best_weights'] = weight_dictionary
 
 				sweeps = np.dot(self.data.batch_factor,self.optimizer.sweeps)
 				if self.settings['verbose'] and iteration % 1 == 0:
@@ -428,9 +428,10 @@ class HessianlearnModel(ABC):
 
 		# The weights need to be manually set once the session scope is closed.
 		try:
-			self._problem._NN.set_weights(self._best_weights)
+			for layer_name in self._best_weights:
+				self._problem._NN.get_layer(layer_name).set_weights(self._best_weights[layer_name])
 		except:
-			pass
+			print('Error setting the weights after training')
 
 	
 	def _record_spectrum(self,iteration):
