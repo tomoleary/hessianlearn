@@ -1,10 +1,23 @@
+# This file is part of the hessianlearn package
+#
+# hessianlearn is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or any later version.
+#
+# hessianlearn is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# If not, see <http://www.gnu.org/licenses/>.
+#
+# Author: Nick Alger
+
 import numpy as np
 
 
-# Tests and example usage in variance_based_nystrom_TEST.ipynb
-
-
-def variance_based_nystrom(apply_AA, num_cols_A, oversampling_parameter=5, batch_size=10, 
+def variance_based_nystrom(apply_AA, num_cols_A, oversampling_parameter=5, block_size=10, 
                            std_tol=0.5, max_bad_vectors=5, max_vectors=100, verbose=True):
 
     op = oversampling_parameter
@@ -18,17 +31,16 @@ def variance_based_nystrom(apply_AA, num_cols_A, oversampling_parameter=5, batch
         Q1 = Q
         Theta11 = Theta
 
-        Y = get_random_range_vectors(apply_AA, n, batch_size)
+        Y = get_random_range_vectors(apply_AA, n, block_size)
         Y_perp = Y - np.dot(Q,np.dot(Q.T, Y))
         Q2,_ = np.linalg.qr(Y_perp)
-        Q2 = Q2.reshape((n,-1)) # Reshape to guard against case batch_size==1
+        Q2 = Q2.reshape((n,-1)) # Reshape to guard against case block_size==1
         Q = np.hstack([Q1, Q2])
 
         Theta = compute_or_update_Theta(Q1, Q2, Theta11, apply_AA)
         dd, U, V = finish_computing_eigenvalue_decomposition(Q, Theta)
         _, all_std = compute_rayleigh_statistics(Theta, V)
         
-    #     bad_inds = (all_std[:-op] / np.abs(dd[:-op])) > std_tol*np.sqrt(m)
         bad_inds = (all_std[:-op] / np.abs(dd[:-op])) > std_tol
         num_bad_vectors = np.sum(bad_inds)
 
@@ -47,7 +59,7 @@ def variance_based_nystrom(apply_AA, num_cols_A, oversampling_parameter=5, batch
     return dd_good, U_good, all_std_good
     
 
-def get_random_range_vectors(apply_AA, num_cols_A, batch_size_r):
+def get_random_range_vectors(apply_AA, num_cols_A, block_size_r):
     """
     Computes n x r matrix
         Y = A * Omega
@@ -58,7 +70,7 @@ def get_random_range_vectors(apply_AA, num_cols_A, batch_size_r):
     and Omega is a random n x r matrix.
     """
     n = num_cols_A
-    r = batch_size_r
+    r = block_size_r
     m = len(apply_AA)
     
     Omega = np.random.randn(n, r)

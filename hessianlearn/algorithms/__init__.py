@@ -21,6 +21,8 @@ from .randomizedEigensolver import low_rank_hessian, randomized_eigensolver, eig
 
 from .rangeFinders import block_range_finder, noise_aware_adaptive_range_finder
 
+from .varianceBasedNystrom import variance_based_nystrom
+
 from .optimizer import Optimizer, ParametersOptimizer
 
 from .cgSolver import CGSolver, ParametersCGSolver
