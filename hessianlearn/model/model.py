@@ -73,11 +73,13 @@ def HessianlearnModelSettings(settings = {}):
 	settings['range_rel_error_tolerance']   = [5, "Error tolerance for error estimator in adaptive range finding"]
 	settings['range_abs_error_tolerance']   = [50, "Error tolerance for error estimator in adaptive range finding"]
 	settings['range_block_size']        	= [10, "Block size used in range finder"]
-
-
 	settings['max_sweeps']					= [10,"Maximum number of times through the data (measured in epoch equivalents"]
 
-	#Settings for recording spectral information during training
+	# Initial weights for specific layers 
+	settings['layer_weights'] 				= [{},"Dictionary of layer name key and weight \
+													values for weights set after global variable initialization "]
+
+	# Settings for recording spectral information during training
 	settings['record_spectrum']         	= [False, "Boolean for recording spectrum during training"]
 	settings['record_last_rq_std']         	= [False, "Boolean for recording last RQ std for last eigenvector of LRSFN"]
 	settings['spec_frequency'] 				= [10, "Frequency for recording of spectrum"]
@@ -239,7 +241,7 @@ class HessianlearnModel(ABC):
 		logger['||g||'] ={}
 		logger['sweeps'] = {}
 		logger['time'] = {}
-		logger['best_weight'] = []
+		logger['best_weights'] = None
 		logger['optimizer'] = None
 		logger['alpha'] = None
 		logger['globalization'] = None
@@ -258,6 +260,9 @@ class HessianlearnModel(ABC):
 			logger['rq_std'] = {}
 		elif self.settings['record_last_rq_std']:
 			logger['last_rq_std'] = {}
+
+		if hasattr(self.problem,'_variance_reduction'):
+			logger['variance_reduction'] = {}
 
 
 		self._logger = logger
@@ -287,6 +292,8 @@ class HessianlearnModel(ABC):
 	def _fit(self,options = None, w_0 = None):
 		with tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=self.settings['intra_threads'],\
 											inter_op_parallelism_threads=self.settings['inter_threads'])) as sess:
+			# Re initialize data
+			self.data.reset()
 			# Initialize logging:
 			self._initialize_logging()
 			# Initialize the optimizer
@@ -303,7 +310,12 @@ class HessianlearnModel(ABC):
 					except:
 						print(80*'#')
 						print('Issue setting weights manually'.center(80))
-						print('tf.global_variables_initializer() used to initial instead'.center(80))		
+						print('tf.global_variables_initializer() used to initial instead'.center(80))
+
+			# This handles a corner case for weights that are not trainable,
+			# but still get set by the tf.global_variables_initializer()
+			for layer_name,weight in self.settings['layer_weights'].items():
+				self.problem._NN.get_layer(layer_name).set_weights(weight)
 
 			if self.settings['verbose']:
 				self.print(first_print = True)
@@ -357,7 +369,12 @@ class HessianlearnModel(ABC):
 				self._logger['loss_train'][iteration] = loss_train
 				# Log for test data
 				if hasattr(self.problem,'accuracy'):
-					loss_test,	accuracy_test = sess.run([self.problem.loss,self.problem.accuracy],test_dict)
+					if hasattr(self.problem,'_variance_reduction'):
+						loss_test,	accuracy_test, var_red_test =\
+						 sess.run([self.problem.loss,self.problem.accuracy,self.problem.variance_reduction],test_dict)
+						self._logger['variance_reduction'][iteration] = var_red_test
+					else:
+						loss_test,	accuracy_test = sess.run([self.problem.loss,self.problem.accuracy],test_dict)
 					self._logger['accuracy_test'][iteration] = accuracy_test
 					max_test_acc = max(max_test_acc,accuracy_test)
 					self._logger['max_accuracy_test'][iteration] = max_test_acc
@@ -372,17 +389,17 @@ class HessianlearnModel(ABC):
 					self._logger['hessian_low_rank'][iteration] = self.optimizer.rank
 
 				if hasattr(self.problem,'accuracy') and accuracy_test == max_test_acc:
-					self._best_weights = sess.run(self.problem._w)
-					if len(self._logger['best_weight']) > 2:
-						self._logger['best_weight'].pop(0)
-					acc_weight_tuple = (accuracy_test,accuracy_train,sess.run(self.problem._flat_w))
-					self._logger['best_weight'].append(acc_weight_tuple) 
+					weight_dictionary = {}
+					for layer in self.problem._NN.layers:
+						weight_dictionary[layer.name] = self.problem._NN.get_layer(layer.name).get_weights()
+					self._best_weights = weight_dictionary
+					self._logger['best_weights'] = weight_dictionary
 				elif loss_test == min_test_loss:
-					self._best_weights = sess.run(self.problem._w)
-					if len(self._logger['best_weight']) > 2:
-						self._logger['best_weight'].pop(0)
-					loss_weight_tuple = (loss_test,loss_train,sess.run(self.problem._flat_w))
-					self._logger['best_weight'].append(loss_weight_tuple) 
+					weight_dictionary = {}
+					for layer in self.problem._NN.layers:
+						weight_dictionary[layer.name] = self.problem._NN.get_layer(layer.name).get_weights()
+					self._best_weights = weight_dictionary
+					self._logger['best_weights'] = weight_dictionary
 
 				sweeps = np.dot(self.data.batch_factor,self.optimizer.sweeps)
 				if self.settings['verbose'] and iteration % 1 == 0:
@@ -411,9 +428,10 @@ class HessianlearnModel(ABC):
 
 		# The weights need to be manually set once the session scope is closed.
 		try:
-			self._problem._NN.set_weights(self._best_weights)
+			for layer_name in self._best_weights:
+				self._problem._NN.get_layer(layer_name).set_weights(self._best_weights[layer_name])
 		except:
-			pass
+			print('Error setting the weights after training')
 
 	
 	def _record_spectrum(self,iteration):
