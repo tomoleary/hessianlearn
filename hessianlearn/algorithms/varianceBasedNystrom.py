@@ -56,7 +56,7 @@ def variance_based_nystrom(apply_AA, num_cols_A, oversampling_parameter=5, block
     dd_good = dd[:-op][good_inds]
     U_good = U[:,:-op][:,good_inds]
     all_std_good = all_std[:-op][good_inds]
-    return dd_good, U_good, all_std_good
+    return [dd_good, U_good, all_std_good],[dd[:-op],U[:,:-op],all_std[:-op]]
     
 
 def get_random_range_vectors(apply_AA, num_cols_A, block_size_r):
