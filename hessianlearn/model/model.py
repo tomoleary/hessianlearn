@@ -44,6 +44,9 @@ from ..algorithms.randomizedEigensolver import *
 from ..problem.regularization import L2Regularization
 from ..algorithms.lowRankSaddleFreeNewton import LowRankSaddleFreeNewton
 
+from ..problem.hessian import Hessian, HessianWrapper
+from ..algorithms.varianceBasedNystrom import variance_based_nystrom
+
 
 
 def HessianlearnModelSettings(settings = {}):
@@ -69,7 +72,7 @@ def HessianlearnModelSettings(settings = {}):
 
 	# Range finding settings for LRSFN
 	settings['range_finding']				= [None,"Range finding, if None then r = hessian_low_rank\
-	 														Choose from None, 'arf', 'naarf'"]
+															Choose from None, 'arf', 'naarf'"]
 	settings['range_rel_error_tolerance']   = [5, "Error tolerance for error estimator in adaptive range finding"]
 	settings['range_abs_error_tolerance']   = [50, "Error tolerance for error estimator in adaptive range finding"]
 	settings['range_block_size']        	= [10, "Block size used in range finder"]
@@ -440,6 +443,9 @@ class HessianlearnModel(ABC):
 		
 		
 		if self.settings['rayleigh_quotients']:
+			print('It is working')
+			my_t0 = time.time()
+
 			train_data_xs = self.data.train._data.x[0:self.settings['rq_data_size']]
 			train_data_ys = self.data.train._data.y[0:self.settings['rq_data_size']]
 			test_data_xs = self.data.test._data.x

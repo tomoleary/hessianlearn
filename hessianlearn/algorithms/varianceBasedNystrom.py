@@ -16,6 +16,8 @@
 
 import numpy as np
 
+np.random.seed(0)
+
 
 def variance_based_nystrom(apply_AA, num_cols_A, oversampling_parameter=5, block_size=10, 
                            std_tol=0.5, max_bad_vectors=5, max_vectors=100, verbose=True):
@@ -59,7 +61,7 @@ def variance_based_nystrom(apply_AA, num_cols_A, oversampling_parameter=5, block
     return [dd_good, U_good, all_std_good],[dd[:-op],U[:,:-op],all_std[:-op]]
     
 
-def get_random_range_vectors(apply_AA, num_cols_A, block_size_r):
+def get_random_range_vectors(apply_AA, num_cols_A, block_size_r,seed = 0):
     """
     Computes n x r matrix
         Y = A * Omega
