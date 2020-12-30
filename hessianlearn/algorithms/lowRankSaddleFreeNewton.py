@@ -152,7 +152,23 @@ class LowRankSaddleFreeNewton(Optimizer):
 			self._rank = Q.shape[1]
 			H = lambda x: self.H(x,hessian_feed_dict,verbose = self.parameters['verbose'])
 			Lmbda,U = eigensolver_from_range(H,Q)
-			pass
+
+		elif self.parameters['range_finding'] == 'vn':
+			if rq_estimator_dict is None:
+				rq_estimator_dict_list = self.problem._partition_dictionaries(feed_dict,self.parameters['rq_samples_for_naarf'])
+			elif type(rq_estimator_dict) == list:
+				rq_estimator_dict_list = rq_estimator_dict
+			elif type(rq_estimator_dict) == dict:
+				rq_estimator_dict_list = self.problem._partition_dictionaries(rq_estimator_dict,self.parameters['rq_samples_for_naarf'])
+			else:
+				raise
+			
+
+			Q = noise_aware_adaptive_range_finder(self.H,hessian_feed_dict,rq_estimator_dict_list,block_size = self.parameters['range_block_size'],noise_tolerance = noise_tolerance,epsilon = tolerance)
+			self._rank = Q.shape[1]
+			H = lambda x: self.H(x,hessian_feed_dict,verbose = self.parameters['verbose'])
+			Lmbda,U = eigensolver_from_range(H,Q)	
+
 		else:
 			H = lambda x: self.H(x,hessian_feed_dict,verbose = self.parameters['verbose'])
 			n = self.problem.dimension

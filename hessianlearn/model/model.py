@@ -57,6 +57,7 @@ def HessianlearnModelSettings(settings = {}):
 												'||g||':'||g||','Loss test':'loss_test','acc test':'accuracy_test',\
 												'maxacc test':'max_accuracy_test','alpha':'alpha'},\
 																			"Dictionary of items for printing"]
+	settings['printing_sweep_frequency']    = [1, "Print only every this many sweeps"]
 
 	settings['verbose']         			= [True, "Boolean for printing"]
 
@@ -405,9 +406,9 @@ class HessianlearnModel(ABC):
 					self._logger['best_weights'] = weight_dictionary
 
 				sweeps = np.dot(self.data.batch_factor,self.optimizer.sweeps)
-				if self.settings['verbose'] and iteration % 1 == 0:
+				if self.settings['verbose']:
 					# Print once each epoch
-					self.print(iteration = iteration)
+					self.print(iteration = iteration,every_sweep = self.settings['printing_sweep_frequency'])
 
 				if np.isnan(loss_train) or np.isnan(norm_g):
 					print(80*'#')
@@ -427,6 +428,8 @@ class HessianlearnModel(ABC):
 					pickle.dump(self.logger, f, pickle.HIGHEST_PROTOCOL)
 
 				if sweeps > max_sweeps:
+					# One last print
+					# self.print(iteration = iteration)
 					break
 
 		# The weights need to be manually set once the session scope is closed.
@@ -484,7 +487,7 @@ class HessianlearnModel(ABC):
 
 
 
-	def print(self,first_print = False,iteration = None):
+	def print(self,first_print = False,iteration = None,every_sweep = None):
 		for key in self.settings['printing_items'].keys():
 			assert self.settings['printing_items'][key] in self._logger.keys(), 'item '+str(self.settings['printing_items'][key])+' not in logger'
 		if first_print:
@@ -503,18 +506,33 @@ class HessianlearnModel(ABC):
 				if 'sweeps' in key:
 					format_string += '{'+str(i)+':^8.2f} '
 				elif 'acc' in key:
-					if False:
-						pass
+					value = self._logger[self.settings['printing_items'][key]][iteration]
+					if value < 0.0:
+						format_string += '{'+str(i)+':.2%} '
 					else:
 						format_string += '{'+str(i)+':.3%} '
 				elif 'rank' in key: 
 					format_string += '{'+str(i)+':10} '
 				else:
 					format_string += '{'+str(i)+':1.4e} '
+			# Check sweep remainder condition here
+			if every_sweep is None or not ('sweeps' in self.settings['printing_items'].keys()):
+				print_this_time = True
+			elif iteration == 0:
+				print_this_time = True
+			elif every_sweep is not None:
 
-			value_tuples = (self._logger[self.settings['printing_items'][item]][iteration] for item in self.settings['printing_items'])
+				last_sweep_floor_div,last_sweep_rem = np.divmod(self._logger['sweeps'][iteration-1], every_sweep)
+				this_sweep_floor_div,this_sweep_rem = np.divmod(self._logger['sweeps'][iteration], every_sweep)
 
+				if this_sweep_floor_div > last_sweep_floor_div:
+					print_this_time = True
+				else:
+					print_this_time = False
 
-			print(format_string.format(*value_tuples))
+			# Actual printing
+			if print_this_time:
+				value_tuples = (self._logger[self.settings['printing_items'][item]][iteration] for item in self.settings['printing_items'])
+				print(format_string.format(*value_tuples))
 
 
