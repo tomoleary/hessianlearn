@@ -73,11 +73,16 @@ def HessianlearnModelSettings(settings = {}):
 
 	# Range finding settings for LRSFN
 	settings['range_finding']				= [None,"Range finding, if None then r = hessian_low_rank\
-															Choose from None, 'arf', 'naarf'"]
+															Choose from None, 'arf', 'naarf','vn' "]
 	settings['range_rel_error_tolerance']   = [5, "Error tolerance for error estimator in adaptive range finding"]
 	settings['range_abs_error_tolerance']   = [50, "Error tolerance for error estimator in adaptive range finding"]
 	settings['range_block_size']        	= [10, "Block size used in range finder"]
 	settings['max_sweeps']					= [10,"Maximum number of times through the data (measured in epoch equivalents"]
+
+	settings['max_bad_vectors_nystrom']     = [5, "Number of maximum bad vectors for variance based Nystrom"]
+	settings['max_vectors_nystrom']       	= [40, "Number of maximum vectors for variance based Nystrom"]
+	settings['nystrom_std_tolerance']       = [0.5, "Noise to eigenvalue ratio used for Nystrom truncation"]
+
 
 	# Initial weights for specific layers 
 	settings['layer_weights'] 				= [{},"Dictionary of layer name key and weight \
@@ -202,6 +207,9 @@ class HessianlearnModel(ABC):
 				optimizer.parameters['range_finding'] = settings['range_finding']
 				optimizer.parameters['range_rel_error_tolerance'] =	settings['range_rel_error_tolerance']
 				optimizer.parameters['range_block_size'] =	settings['range_block_size']
+				optimizer.parameters['max_bad_vectors_nystrom'] = settings['max_bad_vectors_nystrom'] 
+				optimizer.parameters['max_vectors_nystrom']  = settings['max_vectors_nystrom'] 
+				optimizer.parameters['nystrom_std_tolerance']  = settings['nystrom_std_tolerance'] 
 
 			else:
 				print('Using low rank SFN optimizer with fixed step'.center(80))
@@ -215,6 +223,9 @@ class HessianlearnModel(ABC):
 				optimizer.parameters['range_finding'] = settings['range_finding']
 				optimizer.parameters['range_rel_error_tolerance'] =	settings['range_rel_error_tolerance']
 				optimizer.parameters['range_block_size'] =	settings['range_block_size']
+				optimizer.parameters['max_bad_vectors_nystrom'] = settings['max_bad_vectors_nystrom'] 
+				optimizer.parameters['max_vectors_nystrom']  = settings['max_vectors_nystrom'] 
+				optimizer.parameters['nystrom_std_tolerance']  = settings['nystrom_std_tolerance'] 
 				optimizer.alpha = settings['alpha']
 				self._logger['alpha'][0] = settings['alpha']
 			if self.settings['range_finding'] is None:
