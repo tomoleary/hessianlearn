@@ -21,7 +21,28 @@ np.random.seed(0)
 
 def variance_based_nystrom(apply_AA, num_cols_A, oversampling_parameter=5, block_size=10, 
                            std_tol=0.5, max_bad_vectors=5, max_vectors=100, verbose=True):
+    """
+    Computes approximate truncated eigenvalue decomposition
+        A = U D U^T
+    of a n x n matrix A which is given by the following sum of matrices:
+        A = (A1 + A2 + ... + Am)/m.
+    U is an n x r orthonormal matrix, and D = diag(dd).
 
+    The eigenvalue decomposition is terminated when the relative variance
+    of the eigenvalues exceeds the threshold std_tol for at least max_bad_vectors.
+    Only eigenvalues which do not exceed std_tol are retuend.
+
+    apply_AA is a list of callables, where matvecs with the matrices Ak are computed via
+        apply_AA[k](x) = Ak * x.
+
+    num_cols_A is the number of columns of A (A is n x n, num_cols_A = n)
+
+    oversampling_parameter is the number of extra vectors used within randmoized SVD
+
+    block_size is the number of random vectors per group used in the randomized eigenvalue method.
+
+    max_vectors is the maximum rank of the truncated eigenvalue decompisition
+    """
     op = oversampling_parameter
     n = num_cols_A
     m = len(apply_AA)
