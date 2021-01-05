@@ -136,3 +136,14 @@ class Hessian(ABC):
 		else:
 			raise
 
+
+class HessianWrapper:
+    
+    def __init__(self,hessian,data_dictionary):
+        
+        self._hessian = hessian
+        self._data_dictionary = data_dictionary
+        
+        
+    def __call__(self,x):
+        return self._hessian(x,self._data_dictionary)

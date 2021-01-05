@@ -32,8 +32,6 @@ def low_rank_hessian(optimizer,feed_dict,k,p=None,verbose = False):
     return randomized_eigensolver(H, n, k,p = p,verbose = verbose)
 
 
-
-
 def randomized_eigensolver(Aop, n, k, p = None,seed = 0,verbose = False):
     """
     Randomized algorithm for Hermitian eigenvalue problems
@@ -112,7 +110,7 @@ def randomized_eigensolver(Aop, n, k, p = None,seed = 0,verbose = False):
     V = V[:, sort_perm[0:k]] 
     
     #Compute eigenvectors        
-    U = np.dot(Q, V[:,::-1])    
+    U = np.dot(Q, V)   
 
     return d[:k], U[:,:k]
 
@@ -157,8 +155,8 @@ def eigensolver_from_range(Aop, Q,verbose = False):
     d = d[sort_perm[0:m]]
     V = V[:, sort_perm[0:m]] 
     
-    #Compute eigenvectors        
-    U = np.dot(Q, V[:,::-1])    
+    #Compute eigenvectors           
+    U = np.dot(Q, V)    
 
     return d[:m], U[:,:m]
 

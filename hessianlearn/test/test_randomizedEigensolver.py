@@ -33,6 +33,8 @@ class TestRandomizedEigensolver(unittest.TestCase):
 		Aop = lambda x: Q@np.diag(d)@(Q.T@x)
 		d_hl, Q_hl = randomized_eigensolver(Aop,100, 100)
 		assert np.linalg.norm(d[:50] - d_hl[0:50]) < 1e-10
+		error = np.linalg.norm(Q@np.diag(d)@Q.T - Q_hl@np.diag(d_hl)@Q_hl.T)
+		assert error < 1e-10
 
 if __name__ == '__main__':
     unittest.main()

@@ -21,14 +21,15 @@ from __future__ import print_function
 
 import numpy as np
 from scipy.sparse import diags
+import time
 
 from ..utilities.parameterList import ParameterList
 from ..algorithms import Optimizer
 from ..algorithms.globalization import ArmijoLineSearch, TrustRegion
 from ..algorithms.randomizedEigensolver import randomized_eigensolver, eigensolver_from_range
 from ..algorithms.rangeFinders import block_range_finder, noise_aware_adaptive_range_finder
-from ..problem import L2Regularization
-
+from ..algorithms.varianceBasedNystrom import variance_based_nystrom
+from ..problem import L2Regularization, HessianWrapper
 
 
 
@@ -41,12 +42,16 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 	
 	# Hessian approximation parameters
 	parameters['range_finding']					= [None,"Range finding, if None then r = hessian_low_rank\
-															Choose from None, 'arf', 'naarf'"]
+															Choose from None, 'arf', 'naarf', 'vn'"]
 	parameters['range_rel_error_tolerance']     = [100, "Error tolerance for error estimator in adaptive range finding"]
 	parameters['range_abs_error_tolerance']     = [100, "Error tolerance for error estimator in adaptive range finding"]
 	parameters['range_block_size']        		= [10, "Block size used in range finder"]
 	parameters['rq_samples_for_naarf']        	= [100, "Number of partitions for RQ variance evaluation"]
 	parameters['hessian_low_rank']        		= [20, "Fixed rank for randomized eigenvalue decomposition"]
+	# Variance Nystrom Parameters
+	parameters['max_bad_vectors_nystrom']       = [5, "Number of maximum bad vectors for variance based Nystrom"]
+	parameters['max_vectors_nystrom']       	= [40, "Number of maximum vectors for variance based Nystrom"]
+	parameters['nystrom_std_tolerance']       	= [0.5, "Noise to eigenvalue ratio used for Nystrom truncation"]
 	
 
 	# Globaliziation parameters
@@ -117,7 +122,7 @@ class LowRankSaddleFreeNewton(Optimizer):
 		assert self.sess is not None
 		assert feed_dict is not None
 
-		assert self.parameters['range_finding'] in [None,'arf','naarf']
+		assert self.parameters['range_finding'] in [None,'arf','naarf','vn']
 
 		if hessian_feed_dict is None:
 			hessian_feed_dict = feed_dict
@@ -152,7 +157,27 @@ class LowRankSaddleFreeNewton(Optimizer):
 			self._rank = Q.shape[1]
 			H = lambda x: self.H(x,hessian_feed_dict,verbose = self.parameters['verbose'])
 			Lmbda,U = eigensolver_from_range(H,Q)
-			pass
+
+		elif self.parameters['range_finding'] == 'vn':
+			if rq_estimator_dict is None:
+				rq_estimator_dict_list = self.problem._partition_dictionaries(feed_dict,self.parameters['rq_samples_for_naarf'])
+			elif type(rq_estimator_dict) == list:
+				rq_estimator_dict_list = rq_estimator_dict
+			elif type(rq_estimator_dict) == dict:
+				rq_estimator_dict_list = self.problem._partition_dictionaries(rq_estimator_dict,self.parameters['rq_samples_for_naarf'])
+			else:
+				raise
+			nystrom_t0 = time.time()
+			apply_H_list = [HessianWrapper(self.H,dictionary) for dictionary in rq_estimator_dict_list]
+			[Lmbda, U, all_std_good],[Lmbda_all,U_all,all_std] = variance_based_nystrom(apply_H_list, self.H.dimension,\
+																std_tol = self.parameters['nystrom_std_tolerance'],\
+																max_vectors = self.parameters['max_vectors_nystrom'],\
+																max_bad_vectors=self.parameters['max_bad_vectors_nystrom'],\
+																verbose = self.parameters['verbose'])
+			self._rank = U_all.shape[1]
+			if self.parameters['verbose']:
+				print('Nystrom method took ',time.time() - nystrom_t0, 's')
+
 		else:
 			H = lambda x: self.H(x,hessian_feed_dict,verbose = self.parameters['verbose'])
 			n = self.problem.dimension
@@ -162,35 +187,31 @@ class LowRankSaddleFreeNewton(Optimizer):
 		
 		# Log the variance of the last eigenvector
 		if self.parameters['record_last_rq_std'] :
-			rq_direction = U[:,-1]
-			if rq_estimator_dict is None:
-				rq_estimator_dict_list = self.problem._partition_dictionaries(feed_dict,self.parameters['rq_samples_for_naarf'])
-			elif type(rq_estimator_dict) == list:
-				rq_estimator_dict_list = rq_estimator_dict
-			elif type(rq_estimator_dict) == dict:
-				rq_estimator_dict_list = self.problem._partition_dictionaries(rq_estimator_dict,self.parameters['rq_samples_for_naarf'])
-			else:
-				raise	
-			
 			try:
-				RQ_samples = np.zeros((len(rq_estimator_dict_list),rq_direction.shape[1]))
+				rq_direction = U[:,-1]
+				if rq_estimator_dict is None:
+					rq_estimator_dict_list = self.problem._partition_dictionaries(feed_dict,self.parameters['rq_samples_for_naarf'])
+				elif type(rq_estimator_dict) == list:
+					rq_estimator_dict_list = rq_estimator_dict
+				elif type(rq_estimator_dict) == dict:
+					rq_estimator_dict_list = self.problem._partition_dictionaries(rq_estimator_dict,self.parameters['rq_samples_for_naarf'])
+				else:
+					raise	
+				
+				try:
+					RQ_samples = np.zeros((len(rq_estimator_dict_list),rq_direction.shape[1]))
+				except:
+					RQ_samples = np.zeros(len(rq_estimator_dict_list))
+
+				for samp_i,sample_dictionary in enumerate(rq_estimator_dict_list):
+					RQ_samples[samp_i] = self.H.quadratics(rq_direction,sample_dictionary)
+				self._rq_std = np.std(RQ_samples)
 			except:
-				RQ_samples = np.zeros(len(rq_estimator_dict_list))
-
-			for samp_i,sample_dictionary in enumerate(rq_estimator_dict_list):
-				RQ_samples[samp_i] = self.H.quadratics(rq_direction,sample_dictionary)
-
-			self._rq_std = np.std(RQ_samples)
-
-			# print('RQ_std = ',self._rq_std)
-			# norm_g = np.linalg.norm(gradient)
-			# print('rq_std/||g|| = ',self._rq_std/norm_g)
-
+				self._rq_std = None
+				print(80*'#')
+				print('U is [], taking gradient step, fix this later?'.center(80))
 
 		# Saddle free inversion via Woodbury
-		Lmbda_abs = np.abs(Lmbda)
-		
-
 		if self.regularization.parameters['gamma'] < 1e-4:
 			gamma_damping = self.parameters['default_damping']
 			# Using this condition instead of fixed gamma allows one to take larger step sizes
@@ -198,14 +219,11 @@ class LowRankSaddleFreeNewton(Optimizer):
 			# gamma_damping = max(0.9*Lmbda_abs[-1],self.parameters['default_damping'])
 		else:
 			gamma_damping = self.regularization.parameters['gamma']
-
+		Lmbda_abs = np.abs(Lmbda)
 		Lmbda_diags = diags(Lmbda_abs)
-
 		# Build terms for Woodbury inversion
 		D_denominator = Lmbda_abs + gamma_damping*np.ones_like(Lmbda_abs)
-
 		D = np.divide(Lmbda_abs,D_denominator)
-
 		# Invert by applying terms in Woodbury formula:
 		UTg = np.dot(U.T,gradient)
 		DUTg = np.multiply(D,UTg)
@@ -214,7 +232,7 @@ class LowRankSaddleFreeNewton(Optimizer):
 		self.p = -minus_p
 		
 
-
+		# Globalization: compute alpha and update the weights
 		if self.parameters['globalization'] is None:
 			self.alpha = self.parameters['alpha']
 			self._sweeps += [1,2*self._rank]

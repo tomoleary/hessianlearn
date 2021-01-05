@@ -83,10 +83,6 @@ class Problem(ABC):
 		# Define assignment operations
 		self._initialize_assignment_ops()
 
-		
-		
-		
-
 
 	@property
 	def NN(self):
@@ -212,6 +208,7 @@ class Problem(ABC):
 		self._H_action = my_flatten(tf.gradients(self._g_inner_w_hat,self._w,stop_gradients = self._w_hat,name = 'hessian_action'))
 		# Define Hessian quadratic forms
 		self._H_quadratic = tf.tensordot(self._w_hat,self._H_action,axes = [[0],[0]])
+
 
 	def _initialize_assignment_ops(self):
 		"""

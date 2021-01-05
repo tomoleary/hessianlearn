@@ -44,6 +44,9 @@ from ..algorithms.randomizedEigensolver import *
 from ..problem.regularization import L2Regularization
 from ..algorithms.lowRankSaddleFreeNewton import LowRankSaddleFreeNewton
 
+from ..problem.hessian import Hessian, HessianWrapper
+from ..algorithms.varianceBasedNystrom import variance_based_nystrom
+
 
 
 def HessianlearnModelSettings(settings = {}):
@@ -54,6 +57,7 @@ def HessianlearnModelSettings(settings = {}):
 												'||g||':'||g||','Loss test':'loss_test','acc test':'accuracy_test',\
 												'maxacc test':'max_accuracy_test','alpha':'alpha'},\
 																			"Dictionary of items for printing"]
+	settings['printing_sweep_frequency']    = [1, "Print only every this many sweeps"]
 
 	settings['verbose']         			= [True, "Boolean for printing"]
 
@@ -69,11 +73,16 @@ def HessianlearnModelSettings(settings = {}):
 
 	# Range finding settings for LRSFN
 	settings['range_finding']				= [None,"Range finding, if None then r = hessian_low_rank\
-	 														Choose from None, 'arf', 'naarf'"]
+															Choose from None, 'arf', 'naarf','vn' "]
 	settings['range_rel_error_tolerance']   = [5, "Error tolerance for error estimator in adaptive range finding"]
 	settings['range_abs_error_tolerance']   = [50, "Error tolerance for error estimator in adaptive range finding"]
 	settings['range_block_size']        	= [10, "Block size used in range finder"]
 	settings['max_sweeps']					= [10,"Maximum number of times through the data (measured in epoch equivalents"]
+
+	settings['max_bad_vectors_nystrom']     = [5, "Number of maximum bad vectors for variance based Nystrom"]
+	settings['max_vectors_nystrom']       	= [40, "Number of maximum vectors for variance based Nystrom"]
+	settings['nystrom_std_tolerance']       = [0.5, "Noise to eigenvalue ratio used for Nystrom truncation"]
+
 
 	# Initial weights for specific layers 
 	settings['layer_weights'] 				= [{},"Dictionary of layer name key and weight \
@@ -198,6 +207,9 @@ class HessianlearnModel(ABC):
 				optimizer.parameters['range_finding'] = settings['range_finding']
 				optimizer.parameters['range_rel_error_tolerance'] =	settings['range_rel_error_tolerance']
 				optimizer.parameters['range_block_size'] =	settings['range_block_size']
+				optimizer.parameters['max_bad_vectors_nystrom'] = settings['max_bad_vectors_nystrom'] 
+				optimizer.parameters['max_vectors_nystrom']  = settings['max_vectors_nystrom'] 
+				optimizer.parameters['nystrom_std_tolerance']  = settings['nystrom_std_tolerance'] 
 
 			else:
 				print('Using low rank SFN optimizer with fixed step'.center(80))
@@ -211,6 +223,9 @@ class HessianlearnModel(ABC):
 				optimizer.parameters['range_finding'] = settings['range_finding']
 				optimizer.parameters['range_rel_error_tolerance'] =	settings['range_rel_error_tolerance']
 				optimizer.parameters['range_block_size'] =	settings['range_block_size']
+				optimizer.parameters['max_bad_vectors_nystrom'] = settings['max_bad_vectors_nystrom'] 
+				optimizer.parameters['max_vectors_nystrom']  = settings['max_vectors_nystrom'] 
+				optimizer.parameters['nystrom_std_tolerance']  = settings['nystrom_std_tolerance'] 
 				optimizer.alpha = settings['alpha']
 				self._logger['alpha'][0] = settings['alpha']
 			if self.settings['range_finding'] is None:
@@ -402,9 +417,9 @@ class HessianlearnModel(ABC):
 					self._logger['best_weights'] = weight_dictionary
 
 				sweeps = np.dot(self.data.batch_factor,self.optimizer.sweeps)
-				if self.settings['verbose'] and iteration % 1 == 0:
+				if self.settings['verbose']:
 					# Print once each epoch
-					self.print(iteration = iteration)
+					self.print(iteration = iteration,every_sweep = self.settings['printing_sweep_frequency'])
 
 				if np.isnan(loss_train) or np.isnan(norm_g):
 					print(80*'#')
@@ -424,6 +439,8 @@ class HessianlearnModel(ABC):
 					pickle.dump(self.logger, f, pickle.HIGHEST_PROTOCOL)
 
 				if sweeps > max_sweeps:
+					# One last print
+					# self.print(iteration = iteration)
 					break
 
 		# The weights need to be manually set once the session scope is closed.
@@ -440,6 +457,9 @@ class HessianlearnModel(ABC):
 		
 		
 		if self.settings['rayleigh_quotients']:
+			print('It is working')
+			my_t0 = time.time()
+
 			train_data_xs = self.data.train._data.x[0:self.settings['rq_data_size']]
 			train_data_ys = self.data.train._data.y[0:self.settings['rq_data_size']]
 			test_data_xs = self.data.test._data.x
@@ -478,7 +498,7 @@ class HessianlearnModel(ABC):
 
 
 
-	def print(self,first_print = False,iteration = None):
+	def print(self,first_print = False,iteration = None,every_sweep = None):
 		for key in self.settings['printing_items'].keys():
 			assert self.settings['printing_items'][key] in self._logger.keys(), 'item '+str(self.settings['printing_items'][key])+' not in logger'
 		if first_print:
@@ -497,18 +517,33 @@ class HessianlearnModel(ABC):
 				if 'sweeps' in key:
 					format_string += '{'+str(i)+':^8.2f} '
 				elif 'acc' in key:
-					if False:
-						pass
+					value = self._logger[self.settings['printing_items'][key]][iteration]
+					if value < 0.0:
+						format_string += '{'+str(i)+':.2%} '
 					else:
 						format_string += '{'+str(i)+':.3%} '
 				elif 'rank' in key: 
 					format_string += '{'+str(i)+':10} '
 				else:
 					format_string += '{'+str(i)+':1.4e} '
+			# Check sweep remainder condition here
+			if every_sweep is None or not ('sweeps' in self.settings['printing_items'].keys()):
+				print_this_time = True
+			elif iteration == 0:
+				print_this_time = True
+			elif every_sweep is not None:
 
-			value_tuples = (self._logger[self.settings['printing_items'][item]][iteration] for item in self.settings['printing_items'])
+				last_sweep_floor_div,last_sweep_rem = np.divmod(self._logger['sweeps'][iteration-1], every_sweep)
+				this_sweep_floor_div,this_sweep_rem = np.divmod(self._logger['sweeps'][iteration], every_sweep)
 
+				if this_sweep_floor_div > last_sweep_floor_div:
+					print_this_time = True
+				else:
+					print_this_time = False
 
-			print(format_string.format(*value_tuples))
+			# Actual printing
+			if print_this_time:
+				value_tuples = (self._logger[self.settings['printing_items'][item]][iteration] for item in self.settings['printing_items'])
+				print(format_string.format(*value_tuples))
 
 
