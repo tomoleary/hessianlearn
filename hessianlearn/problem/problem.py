@@ -203,7 +203,40 @@ class Problem(ABC):
 		# Initialize vector for Hessian mat-vecs
 		self._w_hat = tf.placeholder(self.dtype,self.dimension )
 		# Define (g,dw) inner product
-		self._g_inner_w_hat = tf.tensordot(self._w_hat,self._gradient,axes = [[0],[0]])
+		self._g_inner_w_hat = tf.tensordot(self._gradient,self._w_hat,axes = [[0],[0]])
+
+		# Define gTdW vector matrix product
+		print('Shape of self._gradient = ', self._gradient.shape)
+		print('Shape of self._w_hat = ', self._w_hat.shape)
+		print('Shape of _g_inner_w_hat = ',self._g_inner_w_hat.shape)
+		block_size = 100
+		self._W_hat = tf.placeholder(self.dtype,shape = (self.dimension,block_size) )
+		print('Shape of self._W_hat = ',self._W_hat.shape)
+		_g_inner_W_hat = tf.tensordot(self._gradient,self._W_hat,axes = [[0],[0]])
+		print('Shape of _g_inner_W_hat = ',_g_inner_W_hat.shape)
+		# Unstack
+		unstacked_g_inner_W_hat = tf.unstack(_g_inner_W_hat)
+		print('len unstacked g inner W hat = ',len(unstacked_g_inner_W_hat))
+
+		# Take derivative
+		unstacked_H_inner_W_hat = [my_flatten(tf.gradients(_g_inner_W_hat,self._w,stop_gradients = self._W_hat,name = 'hmat_action'+str(i))) for i,_g_inner_W_hat in enumerate(unstacked_g_inner_W_hat)]
+
+		self._H_w_restacked = tf.stack(unstacked_H_inner_W_hat,axis = 1)
+		
+		print('H_w_restacked.shape = ',self._H_w_restacked.shape)
+		# Flatten
+
+		# Restack
+
+		# _H_mat_action = my_flatten(tf.gradients(_g_inner_W_hat,self._w,stop_gradients = self._W_hat,name = 'hmat_action'))
+
+		# print('_H_mat_action.shape = ',_H_mat_action.shape)
+
+
+
+
+
+
 		# Define Hessian action Hdw
 		self._H_action = my_flatten(tf.gradients(self._g_inner_w_hat,self._w,stop_gradients = self._w_hat,name = 'hessian_action'))
 		# Define Hessian quadratic forms
