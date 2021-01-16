@@ -34,7 +34,7 @@ def block_range_finder(A_op,n,epsilon,block_size,verbose = False,seed = 0):
     -----------
     Aop : {Callable} n x n symmetric matrix
           Hermitian matrix operator whose eigenvalues need to be estimated
-          y = Aop(w_hat) is the action of A in the direction w_hat 
+          y = Aop(dw) is the action of A in the direction dw 
     n   : size of matrix A
             
     Returns:

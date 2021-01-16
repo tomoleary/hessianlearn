@@ -28,10 +28,10 @@ from abc import ABC, abstractmethod
 
 class Hessian(ABC):
 	"""
-    This class implements methods for the neural network training Hessian.
+	This class implements methods for the neural network training Hessian.
 
-    Must have a problem and a sess in order to be evaluated
-    """
+	Must have a problem and a sess in order to be evaluated
+	"""
 	def __init__(self,problem=None,sess=None):
 		"""
 		Create a Hessian given:
@@ -75,29 +75,62 @@ class Hessian(ABC):
 		"""
 		assert self.problem is not None
 		assert self.sess is not None
-		x_shape = x.shape
-		if len(x_shape) == 1:
-			feed_dict[self.problem.w_hat] = x
-			return self.sess.run(self.problem.H_action,feed_dict)
-		elif len(x_shape) == 2:
-			H_action = np.zeros_like(x)
-			if verbose:
-				try:
-					from tqdm import tqdm
-					for i in tqdm(range(x_shape[1])):
-						feed_dict[self.problem.w_hat] = x[:,i]
-						H_action[:,i] = self.sess.run(self.problem.H_action,feed_dict)
-				except:
-					print('No progress bar :(')
-					for i in range(x_shape[1]):
-						feed_dict[self.problem.w_hat] = x[:,i]
-						H_action[:,i] = self.sess.run(self.problem.H_action,feed_dict)
-			else:
-				for i in range(x_shape[1]):
-					feed_dict[self.problem.w_hat] = x[:,i]
-					H_action[:,i] = self.sess.run(self.problem.H_action,feed_dict)
-			return H_action
+
+		if len(x.shape) == 1:
+			feed_dict[self.problem.dw] = x
+			return self.sess.run(self.problem.Hdw,feed_dict)
+		elif len(x.shape) == 2:
+			n_vectors = x.shape[-1]
+			if self.problem._HdW is None:
+				if verbose:
+					print('Total vectors = ',n_vectors)
+					print('Initializing Hessian blocking')
+				self.problem._initialize_hessian_blocking(n_vectors)
+			# When the block sizes agree
+			if n_vectors == self.problem._hessian_block_size:
+				feed_dict[self.problem._dW] = x
+				HdW = self.sess.run(self.problem.HdW,feed_dict)
+				return HdW
+			# When the requested block size is smaller
+			elif n_vectors < self.problem._hessian_block_size:
+				# The speedup is roughly 5x, so in the case that its less 
+				# than 1/5 its faster to either reinitialize the blocking
+				# or for loop around running problem.Hdw
+				if n_vectors < 0.2*self.problem._hessian_block_size:
+					# Could reinitialize the blocking or just for loop
+					# For looping for now
+					HdW = np.zeros_like(x)
+					for i in range(n_vectors):
+						feed_dict[problem.dw] = x[:,i]
+						HdW[:,i] = sess.run(problem.Hdw,feed_dict)
+					return HdW
+				else:
+					dW = np.zeros(self.problem.dimension,self.problem._hessian_block_size)
+					dW[:,:n_vectors] = x
+					feed_dict[self.problem._dW] = dW
+					HdW =  self.sess.run(self.problem.HdW,feed_dict)
+					return HdW[:,:n_vectors]
+			# When the requested block size is larger
+			elif n_vectors > self.problem._hessian_block_size:
+				HdW = np.zeros_like(x)
+				block_size = self.problem._hessian_block_size
+				blocks, remainder = np.divmod(block_size,block_size)
+				for i in range(blocks):
+					feed_dict[self.problem._dW] = x[:,i*block_size:(i+1)*block_size]
+					HdW[:,i*block_size:(i+1)*block_size] = self.sess.run(self.problem.HdW,feed_dict)
+				# The last vectors are done as a for loop or a zeroed out array
+				if remainder < 0.2*self.problem._hessian_block_size:
+					for i in range(n_vectors):
+						feed_dict[problem.dw] = x[:,blocks*block_size+i]
+						HdW[:,blocks*block_size+i] = sess.run(problem.Hdw,feed_dict)
+				else:
+					dW = np.zeros(self.problem.dimension,self.problem._hessian_block_size)
+					dW[:,:remainder] = x[:,-remainder:]
+					feed_dict[self.problem._dW] = dW
+					HdW[:,-remainder:] = sess.run(problem.Hdw,feed_dict)
 		else:
+			# Many different Hessian mat-vecs interpreted as a tensor?
+			print('This case is not yet implemented'.center(80))
 			raise
 
 	def quadratics(self,x,feed_dict,verbose = False):
@@ -110,27 +143,26 @@ class Hessian(ABC):
 		"""
 		assert self.problem is not None
 		assert self.sess is not None
-		x_shape = x.shape
-		if len(x_shape) == 1:
-			feed_dict[self.problem.w_hat] = x
+		if len(x.shape) == 1:
+			feed_dict[self.problem.dw] = x
 			return self.sess.run(self.problem.H_quadratic,feed_dict)
-		elif len(x_shape) == 2:
-			number_of_quadratics = x_shape[1]
+		elif len(x.shape) == 2:
+			number_of_quadratics = x.shape[1]
 			H_quads = np.zeros(number_of_quadratics)
 			if verbose:
 				try:
 					from tqdm import tqdm
 					for i in tqdm(range(number_of_quadratics)):
-						feed_dict[self.problem.w_hat] = x[:,i]
+						feed_dict[self.problem.dw] = x[:,i]
 						H_quads[i] = self.sess.run(self.problem.H_quadratic,feed_dict)
 				except:
 					print('No progress bar :(')
 					for i in range(number_of_quadratics):
-						feed_dict[self.problem.w_hat] = x[:,i]
+						feed_dict[self.problem.dw] = x[:,i]
 						H_quads[i] = self.sess.run(self.problem.H_quadratic,feed_dict)
 			else:
 				for i in range(number_of_quadratics):
-					feed_dict[self.problem.w_hat] = x[:,i]
+					feed_dict[self.problem.dw] = x[:,i]
 					H_quads[i] = self.sess.run(self.problem.H_quadratic,feed_dict)
 			return H_quads
 		else:
@@ -138,12 +170,12 @@ class Hessian(ABC):
 
 
 class HessianWrapper:
-    
-    def __init__(self,hessian,data_dictionary):
-        
-        self._hessian = hessian
-        self._data_dictionary = data_dictionary
-        
-        
-    def __call__(self,x):
-        return self._hessian(x,self._data_dictionary)
+	
+	def __init__(self,hessian,data_dictionary):
+		
+		self._hessian = hessian
+		self._data_dictionary = data_dictionary
+		
+		
+	def __call__(self,x):
+		return self._hessian(x,self._data_dictionary)

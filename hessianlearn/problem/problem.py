@@ -58,7 +58,7 @@ class Problem(ABC):
 	It takes a neural network model and defines loss function and derivatives
 	Also defines update operations.
 	"""
-	def __init__(self,NeuralNetwork,dtype = tf.float32):
+	def __init__(self,NeuralNetwork,hessian_block_size = None,dtype = tf.float32):
 		"""
 		The Problem parent class constructor takes a neural network model (typically from tf.keras.Model)
 		Children class implement different loss functions which are implemented by the method _initialize_loss
@@ -68,6 +68,8 @@ class Problem(ABC):
 		# Boolean to indicate if only input data should be passed into loss function
 		self._is_autoencoder = False
 		self._is_gan = False
+		# Hessian block size
+		self._hessian_block_size = hessian_block_size
 		# Data type
 		self._dtype = dtype
 
@@ -117,12 +119,20 @@ class Problem(ABC):
 		return self._dimension
 
 	@property
-	def w_hat(self):
-		return self._w_hat
+	def dw(self):
+		return self._dw
 
 	@property
-	def H_action(self):
-		return self._H_action
+	def Hdw(self):
+		return self._Hdw
+
+	@property
+	def dW(self):
+		return self._dW
+
+	@property
+	def HdW(self):
+		return self._HdW
 
 	@property
 	def H_quadratic(self):
@@ -201,46 +211,40 @@ class Problem(ABC):
 
 		self._norm_g = tf.sqrt(tf.reduce_sum(self.gradient*self.gradient))
 		# Initialize vector for Hessian mat-vecs
-		self._w_hat = tf.placeholder(self.dtype,self.dimension )
+		self._dw = tf.placeholder(self.dtype,self.dimension )
 		# Define (g,dw) inner product
-		self._g_inner_w_hat = tf.tensordot(self._gradient,self._w_hat,axes = [[0],[0]])
-
-		# Define gTdW vector matrix product
-		print('Shape of self._gradient = ', self._gradient.shape)
-		print('Shape of self._w_hat = ', self._w_hat.shape)
-		print('Shape of _g_inner_w_hat = ',self._g_inner_w_hat.shape)
-		block_size = 100
-		self._W_hat = tf.placeholder(self.dtype,shape = (self.dimension,block_size) )
-		print('Shape of self._W_hat = ',self._W_hat.shape)
-		_g_inner_W_hat = tf.tensordot(self._gradient,self._W_hat,axes = [[0],[0]])
-		print('Shape of _g_inner_W_hat = ',_g_inner_W_hat.shape)
-		# Unstack
-		unstacked_g_inner_W_hat = tf.unstack(_g_inner_W_hat)
-		print('len unstacked g inner W hat = ',len(unstacked_g_inner_W_hat))
-
-		# Take derivative
-		unstacked_H_inner_W_hat = [my_flatten(tf.gradients(_g_inner_W_hat,self._w,stop_gradients = self._W_hat,name = 'hmat_action'+str(i))) for i,_g_inner_W_hat in enumerate(unstacked_g_inner_W_hat)]
-
-		self._H_w_restacked = tf.stack(unstacked_H_inner_W_hat,axis = 1)
-		
-		print('H_w_restacked.shape = ',self._H_w_restacked.shape)
-		# Flatten
-
-		# Restack
-
-		# _H_mat_action = my_flatten(tf.gradients(_g_inner_W_hat,self._w,stop_gradients = self._W_hat,name = 'hmat_action'))
-
-		# print('_H_mat_action.shape = ',_H_mat_action.shape)
-
-
-
-
-
+		self._gTdw = tf.tensordot(self._gradient,self._dw,axes = [[0],[0]])
 
 		# Define Hessian action Hdw
-		self._H_action = my_flatten(tf.gradients(self._g_inner_w_hat,self._w,stop_gradients = self._w_hat,name = 'hessian_action'))
+		self._Hdw = my_flatten(tf.gradients(self._gTdw,self._w,stop_gradients = self._dw,name = 'hessian_action'))
 		# Define Hessian quadratic forms
-		self._H_quadratic = tf.tensordot(self._w_hat,self._H_action,axes = [[0],[0]])
+		self._H_quadratic = tf.tensordot(self._dw,self._Hdw,axes = [[0],[0]])
+
+		if self._hessian_block_size is None:
+			# Default is to not initialize the blocking unless it will actually be used.
+			# It can be initialized at a later time. 
+			self._dW = None
+			self._HdW = None
+		else:
+			assert type(self._hessian_block_size) is int
+			assert self._hessian_block_size < self.dimension
+			self._initialize_hessian_blocking(self._hessian_block_size)
+
+	def _initialize_hessian_blocking(self,block_size):
+		# Hessian matrix product action
+		self._hessian_block_size = block_size
+		self._dW = tf.placeholder(self.dtype,shape = (self.dimension,block_size))
+		_gTdW = tf.tensordot(self._gradient,self._dW,axes = [[0],[0]])
+		# Unstack
+		unstacked_gTdW = tf.unstack(_gTdW)
+		# Take derivative
+		unstacked_HdW = [my_flatten(tf.gradients(_gTdW,self._w,stop_gradients = self._dW,name = 'hmat_action'+str(i))) for i,_gTdW in enumerate(unstacked_gTdW)]
+		self._HdW = tf.stack(unstacked_HdW,axis = 1)
+		
+
+
+
+		
 
 
 	def _initialize_assignment_ops(self):
@@ -337,7 +341,7 @@ class ClassificationProblem(Problem):
 	This class implements the description of basic classification problems. 
 
 	"""
-	def __init__(self,NeuralNetwork,loss_type = 'cross_entropy',dtype = tf.float32):
+	def __init__(self,NeuralNetwork,loss_type = 'cross_entropy',hessian_block_size = None,dtype = tf.float32):
 		"""
 		The class constructor is like that of the parent except it takes an additional flag 
 		for the type of the loss function to be employed.
@@ -348,7 +352,7 @@ class ClassificationProblem(Problem):
 		"""
 		assert loss_type in ['cross_entropy','least_squares','mixed','squared_hinge']
 		self._loss_type = loss_type
-		super(ClassificationProblem,self).__init__(NeuralNetwork,dtype = dtype)
+		super(ClassificationProblem,self).__init__(NeuralNetwork,hessian_block_size = hessian_block_size,dtype = dtype)
 
 	@property
 	def loss_type(self):
@@ -428,7 +432,7 @@ class RegressionProblem(Problem):
 	This class implements the description of basic regression problems. 
 
 	"""
-	def __init__(self,NeuralNetwork,y_mean = None,dtype = tf.float32):
+	def __init__(self,NeuralNetwork,y_mean = None,hessian_block_size = None,dtype = tf.float32):
 		"""
 		The constructor for this class takes:
 			-NeuralNetwork: the neural network represented as a tf.keras Model
@@ -438,7 +442,7 @@ class RegressionProblem(Problem):
 			self.y_mean = tf.constant(y_mean,dtype = dtype)
 		else:
 			self.y_mean = None
-		super(RegressionProblem,self).__init__(NeuralNetwork,dtype = dtype)
+		super(RegressionProblem,self).__init__(NeuralNetwork,hessian_block_size = hessian_block_size,dtype = dtype)
 
 	@property
 	def variance_reduction(self):
@@ -500,12 +504,12 @@ class AutoencoderProblem(Problem):
 	This class implements the description of basic autoencoder problems. 
 
 	"""
-	def __init__(self,NeuralNetwork,dtype = tf.float32):
+	def __init__(self,NeuralNetwork,hessian_block_size = None,dtype = tf.float32):
 		"""
 		The constructor for this class takes:
 			-NeuralNetwork: the tf.keras Model representation of the neural network
 		"""
-		super(AutoencoderProblem,self).__init__(NeuralNetwork,dtype = dtype)
+		super(AutoencoderProblem,self).__init__(NeuralNetwork,hessian_block_size = hessian_block_size,dtype = dtype)
 		self._is_autoencoder = True
 
 	@property
@@ -518,7 +522,9 @@ class AutoencoderProblem(Problem):
 		This method defines the least squares loss function as well as relative error and accuracy
 		"""
 		with tf.name_scope('loss'): # 
-			self._loss = tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)) 
+			# self._loss = tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)) 
+
+			self._loss = tf.reduce_mean(tf.keras.losses.MSE(self.x,self.y_prediction))
 			self._rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
 							/tf.reduce_mean(tf.pow(self.x,2)))
 			self._accuracy = 1. - self.rel_error
@@ -548,7 +554,7 @@ class VariationalAutoencoderProblem(Problem):
 	This class implements the description of basic variational autoencoder problems. 
 
 	"""
-	def __init__(self,NeuralNetwork,z_mean,z_log_sigma,loss_type = 'least_squares',dtype = tf.float32):
+	def __init__(self,NeuralNetwork,z_mean,z_log_sigma,loss_type = 'least_squares',hessian_block_size = None,dtype = tf.float32):
 		"""
 		The constructor for this class takes:
 			-NeuralNetwork: the tf.keras Model representation of the neural network
@@ -563,7 +569,7 @@ class VariationalAutoencoderProblem(Problem):
 		self.z_mean = z_mean
 		self.z_log_sigma = z_log_sigma
 		
-		super(VariationalAutoencoderProblem,self).__init__(NeuralNetwork,dtype = dtype)
+		super(VariationalAutoencoderProblem,self).__init__(NeuralNetwork,hessian_block_size = hessian_block_size,dtype = dtype)
 		self._is_autoencoder = True
 
 	@property
@@ -620,7 +626,7 @@ class GenerativeAdversarialNetworkProblem(Problem):
 	This class implements the description of basic generative adversarial network problems. 
 
 	"""
-	def __init__(self,generator,discriminator,loss_type = 'least_squares',dtype = tf.float32):
+	def __init__(self,generator,discriminator,loss_type = 'least_squares',hessian_block_size = None,dtype = tf.float32):
 		"""
 		The constructor for this class takes:
 			-generator: the tf.keras.model.Model description of the generator neural network
@@ -629,7 +635,7 @@ class GenerativeAdversarialNetworkProblem(Problem):
 		assert loss_type in ['cross_entropy','least_squares']
 		self._loss_type = loss_type
 
-		super(GenerativeAdversarialNetworkProblem,self).__init__([generator,discriminator],dtype = dtype)
+		super(GenerativeAdversarialNetworkProblem,self).__init__([generator,discriminator],hessian_block_size = hessian_block_size,dtype = dtype)
 
 		self._is_gan = True
 
@@ -771,25 +777,28 @@ class GenerativeAdversarialNetworkProblem(Problem):
 		self._norm_g = tf.sqrt(tf.reduce_sum(self.gradient*self.gradient))
 
 		# Hessian mat-vecs
-		self._w_hat = tf.placeholder(self.dtype, self.dimension)
+		self._dw = tf.placeholder(self.dtype, self.dimension)
 		# Split the placeholder
-		self._generator_w_hat,self._discriminator_w_hat = tf.split(self._w_hat,[self._generator_dimension,self._discriminator_dimension])
+		self._generator_dw,self._discriminator_dw = tf.split(self._dw,[self._generator_dimension,self._discriminator_dimension])
 
 		# Define generator (g,dw) inner product
-		self._generator_g_inner_w_hat = tf.tensordot(self._generator_w_hat,self._generator_gradient,axes = [[0],[0]])
+		self._generator_gTdw = tf.tensordot(self._generator_dw,self._generator_gradient,axes = [[0],[0]])
 		# Define discriminator (g,dw) inner product
-		self._discriminator_g_inner_w_hat = tf.tensordot(self._discriminator_w_hat,self._discriminator_gradient,axes = [[0],[0]])
+		self._discriminator_gTdw = tf.tensordot(self._discriminator_dw,self._discriminator_gradient,axes = [[0],[0]])
 		# Define Hessian action Hdw
-		self._generator_H_action = my_flatten(tf.gradients(self._generator_g_inner_w_hat,self._generator_w,\
-										stop_gradients = self._generator_w_hat,name = 'generator_hessian_action'))
+		self._generator_Hdw = my_flatten(tf.gradients(self._generator_gTdw,self._generator_w,\
+										stop_gradients = self._generator_dw,name = 'generator_hessian_action'))
 
-		self._discriminator_H_action = my_flatten(tf.gradients(self._discriminator_g_inner_w_hat,self._discriminator_w,\
-										stop_gradients = self._discriminator_w_hat,name = 'discriminator_hessian_action'))
+		self._discriminator_Hdw = my_flatten(tf.gradients(self._discriminator_gTdw,self._discriminator_w,\
+										stop_gradients = self._discriminator_dw,name = 'discriminator_hessian_action'))
 
-		self._H_action = tf.concat([self._generator_H_action,self._discriminator_H_action],axis = 0)
+		self._Hdw = tf.concat([self._generator_Hdw,self._discriminator_Hdw],axis = 0)
 
 		# Define Hessian quadratic forms
-		self._H_quadratic = tf.tensordot(self._w_hat,self._H_action,axes = [[0],[0]])
+		self._H_quadratic = tf.tensordot(self._dw,self._Hdw,axes = [[0],[0]])
+
+	def _initalize_hessian_blocking(self,block_size):
+		raise
 
 	def _partition_dictionaries(self,data_dictionary,n_partitions):
 		"""
@@ -810,6 +819,7 @@ class GenerativeAdversarialNetworkProblem(Problem):
 			my_chunk_noise = data_noise[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
 			dictionary_partitions.append({self.x:my_chunk_x, self.noise: my_chunk_noise})
 		return dictionary_partitions
+
 
 
 

@@ -47,8 +47,8 @@ class Regularization (ABC):
 		return self._gradient
 
 	@property
-	def H_action(self):
-		return self._H_action
+	def Hdw(self):
+		return self._Hdw
 
 class L2Regularization(Regularization):
 	"""
@@ -72,7 +72,7 @@ class L2Regularization(Regularization):
 		
 		self._gradient = self.parameters['gamma']*self.problem._flat_w
 
-		self._H_action = self.parameters['gamma']*self.problem.w_hat
+		self._Hdw = self.parameters['gamma']*self.problem.dw
 
 
 

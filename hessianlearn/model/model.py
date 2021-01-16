@@ -188,8 +188,9 @@ class HessianlearnModel(ABC):
 				print('Using inexact Newton CG optimizer with fixed step'.center(80))
 				print(('Batch size = '+str(self.data._batch_size)).center(80))
 				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
-				optimizer = InexactNewtonCG(self.problem,LowRankSaddleFreeNewton.regularization,sess)
+				optimizer = InexactNewtonCG(self.problem,self.regularization,sess)
 				optimizer.parameters['globalization'] = None
+				optimizer.parameters['alpha'] = settings['alpha']
 				optimizer.alpha = settings['alpha']
 				self._logger['alpha'][0] = settings['alpha']
 		elif settings['optimizer'] == 'lrsfn':
