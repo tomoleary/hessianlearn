@@ -461,8 +461,8 @@ class RegressionProblem(Problem):
 		with tf.name_scope('loss'):
 			self._loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
 		with tf.name_scope('rel_error'):
-			self._rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
-							/tf.reduce_mean(tf.pow(self.y_true,2)))
+			self._rel_error = tf.sqrt(tf.reduce_mean(tf.square(self.y_true-self.y_prediction))\
+							/tf.reduce_mean(tf.square(self.y_true)))
 		self._accuracy = 1. - self._rel_error
 		with tf.name_scope('variance_reduction'):
 			# For use in constructing a regressor to serve as a control variate.

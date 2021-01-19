@@ -31,7 +31,7 @@ def ParametersAdam(parameters = {}):
 	parameters['alpha']                         = [1e-3, "Initial steplength, or learning rate"]
 	parameters['beta_1']                        = [0.9, "Exponential decay rate for first moment"]
 	parameters['beta_2']                        = [0.999, "Exponential decay rate for second moment"]
-	parameters['epsilon']						= [1e-8, "epsilon for denominator involving square root"]
+	parameters['epsilon']						= [1e-7, "epsilon for denominator involving square root"]
 
 	parameters['rel_tolerance']                 = [1e-3, "Relative convergence when sqrt(g,g)/sqrt(g_0,g_0) <= rel_tolerance"]
 	parameters['abs_tolerance']                 = [1e-4,"Absolute converge when sqrt(g,g) <= abs_tolerance"]
