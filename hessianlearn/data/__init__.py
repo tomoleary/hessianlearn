@@ -23,8 +23,8 @@ if int(tf.__version__[0]) > 1:
 
 from .data import *
 
-from .mnist import load_mnist
+# from .mnist import load_mnist
 
-from .lfw import load_lfw
+# from .lfw import load_lfw
 
-from .cifar10 import load_cifar10
+# from .cifar10 import load_cifar10
