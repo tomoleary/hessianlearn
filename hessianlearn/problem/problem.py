@@ -18,6 +18,7 @@
 from __future__ import absolute_import, division, print_function
 import numpy as np
 import tensorflow as tf
+# tf.compat.v1.enable_eager_execution()
 if int(tf.__version__[0]) > 1:
 	import tensorflow.compat.v1 as tf
 	tf.disable_v2_behavior()
@@ -68,6 +69,7 @@ class Problem(ABC):
 		# Boolean to indicate if only input data should be passed into loss function
 		self._is_autoencoder = False
 		self._is_gan = False
+		self._has_derivative_loss = False
 		# Hessian block size
 		self._hessian_block_size = hessian_block_size
 		# Data type
@@ -153,6 +155,11 @@ class Problem(ABC):
 	@property
 	def is_gan(self):
 		return self._is_gan
+
+	@property
+	def has_derivative_loss(self):
+		return self._has_derivative_loss
+	
 	
 
 	@property
@@ -464,12 +471,12 @@ class RegressionProblem(Problem):
 			self._rel_error = tf.sqrt(tf.reduce_mean(tf.square(self.y_true-self.y_prediction))\
 							/tf.reduce_mean(tf.square(self.y_true)))
 		self._accuracy = 1. - self._rel_error
-		with tf.name_scope('variance_reduction'):
-			# For use in constructing a regressor to serve as a control variate.
-			# 
-			assert self.y_mean is not None
-			self._variance_reduction = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
-							/tf.reduce_mean(tf.pow(self.y_true - self.y_mean,2)))
+		if self.y_mean is not None:
+			with tf.name_scope('variance_reduction'):
+				# For use in constructing a regressor to serve as a control variate.
+				# 
+				self._variance_reduction = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
+								/tf.reduce_mean(tf.pow(self.y_true - self.y_mean,2)))
 		with tf.name_scope('mad'):
 			try:
 				import tensorflow_probability as tfp
@@ -477,6 +484,103 @@ class RegressionProblem(Problem):
 				self.mad = tfp.stats.percentile(absolute_deviation,50.0,interpolation = 'midpoint')
 			except:
 				self.mad = None
+
+	def _partition_dictionaries(self,data_dictionary,n_partitions):
+		"""
+		This method partitions one data dictionary into n_partitions.
+		For regression this is just inputs to outputs.
+		"""
+		assert type(n_partitions) == int
+		data_xs = data_dictionary[self.x]
+		data_ys = data_dictionary[self.y_true]
+		if n_partitions > len(data_xs):
+			n_partitions = len(data_xs)
+		chunk_size = int(data_xs.shape[0]/n_partitions)
+		dictionary_partitions = []
+		for chunk_i in range(n_partitions):
+			# Array slicing should be a view, not a copy
+			# So this should not be a memory issue
+			my_chunk_x = data_xs[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
+			my_chunk_y = data_ys[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
+			dictionary_partitions.append({self.x:my_chunk_x, self.y_true: my_chunk_y})
+		return dictionary_partitions
+
+
+class H1RegressionProblem(Problem):
+	"""
+	This class implements the description of an H1 regression problem
+
+	"""
+	def __init__(self,NeuralNetwork,y_mean = None,rank = None,hessian_block_size = None,\
+						derivative_weight = 1.0, dtype = tf.float32):
+		"""
+		The constructor for this class takes:
+			-NeuralNetwork: the neural network represented as a tf.keras Model
+
+		"""
+		if y_mean is not None:
+			self.y_mean = tf.constant(y_mean,dtype = dtype)
+		else:
+			self.y_mean = None
+
+		self._has_derivative_loss = True
+
+		assert rank is not None, 'must specify rank of reduced derivative loss'
+		self._rank = rank
+
+		self._derivative_weight = derivative_weight
+		super(H1RegressionProblem,self).__init__(NeuralNetwork,hessian_block_size = hessian_block_size,dtype = dtype)
+
+	@property
+	def variance_reduction(self):
+		return self._variance_reduction
+
+	@property
+	def rel_error(self):
+		return self._rel_error
+	
+	
+
+	def _initialize_loss(self):
+		"""
+		This method defines the least squares loss function as well as relative error and accuracy
+		"""
+		with tf.name_scope('loss'):
+			l2_loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
+
+			output_dimension = self.y_prediction.shape[-1]
+			input_dimension = self.x.shape[-1]
+			self._Vr_data = tf.placeholder(self.dtype,shape = (None,input_dimension,self._rank))
+			self._Ur_data = tf.placeholder(self.dtype,shape = (None,output_dimension,self._rank))
+			self._sigmar_data = tf.placeholder(self.dtype,shape = (None,self._rank))
+			# Einsum with Ur
+			UrTys = tf.einsum('ijk,ij->ik',self._Ur_data,self.y_prediction)
+			unstacked_UrTys = tf.unstack(UrTys,axis = 1)
+			# Taking derivatives
+			unstacked_UrTdydxs = [tf.gradients(UrTy,self.x,stop_gradients=self._Ur_data,name = 'UrT_dydx'+str(i))[0] for i, UrTy in enumerate(unstacked_UrTys)]
+			UrTdydxs = tf.stack(unstacked_UrTdydxs,axis = 1)
+			# Einsum with Vr
+			UrTdydxVrs = tf.einsum('ijk,ikl->ijl',UrTdydxs,self._Vr_data)
+			# Broadcast sigmas to diagonal
+			sigmars_diag = tf.matrix_diag(self._sigmar_data)	
+			# Define Frobenius norm loss in reduced space (r x r)
+			h1_seminorm_loss = tf.reduce_mean(tf.pow(sigmars_diag - UrTdydxVrs,2))
+
+			self._loss = l2_loss
+
+		with tf.name_scope('rel_error'):
+			self._rel_error = tf.sqrt(tf.reduce_mean(tf.square(self.y_true-self.y_prediction))\
+							/tf.reduce_mean(tf.square(self.y_true)))
+		self._accuracy = 1. - self._rel_error
+		if self.y_mean is not None:
+			with tf.name_scope('variance_reduction'):
+				# For use in constructing a regressor to serve as a control variate.
+				# 
+				self._variance_reduction = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
+								/tf.reduce_mean(tf.pow(self.y_true - self.y_mean,2)))
+		else:
+			self._variance_reduction = None
+
 
 	def _partition_dictionaries(self,data_dictionary,n_partitions):
 		"""

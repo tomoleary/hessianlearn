@@ -18,10 +18,10 @@
 from __future__ import absolute_import, division, print_function
 import numpy as np
 from numpy.linalg import norm
-import tensorflow as tf
-if int(tf.__version__[0]) > 1:
-	import tensorflow.compat.v1 as tf
-	tf.disable_v2_behavior()
+# import tensorflow as tf
+# if int(tf.__version__[0]) > 1:
+# 	import tensorflow.compat.v1 as tf
+# 	tf.disable_v2_behavior()
 
 
 def finite_difference_check(sess,problem, feed_dict, w = None, dw=None,verbose = False):

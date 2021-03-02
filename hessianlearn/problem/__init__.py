@@ -17,8 +17,8 @@
 
 from __future__ import absolute_import, division, print_function
 
-from .problem import Problem, ClassificationProblem, RegressionProblem, AutoencoderProblem,\
-						 VariationalAutoencoderProblem, GenerativeAdversarialNetworkProblem
+from .problem import Problem, ClassificationProblem, RegressionProblem, H1RegressionProblem,\
+					AutoencoderProblem,VariationalAutoencoderProblem, GenerativeAdversarialNetworkProblem
 
 from .hessian import Hessian, HessianWrapper
 

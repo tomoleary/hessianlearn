@@ -19,9 +19,12 @@
 from __future__ import absolute_import, division, print_function
 import numpy as np
 import tensorflow as tf
+# tf.compat.v1.enable_eager_execution()
 if int(tf.__version__[0]) > 1:
 	import tensorflow.compat.v1 as tf
 	tf.disable_v2_behavior()
+	# tf.enable_eager_execution()
+
 from abc import ABC, abstractmethod
 
 import sys, os, pickle, time, datetime
@@ -102,11 +105,13 @@ def HessianlearnModelSettings(settings = {}):
 
 
 class HessianlearnModel(ABC):
-	def __init__(self,problem,regularization,data,settings = HessianlearnModelSettings({})):
+	def __init__(self,problem,regularization,data,derivative_data = None,settings = HessianlearnModelSettings({})):
 
 		self._problem = problem
 		self._regularization = regularization
 		self._data = data
+
+		self._derivative_data = derivative_data
 
 		self.settings = settings
 
@@ -120,6 +125,7 @@ class HessianlearnModel(ABC):
 
 		# self._sess = None
 		self._optimizer = None
+
 
 
 
@@ -147,6 +153,10 @@ class HessianlearnModel(ABC):
 	@property
 	def data(self):
 		return self._data
+
+	@property
+	def derivative_data(self):
+		return self._derivative_data
 
 	@property
 	def logger(self):
@@ -335,41 +345,67 @@ class HessianlearnModel(ABC):
 
 			if self.settings['verbose']:
 				self.print(first_print = True)
+			try:
+				x_test, y_test = next(iter(self.data.test))
+				if self.problem.is_autoencoder:
+					test_dict = {self.problem.x: x_test}
+				elif self.problem.is_gan:
+					random_state_gan = np.random.RandomState(seed = 0)
+					# Should the first dimension here agree with the size of the testing data?
+					noise = random_state_gan.normal(size = (self.data.batch_size, self.problem.noise_dimension))
+					test_dict = {self.problem.x: x_test,self.problem.noise : noise}
+				else:
+					test_dict = {self.problem.x: x_test,self.problem.y_true: y_test}
+			except:
+				test_data = next(iter(self.data.test))
+				if self.problem.is_autoencoder:
+					test_dict = {self.problem.x: test_data[self.problem.x]}
+				elif self.problem.is_gan:
+					random_state_gan = np.random.RandomState(seed = 0)
+					# Should the first dimension here agree with the size of the testing data?
+					noise = random_state_gan.normal(size = (self.data.batch_size, self.problem.noise_dimension))
+					test_dict = {self.problem.x: test_data[self.problem.x],self.problem.noise : noise}
+				else:
+					test_dict = {self.problem.x: test_data[self.problem.x],self.problem.y_true: test_data[self.problem.y_true]}
 
-			x_test, y_test = next(iter(self.data.test))
-			if self.problem.is_autoencoder:
-				test_dict = {self.problem.x: x_test}
-			elif self.problem.is_gan:
-				random_state_gan = np.random.RandomState(seed = 0)
-				noise = random_state_gan.normal(size = (self.data.batch_size, self.problem.noise_dimension))
-				test_dict = {self.problem.x: x_test,self.problem.noise : noise}
-			else:
-				test_dict = {self.problem.x: x_test,self.problem.y_true: y_test}
+
 
 			# Iteration Loop
 			max_sweeps = self.settings['max_sweeps']
 			train_data = iter(self.data.train)
-			x_batch,y_batch = next(train_data)
 			sweeps = 0
 			min_test_loss = np.inf
 			max_test_acc = -np.inf
 			t0 = time.time()
 			for iteration, (data_g,data_H) in enumerate(zip(self.data.train,self.data.hess_train)):
 				# Unpack data pairs
-				x_batch,y_batch = data_g
-				x_hess, y_hess = data_H
-				# Instantiate data dictionaries for this iteration
-				if self.problem.is_autoencoder:
-					train_dict = {self.problem.x: x_batch}
-					hess_dict = {self.problem.x: x_hess}
-				elif self.problem.is_gan:
-					noise = random_state_gan.normal(size = (self.data.batch_size, self.problem.noise_dimension))
-					train_dict = {self.problem.x: x_batch,self.problem.noise : noise}
-					noise_hess = random_state_gan.normal(size = (self.data.hessian_batch_size, self.problem.noise_dimension))
-					hess_dict = {self.problem.x: x_hess, self.problem.noise: noise_hess}
-				else:
-					train_dict = {self.problem.x: x_batch, self.problem.y_true: y_batch}
-					hess_dict = {self.problem.x: x_hess, self.problem.y_true: y_hess}
+				if type(data_g) is dict:
+					if self.problem.is_autoencoder:
+						train_dict = {self.problem.x: data_g[self.problem.x]}
+						hess_dict = {self.problem.x: data_H[self.problem.x]}
+					elif self.problem.is_gan:
+						noise = random_state_gan.normal(size = (self.data.batch_size, self.problem.noise_dimension))
+						train_dict = {self.problem.x: data_g[self.problem.x],self.problem.noise : noise}
+						noise_hess = random_state_gan.normal(size = (self.data.hessian_batch_size, self.problem.noise_dimension))
+						hess_dict = {self.problem.x: data_H[self.problem.x], self.problem.noise: noise_hess}
+					else:
+						train_dict = {self.problem.x: data_g[self.problem.x], self.problem.y_true: data_g[self.problem.y_true]}
+						hess_dict = {self.problem.x: data_H[self.problem.x], self.problem.y_true: data_H[self.problem.y_true]}
+				else:			
+					x_batch,y_batch = data_g
+					x_hess, y_hess = data_H
+					# Instantiate data dictionaries for this iteration
+					if self.problem.is_autoencoder:
+						train_dict = {self.problem.x: x_batch}
+						hess_dict = {self.problem.x: x_hess}
+					elif self.problem.is_gan:
+						noise = random_state_gan.normal(size = (self.data.batch_size, self.problem.noise_dimension))
+						train_dict = {self.problem.x: x_batch,self.problem.noise : noise}
+						noise_hess = random_state_gan.normal(size = (self.data.hessian_batch_size, self.problem.noise_dimension))
+						hess_dict = {self.problem.x: x_hess, self.problem.noise: noise_hess}
+					else:
+						train_dict = {self.problem.x: x_batch, self.problem.y_true: y_batch}
+						hess_dict = {self.problem.x: x_hess, self.problem.y_true: y_hess}
 				# Log time / sweep number
 				# Every element of dictionary is 
 				# keyed by the optimization iteration
