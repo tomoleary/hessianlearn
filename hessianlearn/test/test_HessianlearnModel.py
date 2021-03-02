@@ -52,8 +52,6 @@ class TestHessianlearnModel(unittest.TestCase):
 			return labels
 		y_train = one_hot_vectors(y_train)
 		y_test = one_hot_vectors(y_test)
-		# Instante the data object
-		data = Data([x_train,y_train],256,test_data = [x_test,y_test],hessian_batch_size = 32)
 		# Instantiate neural network
 		classifier = tf.keras.Sequential([
 		    tf.keras.layers.Flatten(input_shape=(28, 28)),
@@ -62,8 +60,11 @@ class TestHessianlearnModel(unittest.TestCase):
 		])
 		# Instantiate the problem, regularization.
 		problem = ClassificationProblem(classifier,loss_type = 'least_squares',dtype=tf.float32)
-
 		regularization = L2Regularization(problem,gamma =0.001)
+		# Instante the data object
+		train_dict = {problem.x:x_train, problem.y_true:y_train}
+		test_dict = {problem.x:x_test, problem.y_true:y_test}
+		data = Data(train_dict,256,test_data = test_dict,hessian_batch_size = 32)
 		# Instantiate the model object
 		HLModelSettings = HessianlearnModelSettings()
 		HLModelSettings['max_sweeps'] = 1.
