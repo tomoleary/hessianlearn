@@ -620,6 +620,26 @@ class AutoencoderProblem(Problem):
 	def rel_error(self):
 		return self._rel_error
 
+	def _initialize_network(self,NeuralNetwork):
+		"""
+		This method defines the neural network model
+			-NeuralNetwork: the neural network as a tf.keras.model.Model
+
+		Must set member variable self._output_shape
+		"""
+		self._NN = NeuralNetwork
+		self.x = self.NN.inputs[0]
+		
+		self.y_prediction = self.NN(self.x)
+
+
+		if len(self.y_prediction.shape) > 2:
+			self._output_dimension =  1.
+			for shape in self.y_prediction.shape[1:]:
+				self._output_dimension *= shape.value
+		else:
+			self._output_dimension = self.y_prediction.shape[-1].value
+
 
 	def _initialize_loss(self):
 		"""
@@ -882,6 +902,7 @@ class GenerativeAdversarialNetworkProblem(Problem):
 
 		# Hessian mat-vecs
 		self._dw = tf.placeholder(self.dtype, self.dimension)
+
 		# Split the placeholder
 		self._generator_dw,self._discriminator_dw = tf.split(self._dw,[self._generator_dimension,self._discriminator_dimension])
 
@@ -901,8 +922,44 @@ class GenerativeAdversarialNetworkProblem(Problem):
 		# Define Hessian quadratic forms
 		self._H_quadratic = tf.tensordot(self._dw,self._Hdw,axes = [[0],[0]])
 
-	def _initalize_hessian_blocking(self,block_size):
-		raise
+		if self._hessian_block_size is None:
+			# Default is to not initialize the blocking unless it will actually be used.
+			# It can be initialized at a later time. 
+			self._dW = None
+			self._HdW = None
+		else:
+			assert type(self._hessian_block_size) is int
+			assert self._hessian_block_size < self.dimension
+			self._initialize_hessian_blocking(self._hessian_block_size)
+
+	def _initialize_hessian_blocking(self,block_size):
+		# Hessian matrix product action
+		self._hessian_block_size = block_size
+
+		self._dW = tf.placeholder(self.dtype,shape = (self.dimension,block_size))
+
+		self._generator_dW, self._discriminator_dW = tf.split(self._dW,[self._generator_dimension,self._discriminator_dimension],axis = 0)
+
+
+		_generator_gTdW = tf.tensordot(self._generator_gradient,self._generator_dW,axes = [[0],[0]])
+
+		_discriminator_gTdW = tf.tensordot(self._discriminator_gradient,self._discriminator_dW,axes = [[0],[0]])
+
+		# Unstack
+		unstacked_generator_gTdW = tf.unstack(_generator_gTdW)
+		# Take derivative
+		unstacked_generator_HdW = [my_flatten(tf.gradients(_generator_gTdW,self._generator_w,stop_gradients = self._generator_dW,name = 'generator_hmat_action'+str(i)))\
+																										 for i,_generator_gTdW in enumerate(unstacked_generator_gTdW)]
+		self._generator_HdW = tf.stack(unstacked_generator_HdW,axis = 1)
+
+		unstacked_discriminator_gTdW = tf.unstack(_discriminator_gTdW)
+		# Take derivative
+		unstacked_discriminator_HdW = [my_flatten(tf.gradients(_discriminator_gTdW,self._discriminator_w,stop_gradients = self._discriminator_dW,name = 'discriminator_hmat_action'+str(i)))\
+																										 for i,_discriminator_gTdW in enumerate(unstacked_discriminator_gTdW)]
+		self._discriminator_HdW = tf.stack(unstacked_discriminator_HdW,axis = 1)
+
+		self._HdW = tf.concat([self._generator_HdW,self._discriminator_HdW],axis = 0)
+
 
 	def _partition_dictionaries(self,data_dictionary,n_partitions):
 		"""

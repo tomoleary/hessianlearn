@@ -379,33 +379,24 @@ class HessianlearnModel(ABC):
 			t0 = time.time()
 			for iteration, (data_g,data_H) in enumerate(zip(self.data.train,self.data.hess_train)):
 				# Unpack data pairs
-				if type(data_g) is dict:
-					if self.problem.is_autoencoder:
-						train_dict = {self.problem.x: data_g[self.problem.x]}
-						hess_dict = {self.problem.x: data_H[self.problem.x]}
-					elif self.problem.is_gan:
-						noise = random_state_gan.normal(size = (self.data.batch_size, self.problem.noise_dimension))
-						train_dict = {self.problem.x: data_g[self.problem.x],self.problem.noise : noise}
-						noise_hess = random_state_gan.normal(size = (self.data.hessian_batch_size, self.problem.noise_dimension))
-						hess_dict = {self.problem.x: data_H[self.problem.x], self.problem.noise: noise_hess}
-					else:
-						train_dict = {self.problem.x: data_g[self.problem.x], self.problem.y_true: data_g[self.problem.y_true]}
-						hess_dict = {self.problem.x: data_H[self.problem.x], self.problem.y_true: data_H[self.problem.y_true]}
-				else:			
-					x_batch,y_batch = data_g
-					x_hess, y_hess = data_H
-					# Instantiate data dictionaries for this iteration
-					if self.problem.is_autoencoder:
-						train_dict = {self.problem.x: x_batch}
-						hess_dict = {self.problem.x: x_hess}
-					elif self.problem.is_gan:
-						noise = random_state_gan.normal(size = (self.data.batch_size, self.problem.noise_dimension))
-						train_dict = {self.problem.x: x_batch,self.problem.noise : noise}
-						noise_hess = random_state_gan.normal(size = (self.data.hessian_batch_size, self.problem.noise_dimension))
-						hess_dict = {self.problem.x: x_hess, self.problem.noise: noise_hess}
-					else:
-						train_dict = {self.problem.x: x_batch, self.problem.y_true: y_batch}
-						hess_dict = {self.problem.x: x_hess, self.problem.y_true: y_hess}
+				assert type(data_g) is dict and type(data_H) is dict, 'Old hessianlearn data object has been deprecated, use dictionary iterator now'
+				train_dict = data_g
+				hess_dict = data_H
+				if self.problem.is_autoencoder:
+					assert not hasattr(self.problem,'y_true')
+					# train_dict = {self.problem.x: data_g[self.problem.x]}
+					# hess_dict = {self.problem.x: data_H[self.problem.x]}
+				elif self.problem.is_gan:
+					noise = random_state_gan.normal(size = (self.data.batch_size, self.problem.noise_dimension))
+					train_dict[self.problem.noise] = noise
+					# train_dict = {self.problem.x: data_g[self.problem.x],self.problem.noise : noise}
+					noise_hess = random_state_gan.normal(size = (self.data.hessian_batch_size, self.problem.noise_dimension))
+					hess_dict[self.problem.noise] = noise_hess 
+					# hess_dict = {self.problem.x: data_H[self.problem.x], self.problem.noise: noise_hess}
+				# else:
+				# 	train_dict = {self.problem.x: data_g[self.problem.x], self.problem.y_true: data_g[self.problem.y_true]}
+				# 	hess_dict = {self.problem.x: data_H[self.problem.x], self.problem.y_true: data_H[self.problem.y_true]}
+
 				# Log time / sweep number
 				# Every element of dictionary is 
 				# keyed by the optimization iteration
@@ -448,8 +439,16 @@ class HessianlearnModel(ABC):
 					self._logger['best_weights'] = weight_dictionary
 				elif loss_test == min_test_loss:
 					weight_dictionary = {}
-					for layer in self.problem._NN.layers:
-						weight_dictionary[layer.name] = self.problem._NN.get_layer(layer.name).get_weights()
+					if self.problem.is_gan:
+						weight_dictionary['generator'] = {}
+						for layer in self.problem._generator.layers:
+							weight_dictionary['generator'][layer.name] = self.problem._generator.get_layer(layer.name).get_weights()
+						weight_dictionary['discriminator'] = {}
+						for layer in self.problem._discriminator.layers:
+							weight_dictionary['discriminator'][layer.name] = self.problem._discriminator.get_layer(layer.name).get_weights()
+					else:
+						for layer in self.problem._NN.layers:
+							weight_dictionary[layer.name] = self.problem._NN.get_layer(layer.name).get_weights()
 					self._best_weights = weight_dictionary
 					self._logger['best_weights'] = weight_dictionary
 
@@ -482,8 +481,14 @@ class HessianlearnModel(ABC):
 
 		# The weights need to be manually set once the session scope is closed.
 		try:
-			for layer_name in self._best_weights:
-				self._problem._NN.get_layer(layer_name).set_weights(self._best_weights[layer_name])
+			if self.problem.is_gan:
+				for layer_name in self._best_weights['generator']:
+					self.problem._generator.get_layer(layer_name).set_weights(self._best_weights['generator'][layer_name])
+				for layer_name in self._best_weights['discriminator']:
+					self.problem._discriminator.get_layer(layer_name).set_weights(self._best_weights['discriminator'][layer_name])
+			else:
+				for layer_name in self._best_weights:
+					self._problem._NN.get_layer(layer_name).set_weights(self._best_weights[layer_name])
 		except:
 			print('Error setting the weights after training')
 
