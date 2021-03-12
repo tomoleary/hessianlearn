@@ -61,6 +61,9 @@ def HessianlearnModelSettings(settings = {}):
 												'maxacc test':'max_accuracy_test','alpha':'alpha'},\
 																			"Dictionary of items for printing"]
 	settings['printing_sweep_frequency']    = [1, "Print only every this many sweeps"]
+	settings['validate_frequency']			= [1, "Only compute test/validation quantities every X sweeps"]
+	settings['save_weights']				= [True, "Whether or not to save the best weights"]
+
 
 	settings['verbose']         			= [True, "Boolean for printing"]
 
@@ -276,6 +279,7 @@ class HessianlearnModel(ABC):
 		logger['accuracy_test'] = {}
 		logger['accuracy_train'] = {}
 
+
 		logger['max_accuracy_test'] = {}
 		logger['alpha'] = {}
 
@@ -326,6 +330,7 @@ class HessianlearnModel(ABC):
 			self._initialize_optimizer(sess)
 			# After optimizer is instantiated, we call the global variables initializer
 			sess.run(tf.global_variables_initializer())
+			################################################################################
 			# Load initial guess if requested:
 			if w_0 is not None:
 				if type(w_0) is list:
@@ -337,14 +342,16 @@ class HessianlearnModel(ABC):
 						print(80*'#')
 						print('Issue setting weights manually'.center(80))
 						print('tf.global_variables_initializer() used to initial instead'.center(80))
-
 			# This handles a corner case for weights that are not trainable,
 			# but still get set by the tf.global_variables_initializer()
 			for layer_name,weight in self.settings['layer_weights'].items():
 				self.problem._NN.get_layer(layer_name).set_weights(weight)
-
+			################################################################################
+			# First print
 			if self.settings['verbose']:
 				self.print(first_print = True)
+			################################################################################
+			# Load testing/validation data
 			try:
 				x_test, y_test = next(iter(self.data.test))
 				if self.problem.is_autoencoder:
@@ -368,9 +375,8 @@ class HessianlearnModel(ABC):
 				else:
 					test_dict = {self.problem.x: test_data[self.problem.x],self.problem.y_true: test_data[self.problem.y_true]}
 
-
-
-			# Iteration Loop
+			################################################################################
+			# Prepare for iteration
 			max_sweeps = self.settings['max_sweeps']
 			train_data = iter(self.data.train)
 			sweeps = 0
@@ -378,31 +384,28 @@ class HessianlearnModel(ABC):
 			max_test_acc = -np.inf
 			t0 = time.time()
 			for iteration, (data_g,data_H) in enumerate(zip(self.data.train,self.data.hess_train)):
-				# Unpack data pairs
+				################################################################################
+				# Unpack data pairs and update dictionary as needed
 				assert type(data_g) is dict and type(data_H) is dict, 'Old hessianlearn data object has been deprecated, use dictionary iterator now'
 				train_dict = data_g
 				hess_dict = data_H
 				if self.problem.is_autoencoder:
 					assert not hasattr(self.problem,'y_true')
-					# train_dict = {self.problem.x: data_g[self.problem.x]}
-					# hess_dict = {self.problem.x: data_H[self.problem.x]}
 				elif self.problem.is_gan:
 					noise = random_state_gan.normal(size = (self.data.batch_size, self.problem.noise_dimension))
 					train_dict[self.problem.noise] = noise
-					# train_dict = {self.problem.x: data_g[self.problem.x],self.problem.noise : noise}
 					noise_hess = random_state_gan.normal(size = (self.data.hessian_batch_size, self.problem.noise_dimension))
 					hess_dict[self.problem.noise] = noise_hess 
-					# hess_dict = {self.problem.x: data_H[self.problem.x], self.problem.noise: noise_hess}
-				# else:
-				# 	train_dict = {self.problem.x: data_g[self.problem.x], self.problem.y_true: data_g[self.problem.y_true]}
-				# 	hess_dict = {self.problem.x: data_H[self.problem.x], self.problem.y_true: data_H[self.problem.y_true]}
-
+				################################################################################
 				# Log time / sweep number
 				# Every element of dictionary is 
 				# keyed by the optimization iteration
 				self._logger['time'][iteration] = time.time() - t0
 				self._logger['sweeps'][iteration] = sweeps
 				# Log information for training data
+				# Much more efficient to have the actual optimizer / minimize() function
+				# return this information since it has to query the graph
+				# This is a place to cut down on computational graph queries
 				if hasattr(self.problem,'accuracy'):
 					norm_g, loss_train, accuracy_train = sess.run([self.problem.norm_g,self.problem.loss,self.problem.accuracy],train_dict)
 					self._logger['accuracy_train'][iteration] = accuracy_train
@@ -410,33 +413,51 @@ class HessianlearnModel(ABC):
 					norm_g, loss_train = sess.run([self.problem.norm_g,self.problem.loss],train_dict)
 				self._logger['||g||'][iteration] = norm_g
 				self._logger['loss_train'][iteration] = loss_train
-				# Log for test data
+				# Logging of optimization hyperparameters 
+				# These can change at each iteration when using adaptive range finding
+				# or globalization like line search
+				self._logger['alpha'][iteration] = self.optimizer.alpha
+				if self.settings['optimizer'] == 'lrsfn':
+					self._logger['hessian_low_rank'][iteration] = self.optimizer.rank
+
+				# Update the sweeps
+				sweeps = np.dot(self.data.batch_factor,self.optimizer.sweeps)
+				################################################################################
+				# Log for test / validation data
+				validate_this_iteration = False
+				validate_frequency = self.settings['validate_frequency']
+				if self.settings['validate_frequency'] is None or iteration == 0:
+					validate_this_iteration = True
+				else:
+					validate_this_iteration = self._check_sweep_remainder_condition(iteration,self.settings['validate_frequency'])
+
 				if hasattr(self.problem,'accuracy'):
-					if hasattr(self.problem,'_variance_reduction'):
-						loss_test,	accuracy_test, var_red_test =\
-						 sess.run([self.problem.loss,self.problem.accuracy,self.problem.variance_reduction],test_dict)
-						self._logger['variance_reduction'][iteration] = var_red_test
+					if validate_this_iteration:
+						if hasattr(self.problem,'_variance_reduction'):
+							loss_test,	accuracy_test, var_red_test =\
+							 sess.run([self.problem.loss,self.problem.accuracy,self.problem.variance_reduction],test_dict)
+							self._logger['variance_reduction'][iteration] = var_red_test
+						else:
+							loss_test,	accuracy_test = sess.run([self.problem.loss,self.problem.accuracy],test_dict)
+						self._logger['accuracy_test'][iteration] = accuracy_test
+						max_test_acc = max(max_test_acc,accuracy_test)
+						self._logger['max_accuracy_test'][iteration] = max_test_acc
 					else:
-						loss_test,	accuracy_test = sess.run([self.problem.loss,self.problem.accuracy],test_dict)
-					self._logger['accuracy_test'][iteration] = accuracy_test
-					max_test_acc = max(max_test_acc,accuracy_test)
-					self._logger['max_accuracy_test'][iteration] = max_test_acc
+						self._logger['max_accuracy_test'][iteration] = max_test_acc
 				else:
 					loss_test = sess.run(self.problem.loss,test_dict)
 				self._logger['loss_test'][iteration] = loss_test
 				min_test_loss = min(min_test_loss,loss_test)
 
-				
-				self._logger['alpha'][iteration] = self.optimizer.alpha
-				if self.settings['optimizer'] == 'lrsfn':
-					self._logger['hessian_low_rank'][iteration] = self.optimizer.rank
-
+				################################################################################
+				# Save the best weights based on test / validation accuracy or loss
 				if hasattr(self.problem,'accuracy') and accuracy_test == max_test_acc:
 					weight_dictionary = {}
 					for layer in self.problem._NN.layers:
 						weight_dictionary[layer.name] = self.problem._NN.get_layer(layer.name).get_weights()
 					self._best_weights = weight_dictionary
-					self._logger['best_weights'] = weight_dictionary
+					if self.settings['save_weights']:
+						self._logger['best_weights'] = weight_dictionary
 				elif loss_test == min_test_loss:
 					weight_dictionary = {}
 					if self.problem.is_gan:
@@ -450,35 +471,42 @@ class HessianlearnModel(ABC):
 						for layer in self.problem._NN.layers:
 							weight_dictionary[layer.name] = self.problem._NN.get_layer(layer.name).get_weights()
 					self._best_weights = weight_dictionary
-					self._logger['best_weights'] = weight_dictionary
-
-				sweeps = np.dot(self.data.batch_factor,self.optimizer.sweeps)
+					if self.settings['save_weights']:
+						self._logger['best_weights'] = weight_dictionary
+				################################################################################
+				# Printing
 				if self.settings['verbose']:
 					# Print once each epoch
-					self.print(iteration = iteration,every_sweep = self.settings['printing_sweep_frequency'])
-
+					self.print(iteration = iteration)
+				################################################################################
+				# Checking for nans!
 				if np.isnan(loss_train) or np.isnan(norm_g):
 					print(80*'#')
 					print('Encountered nan, exiting'.center(80))
 					print(80*'#')
 					return
+				################################################################################
+				# Actual optimization takes place here
 				try:
 					self.optimizer.minimize(train_dict,hessian_feed_dict=hess_dict)
 				except:
 					self.optimizer.minimize(train_dict)
-
+				################################################################################
+				# Recording the spectrum
 				if self.settings['record_spectrum'] and iteration%self.settings['spec_frequency'] ==0:
 					self._record_spectrum(iteration)
 				elif self.settings['record_last_rq_std'] and self.settings['optimizer'] == 'lrsfn':
 					logger['last_rq_std'][iteration] = self.optimizer._rq_std
 				with open(self.settings['problem_name']+'_logging/'+ self.logger_outname +'.pkl', 'wb+') as f:
 					pickle.dump(self.logger, f, pickle.HIGHEST_PROTOCOL)
-
+				################################################################################
+				# Check if max_sweeps condition has been met
 				if sweeps > max_sweeps:
 					# One last print
-					# self.print(iteration = iteration)
+					self.print(iteration = iteration,force_print = True)
 					break
-
+		################################################################################
+		# Post optimization
 		# The weights need to be manually set once the session scope is closed.
 		try:
 			if self.problem.is_gan:
@@ -540,9 +568,13 @@ class HessianlearnModel(ABC):
 
 
 
-	def print(self,first_print = False,iteration = None,every_sweep = None):
+	def print(self,first_print = False,iteration = None,force_print = False):
+		################################################################################
+		# Check to make sure everything requested to print exists
 		for key in self.settings['printing_items'].keys():
 			assert self.settings['printing_items'][key] in self._logger.keys(), 'item '+str(self.settings['printing_items'][key])+' not in logger'
+		################################################################################
+		# First print : column names
 		if first_print:
 			print(80*'#')
 			format_string = ''
@@ -553,10 +585,14 @@ class HessianlearnModel(ABC):
 					format_string += '{'+str(i)+':10} '
 			string_tuples = (print_string.center(8) for print_string in self.settings['printing_items'].keys())
 			print(format_string.format(*string_tuples))
+		################################################################################
+		# Iteration prints
 		else:
 			format_string = ''
 			for i,key in enumerate(self.settings['printing_items'].keys()):
-				if 'sweeps' in key:
+				if iteration not in self._logger[self.settings['printing_items'][key]].keys():
+					format_string += '{'+str(i)+':7} '
+				elif 'sweeps' in key:
 					format_string += '{'+str(i)+':^8.2f} '
 				elif 'acc' in key:
 					value = self._logger[self.settings['printing_items'][key]][iteration]
@@ -568,24 +604,35 @@ class HessianlearnModel(ABC):
 					format_string += '{'+str(i)+':10} '
 				else:
 					format_string += '{'+str(i)+':1.4e} '
+			################################################################################
 			# Check sweep remainder condition here
+			every_sweep = self.settings['printing_sweep_frequency']
 			if every_sweep is None or not ('sweeps' in self.settings['printing_items'].keys()):
 				print_this_time = True
-			elif iteration == 0:
+			elif iteration == 0 or force_print:
 				print_this_time = True
 			elif every_sweep is not None:
-
-				last_sweep_floor_div,last_sweep_rem = np.divmod(self._logger['sweeps'][iteration-1], every_sweep)
-				this_sweep_floor_div,this_sweep_rem = np.divmod(self._logger['sweeps'][iteration], every_sweep)
-
-				if this_sweep_floor_div > last_sweep_floor_div:
-					print_this_time = True
-				else:
-					print_this_time = False
-
+				assert iteration is not None
+				print_this_time = self._check_sweep_remainder_condition(iteration,every_sweep)
+			################################################################################
 			# Actual printing
 			if print_this_time:
-				value_tuples = (self._logger[self.settings['printing_items'][item]][iteration] for item in self.settings['printing_items'])
-				print(format_string.format(*value_tuples))
+				value_list = []
+				for item in self.settings['printing_items']:
+					if iteration in self._logger[self.settings['printing_items'][item]]:
+						value_list.append(self._logger[self.settings['printing_items'][item]][iteration])
+					else:
+						value_list.append(8*' ')
+				# value_tuples = (self._logger[self.settings['printing_items'][item]][iteration] for item in self.settings['printing_items'])
+				print(format_string.format(*value_list))
 
 
+	def _check_sweep_remainder_condition(self,iteration, sweeps_divisor):
+
+		last_sweep_floor_div,last_sweep_rem = np.divmod(self._logger['sweeps'][iteration-1], sweeps_divisor)
+		this_sweep_floor_div,this_sweep_rem = np.divmod(self._logger['sweeps'][iteration], sweeps_divisor)
+
+		if this_sweep_floor_div > last_sweep_floor_div:
+			return True
+		else:
+			return False

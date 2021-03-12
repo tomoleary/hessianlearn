@@ -30,19 +30,19 @@ from abc import ABC, abstractmethod
 class Data(ABC):
 	"""
 	This class implements the data iterator construct used in hessianlearn
-	It takes data already prepartitioned into testing and training, or partitions 
+	It takes data already prepartitioned into validation and training, or partitions 
 	the data as such and then implements iterators that are used in the training loop
 	"""
-	def __init__(self,data, batch_size,test_data = None,
-					test_data_size = None, max_epochs = np.inf,hessian_batch_size = -1,\
+	def __init__(self,data, batch_size,validation_data = None,
+					validation_data_size = None, max_epochs = np.inf,hessian_batch_size = -1,\
 					variable_batch = False,batch_increment = None,
 					shuffle = True,verbose = False,seed = 0):
 		""" 
 		The constructor for this class takes (x,y) data and partitions it into member iterators
 			-data: a dictionary containing keys for names of data and values for the data itself
 			-batch_size: the initial batch size to be used during training
-			-test_data: if none then test and training data will be sampled and partitioned
-				from data, otherwise data will be used for training and test_data for testing
+			-validation_data: if none then validation and training data will be sampled and partitioned
+				from data, otherwise data will be used for training and validation_data for validation
 			-max_epochs: maximum numbers of times through the the data during iteration
 			-hessian_batch_size: if positive then a Hessian data batch iterator will be instantiated,
 				otherwise it will not
@@ -65,19 +65,19 @@ class Data(ABC):
 
 		print('Data dimension agree')
 
-		if test_data is not None:
-			assert data.keys() == test_data.keys(), 'Test data do not agree with train data'
-			self._test_data_size = test_data[data_keys[0]].shape[0]
-			# Make sure all test data have the same cardinality
+		if validation_data is not None:
+			assert data.keys() == validation_data.keys(), 'Validation data do not agree with train data'
+			self._validation_data_size = validation_data[data_keys[0]].shape[0]
+			# Make sure all validation data have the same cardinality
 			for key in data_keys:
-				assert test_data[key].shape[0] == self._test_data_size, 'Cardinality mismatch within test data'
-			# Make sure that all of the test data shapes agree with training data
+				assert validation_data[key].shape[0] == self._validation_data_size, 'Cardinality mismatch within validation data'
+			# Make sure that all of the validation data shapes agree with training data
 			for key in data_keys:
-				assert data[key][0].shape == test_data[key][0].shape, 'Shape mismatch between train and test'
+				assert data[key][0].shape == validation_data[key][0].shape, 'Shape mismatch between train and validation'
 
 		else:
-			assert test_data_size is not None
-			self._test_data_size = test_data_size
+			assert validation_data_size is not None
+			self._validation_data_size = validation_data_size
 
 		self._batch_size = batch_size
 
@@ -91,18 +91,18 @@ class Data(ABC):
 		self._shuffle = shuffle
 
 
-		if test_data is None:
-			test_data_cardinality = 0
+		if validation_data is None:
+			validation_data_cardinality = 0
 		else:
-			test_data_cardinality = test_data[data_keys[0]].shape[0]
-		self._total_data_cardinality = data_cardinality + test_data_cardinality
+			validation_data_cardinality = validation_data[data_keys[0]].shape[0]
+		self._total_data_cardinality = data_cardinality + validation_data_cardinality
 
-		# Partition data and instantiate iterables for training and testing data
-		self._partition(data,test_data = test_data,seed = seed)
+		# Partition data and instantiate iterables for training and validation data
+		self._partition(data,validation_data = validation_data,seed = seed)
 
 	@property
-	def test(self):
-		return self._test
+	def validation(self):
+		return self._validation
 
 	@property
 	def train(self):
@@ -117,8 +117,8 @@ class Data(ABC):
 		return self._batch_factor
 
 	@property
-	def test_data_size(self):
-		return self._test_data_size
+	def validation_data_size(self):
+		return self._validation_data_size
 	
 	@property
 	def train_data_size(self):
@@ -135,27 +135,27 @@ class Data(ABC):
 	
 	
 
-	def _partition(self,data,test_data = None, seed = 0):
+	def _partition(self,data,validation_data = None, seed = 0):
 		"""
-		This method partitions the data, if test_data is none
+		This method partitions the data, if validation_data is none
 		the method will shuffle and partition data when the boolean
 		self._shuffle is True, otherwise it will partition the data
 		as it is passed in.
-			-data: the corpus of data, if test_data is not None, then data
+			-data: the corpus of data, if validation_data is not None, then data
 			is just the training data
-			-test_data: Optional, pre determined testing data partition
+			-validation_data: Optional, pre determined validationing data partition
 			-seed: random seed used for shuffling
-		This method instantiates the self.train and self.test data iterators
+		This method instantiates the self.train and self.validation data iterators
 		"""
-		if test_data is not None:
+		if validation_data is not None:
 			# Then the partition is giving implicitly by the user 
-			_test_data = DictData(test_data)
+			_validation_data = DictData(validation_data)
 			_train_data = DictData(data)
 		else:
 			# In this case we parititon from the entire dataset
 			print('self._total_data_cardinality = ',self._total_data_cardinality)
 			indices = range(self._total_data_cardinality)
-			test_indices,train_indices 	= np.split(indices,[self._test_data_size])
+			validation_indices,train_indices 	= np.split(indices,[self._validation_data_size])
 
 			if self.verbose:
 				print('Shuffling data')
@@ -171,12 +171,12 @@ class Data(ABC):
 				t0 = time.time()
 
 			train_dict = {}
-			test_dict = {}
+			validation_dict = {}
 			for key in data:
 				train_dict[key] = data[key][train_indices]
-				test_dict[key] = data[key][test_indices]
+				validation_dict[key] = data[key][validation_indices]
 
-			_test_data = DictData(test_dict)
+			_validation_data = DictData(validation_dict)
 			_train_data = DictData(train_dict)
 			if self.verbose:
 				duration = time.time() - t0
@@ -184,8 +184,8 @@ class Data(ABC):
 				print('Instantiating data iterables')
 				t0 = time.time()		
 
-		# Instantiate the testing data static iterator
-		self._test = StaticIterator(_test_data)
+		# Instantiate the validation data static iterator
+		self._validation = StaticIterator(_validation_data)
 		# Instantiate the training data iterator
 		if self._variable_batch:
 			self._train = VariableBatchIterator(_train_data,self._batch_size,\
@@ -217,7 +217,7 @@ class Data(ABC):
 
 	def reset(self):
 		self._train._index = 0
-		self._test._index = 0
+		self._validation._index = 0
 
 
 
