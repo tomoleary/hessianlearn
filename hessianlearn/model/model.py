@@ -448,7 +448,9 @@ class HessianlearnModel(ABC):
 						else:
 							val_loss,	val_acc = sess.run([self.problem.loss,self.problem.accuracy],val_dict)
 						self._logger['val_acc'][iteration] = val_acc
+						self._logger['val_loss'][iteration] = val_loss
 						max_val_acc = max(max_val_acc,val_acc)
+						min_val_loss = min(min_val_loss,val_loss)
 						validation_duration += time.time() - validation_start
 					self._logger['max_val_acc'][iteration] = max_val_acc
 				else:
@@ -456,9 +458,8 @@ class HessianlearnModel(ABC):
 						validation_start = time.time()
 						val_loss = sess.run(self.problem.loss,val_dict)
 						validation_duration += time.time() - validation_start
-					self._logger['val_loss'][iteration] = val_loss
-
-				min_val_loss = min(min_val_loss,val_loss)
+						min_val_loss = min(min_val_loss,val_loss)
+						self._logger['val_loss'][iteration] = val_loss
 
 				################################################################################
 				# Save the best weights based on validation accuracy or loss
