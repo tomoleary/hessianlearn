@@ -56,12 +56,12 @@ def HessianlearnModelSettings(settings = {}):
 	settings['problem_name']         		= ['', "string for name used in file naming"]
 	settings['title']         				= [None, "string for name used in plotting"]
 	settings['logger_outname']         		= [None, "string for name used in logger file naming"]
-	settings['printing_items']				= [{'sweeps':'sweeps','Loss':'loss_train','acc train':'accuracy_train',\
-												'||g||':'||g||','Loss test':'loss_test','acc test':'accuracy_test',\
-												'maxacc test':'max_accuracy_test','alpha':'alpha'},\
+	settings['printing_items']				= [{'sweeps':'sweeps','Loss':'train_loss','acc train':'train_acc',\
+												'||g||':'||g||','Loss val':'val_loss','acc val':'val_acc',\
+												'maxacc val':'max_val_acc','alpha':'alpha'},\
 																			"Dictionary of items for printing"]
 	settings['printing_sweep_frequency']    = [1, "Print only every this many sweeps"]
-	settings['validate_frequency']			= [1, "Only compute test/validation quantities every X sweeps"]
+	settings['validate_frequency']			= [1, "Only compute validation quantities every X sweeps"]
 	settings['save_weights']				= [True, "Whether or not to save the best weights"]
 
 
@@ -265,8 +265,8 @@ class HessianlearnModel(ABC):
 		logger['title'] = self.settings['title']
 		logger['batch_size'] = self.data._batch_size
 		logger['hessian_batch_size'] = self.data._hessian_batch_size
-		logger['loss_train'] = {}
-		logger['loss_test'] = {}
+		logger['train_loss'] = {}
+		logger['val_loss'] = {}
 		logger['||g||'] ={}
 		logger['sweeps'] = {}
 		logger['time'] = {}
@@ -276,23 +276,23 @@ class HessianlearnModel(ABC):
 		logger['globalization'] = None
 		logger['hessian_low_rank'] = {}
 
-		logger['accuracy_test'] = {}
-		logger['accuracy_train'] = {}
+		logger['val_acc'] = {}
+		logger['train_acc'] = {}
 
 
-		logger['max_accuracy_test'] = {}
+		logger['max_val_acc'] = {}
 		logger['alpha'] = {}
 
 		if self.settings['record_spectrum']:
 			logger['full_train_eigenvalues'] = {}
 			logger['train_eigenvalues'] = {}
-			logger['test_eigenvalues'] = {}
+			logger['val_eigenvalues'] = {}
 			logger['rq_std'] = {}
 		elif self.settings['record_last_rq_std']:
 			logger['last_rq_std'] = {}
 
 		if hasattr(self.problem,'_variance_reduction'):
-			logger['variance_reduction'] = {}
+			logger['val_variance_reduction'] = {}
 
 
 		self._logger = logger
@@ -351,37 +351,37 @@ class HessianlearnModel(ABC):
 			if self.settings['verbose']:
 				self.print(first_print = True)
 			################################################################################
-			# Load testing/validation data
+			# Load validation data
 			try:
-				x_test, y_test = next(iter(self.data.test))
+				x_val, y_val = next(iter(self.data.validation))
 				if self.problem.is_autoencoder:
-					test_dict = {self.problem.x: x_test}
+					val_dict = {self.problem.x: x_val}
 				elif self.problem.is_gan:
 					random_state_gan = np.random.RandomState(seed = 0)
-					# Should the first dimension here agree with the size of the testing data?
+					# Should the first dimension here agree with the size of the validation data?
 					noise = random_state_gan.normal(size = (self.data.batch_size, self.problem.noise_dimension))
-					test_dict = {self.problem.x: x_test,self.problem.noise : noise}
+					val_dict = {self.problem.x: x_val,self.problem.noise : noise}
 				else:
-					test_dict = {self.problem.x: x_test,self.problem.y_true: y_test}
+					val_dict = {self.problem.x: x_val,self.problem.y_true: y_val}
 			except:
-				test_data = next(iter(self.data.test))
+				val_data = next(iter(self.data.validation))
 				if self.problem.is_autoencoder:
-					test_dict = {self.problem.x: test_data[self.problem.x]}
+					val_dict = {self.problem.x: val_data[self.problem.x]}
 				elif self.problem.is_gan:
 					random_state_gan = np.random.RandomState(seed = 0)
-					# Should the first dimension here agree with the size of the testing data?
+					# Should the first dimension here agree with the size of the validation data?
 					noise = random_state_gan.normal(size = (self.data.batch_size, self.problem.noise_dimension))
-					test_dict = {self.problem.x: test_data[self.problem.x],self.problem.noise : noise}
+					val_dict = {self.problem.x: val_data[self.problem.x],self.problem.noise : noise}
 				else:
-					test_dict = {self.problem.x: test_data[self.problem.x],self.problem.y_true: test_data[self.problem.y_true]}
+					val_dict = {self.problem.x: val_data[self.problem.x],self.problem.y_true: val_data[self.problem.y_true]}
 
 			################################################################################
 			# Prepare for iteration
 			max_sweeps = self.settings['max_sweeps']
 			train_data = iter(self.data.train)
 			sweeps = 0
-			min_test_loss = np.inf
-			max_test_acc = -np.inf
+			min_val_loss = np.inf
+			max_val_acc = -np.inf
 			t0 = time.time()
 			for iteration, (data_g,data_H) in enumerate(zip(self.data.train,self.data.hess_train)):
 				################################################################################
@@ -407,12 +407,12 @@ class HessianlearnModel(ABC):
 				# return this information since it has to query the graph
 				# This is a place to cut down on computational graph queries
 				if hasattr(self.problem,'accuracy'):
-					norm_g, loss_train, accuracy_train = sess.run([self.problem.norm_g,self.problem.loss,self.problem.accuracy],train_dict)
-					self._logger['accuracy_train'][iteration] = accuracy_train
+					norm_g, train_loss, train_acc = sess.run([self.problem.norm_g,self.problem.loss,self.problem.accuracy],train_dict)
+					self._logger['train_acc'][iteration] = train_acc
 				else:
-					norm_g, loss_train = sess.run([self.problem.norm_g,self.problem.loss],train_dict)
+					norm_g, train_loss = sess.run([self.problem.norm_g,self.problem.loss],train_dict)
 				self._logger['||g||'][iteration] = norm_g
-				self._logger['loss_train'][iteration] = loss_train
+				self._logger['train_loss'][iteration] = train_loss
 				# Logging of optimization hyperparameters 
 				# These can change at each iteration when using adaptive range finding
 				# or globalization like line search
@@ -423,7 +423,7 @@ class HessianlearnModel(ABC):
 				# Update the sweeps
 				sweeps = np.dot(self.data.batch_factor,self.optimizer.sweeps)
 				################################################################################
-				# Log for test / validation data
+				# Log for validation data
 				validate_this_iteration = False
 				validate_frequency = self.settings['validate_frequency']
 				if self.settings['validate_frequency'] is None or iteration == 0:
@@ -434,31 +434,29 @@ class HessianlearnModel(ABC):
 				if hasattr(self.problem,'accuracy'):
 					if validate_this_iteration:
 						if hasattr(self.problem,'_variance_reduction'):
-							loss_test,	accuracy_test, var_red_test =\
-							 sess.run([self.problem.loss,self.problem.accuracy,self.problem.variance_reduction],test_dict)
-							self._logger['variance_reduction'][iteration] = var_red_test
+							val_loss,	val_acc, val_var_red =\
+							 sess.run([self.problem.loss,self.problem.accuracy,self.problem.variance_reduction],val_dict)
+							self._logger['val_variance_reduction'][iteration] = val_var_red
 						else:
-							loss_test,	accuracy_test = sess.run([self.problem.loss,self.problem.accuracy],test_dict)
-						self._logger['accuracy_test'][iteration] = accuracy_test
-						max_test_acc = max(max_test_acc,accuracy_test)
-						self._logger['max_accuracy_test'][iteration] = max_test_acc
-					else:
-						self._logger['max_accuracy_test'][iteration] = max_test_acc
+							val_loss,	val_acc = sess.run([self.problem.loss,self.problem.accuracy],val_dict)
+						self._logger['val_acc'][iteration] = val_acc
+						max_val_acc = max(max_val_acc,val_acc)
+					self._logger['max_val_acc'][iteration] = max_val_acc
 				else:
-					loss_test = sess.run(self.problem.loss,test_dict)
-				self._logger['loss_test'][iteration] = loss_test
-				min_test_loss = min(min_test_loss,loss_test)
+					val_loss = sess.run(self.problem.loss,val_dict)
+				self._logger['val_loss'][iteration] = val_loss
+				min_val_loss = min(min_val_loss,val_loss)
 
 				################################################################################
-				# Save the best weights based on test / validation accuracy or loss
-				if hasattr(self.problem,'accuracy') and accuracy_test == max_test_acc:
+				# Save the best weights based on validation accuracy or loss
+				if hasattr(self.problem,'accuracy') and val_acc == max_val_acc:
 					weight_dictionary = {}
 					for layer in self.problem._NN.layers:
 						weight_dictionary[layer.name] = self.problem._NN.get_layer(layer.name).get_weights()
 					self._best_weights = weight_dictionary
 					if self.settings['save_weights']:
 						self._logger['best_weights'] = weight_dictionary
-				elif loss_test == min_test_loss:
+				elif val_loss == min_val_loss:
 					weight_dictionary = {}
 					if self.problem.is_gan:
 						weight_dictionary['generator'] = {}
@@ -480,7 +478,7 @@ class HessianlearnModel(ABC):
 					self.print(iteration = iteration)
 				################################################################################
 				# Checking for nans!
-				if np.isnan(loss_train) or np.isnan(norm_g):
+				if np.isnan(train_loss) or np.isnan(norm_g):
 					print(80*'#')
 					print('Encountered nan, exiting'.center(80))
 					print(80*'#')
@@ -530,16 +528,15 @@ class HessianlearnModel(ABC):
 			print('It is working')
 			my_t0 = time.time()
 
-			train_data_xs = self.data.train._data.x[0:self.settings['rq_data_size']]
-			train_data_ys = self.data.train._data.y[0:self.settings['rq_data_size']]
-			test_data_xs = self.data.test._data.x
-			test_data_ys = self.data.test._data.y
+			train_data = self.data.train._data
+			val_data = self.data.val._data
+
 			if self.problem.is_autoencoder:
-				full_train_dict = {self.problem.x:train_data_xs}
-				full_test_dict = {self.problem.x:test_data_xs}
+				full_train_dict = {self.problem.x:train_data[self.problem.x]}
+				full_val_dict = {self.problem.x:val_data[self.problem.x]}
 			else:
-				full_train_dict = {self.problem.x:train_data_xs,self.problem.y_true:train_data_ys}
-				full_test_dict = {self.problem.x:test_data_xs,self.problem.y_true:test_data_ys}
+				full_train_dict = {self.problem.x:train_data[self.problem.x],self.problem.y_true:train_data[self.problem.y_true]}
+				full_val_dict = {self.problem.x:val_data[self.problem.x],self.problem.y_true:val_data[self.problem.y_true]}
 
 			d_full_train, U_full_train = low_rank_hessian(self.optimizer,full_train_dict,k_rank,p_oversample,verbose=True)
 			self._logger['full_train_eigenvalues'][iteration] = d_full_train
@@ -563,8 +560,8 @@ class HessianlearnModel(ABC):
 		else:
 			d_full,_ = low_rank_hessian(self.optimizer,train_dict,k_rank,p_oversample)
 			self._logger['train_eigenvalues'][iteration] = d_full
-			d_test,_ = low_rank_hessian(self.optimizer,test_dict,k)
-			self._logger['test_eigenvalues'][iteration] = d_test
+			d_val,_ = low_rank_hessian(self.optimizer,val_dict,k)
+			self._logger['val_eigenvalues'][iteration] = d_val
 
 
 
