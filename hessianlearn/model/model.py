@@ -505,7 +505,10 @@ class HessianlearnModel(ABC):
 					self.optimizer.minimize(train_dict)
 				################################################################################
 				# Recording the spectrum
-				if self.settings['record_spectrum'] and iteration%self.settings['spec_frequency'] ==0:
+				if not self.settings['record_spectrum'] and self.settings['optimizer'] == 'lrsfn':
+					self._logger['train_eigenvalues'][iteration] = self.optimizer.eigenvalues
+
+				elif self.settings['record_spectrum'] and iteration%self.settings['spec_frequency'] ==0:
 					self._record_spectrum(iteration)
 				elif self.settings['record_last_rq_std'] and self.settings['optimizer'] == 'lrsfn':
 					logger['last_rq_std'][iteration] = self.optimizer._rq_std

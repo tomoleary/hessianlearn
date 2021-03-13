@@ -59,7 +59,7 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 	parameters['max_backtracking_iter']			= [5, 'Max backtracking iterations for armijo line search']
 
 	parameters['verbose']                       = [False, "Printing"]
-	parameters['record_last_rq_std']			= [True, "Record the last eigenvector RQ variance"]
+	parameters['record_last_rq_std']			= [False, "Record the last eigenvector RQ variance"]
 
 	return ParameterList(parameters)
 
@@ -182,8 +182,8 @@ class LowRankSaddleFreeNewton(Optimizer):
 			n = self.problem.dimension
 			self._rank = self.parameters['hessian_low_rank']
 			Lmbda,U = randomized_eigensolver(H, n, self._rank,verbose=False)
-			self.lambdas = Lmbda
 		
+		self.eigenvalues = Lmbda
 		# Log the variance of the last eigenvector
 		if self.parameters['record_last_rq_std'] :
 			try:
