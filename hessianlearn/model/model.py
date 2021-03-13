@@ -509,7 +509,6 @@ class HessianlearnModel(ABC):
 				# Recording the spectrum
 				if not self.settings['record_spectrum'] and self.settings['optimizer'] == 'lrsfn':
 					self._logger['train_eigenvalues'][iteration] = self.optimizer.eigenvalues
-					print('Yes the logging is working')
 				elif self.settings['record_spectrum'] and iteration%self.settings['spec_frequency'] ==0:
 					self._record_spectrum(iteration)
 				elif self.settings['record_last_rq_std'] and self.settings['optimizer'] == 'lrsfn':
