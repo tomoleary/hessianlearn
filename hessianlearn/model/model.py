@@ -269,6 +269,7 @@ class HessianlearnModel(ABC):
 		logger['val_loss'] = {}
 		logger['||g||'] ={}
 		logger['sweeps'] = {}
+		logger['total_time'] = {}
 		logger['time'] = {}
 		logger['best_weights'] = None
 		logger['optimizer'] = None
@@ -382,6 +383,7 @@ class HessianlearnModel(ABC):
 			sweeps = 0
 			min_val_loss = np.inf
 			max_val_acc = -np.inf
+			validation_duration = 0.0
 			t0 = time.time()
 			for iteration, (data_g,data_H) in enumerate(zip(self.data.train,self.data.hess_train)):
 				################################################################################
@@ -400,7 +402,12 @@ class HessianlearnModel(ABC):
 				# Log time / sweep number
 				# Every element of dictionary is 
 				# keyed by the optimization iteration
-				self._logger['time'][iteration] = time.time() - t0
+				self._logger['total_time'][iteration] = time.time() - t0 - validation_duration 
+				self._logger['sweeps'][iteration] = sweeps
+				if iteration-1 not in self._logger['time'].keys():
+					self._logger['time'][iteration] = self._logger['total_time'][iteration]
+				else:
+					self._logger['time'][iteration] = self._logger['total_time'][iteration] - self._logger['total_time'][iteration-1]
 				self._logger['sweeps'][iteration] = sweeps
 				# Log information for training data
 				# Much more efficient to have the actual optimizer / minimize() function
@@ -433,6 +440,7 @@ class HessianlearnModel(ABC):
 
 				if hasattr(self.problem,'accuracy'):
 					if validate_this_iteration:
+						validation_start = time.time()
 						if hasattr(self.problem,'_variance_reduction'):
 							val_loss,	val_acc, val_var_red =\
 							 sess.run([self.problem.loss,self.problem.accuracy,self.problem.variance_reduction],val_dict)
@@ -441,10 +449,15 @@ class HessianlearnModel(ABC):
 							val_loss,	val_acc = sess.run([self.problem.loss,self.problem.accuracy],val_dict)
 						self._logger['val_acc'][iteration] = val_acc
 						max_val_acc = max(max_val_acc,val_acc)
+						validation_duration += time.time() - validation_start
 					self._logger['max_val_acc'][iteration] = max_val_acc
 				else:
-					val_loss = sess.run(self.problem.loss,val_dict)
-				self._logger['val_loss'][iteration] = val_loss
+					if validate_this_iteration:
+						validation_start = time.time()
+						val_loss = sess.run(self.problem.loss,val_dict)
+						validation_duration += time.time() - validation_start
+					self._logger['val_loss'][iteration] = val_loss
+
 				min_val_loss = min(min_val_loss,val_loss)
 
 				################################################################################
