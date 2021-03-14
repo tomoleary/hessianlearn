@@ -73,14 +73,13 @@ class TestHessianlearnModel(unittest.TestCase):
 		for optimizer in ['lrsfn','adam','gd','incg','sgd']:
 			HLModel.settings['optimizer'] = optimizer
 			HLModel.fit()
-			first_loss = HLModel.logger['loss_train'][0]
-			last_iteration = max(HLModel.logger['loss_train'].keys())
-			last_loss = HLModel.logger['loss_train'][last_iteration]
+			first_loss = HLModel.logger['train_loss'][0]
+			last_iteration = max(HLModel.logger['train_loss'].keys())
+			last_loss = HLModel.logger['train_loss'][last_iteration]
 			print('first loss = ',first_loss)
 			print('last_loss = ',last_loss)
+			assert last_loss < first_loss
 
-
-		assert True
 
 if __name__ == '__main__':
     unittest.main()
