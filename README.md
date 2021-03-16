@@ -80,7 +80,7 @@ hessianlearn implements various training [`problem`](https://github.com/tomolear
 problem = RegressionProblem(neural_network,dtype = tf.float32)
 # Instantiate the data object, this handles the train / validation split
 # as well as iterating during training
-data = Data({problem.x:x_data,problem.y_true},train_batch_size,\
+data = Data({problem.x:x_data,problem.y_true:y_data},train_batch_size,\
 	validation_data_size = validation_data_size)
 # Instantiate the regularization: L2Regularization is Tikhonov,
 # gamma = 0 is no regularization
