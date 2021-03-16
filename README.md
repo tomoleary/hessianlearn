@@ -48,7 +48,7 @@
 
 # References
 
-These papers motivate and use the hessianlearn library for stochastic nonconvex optimization
+These publications motivate and use the hessianlearn library for stochastic nonconvex optimization
 
 - \[1\] O'Leary-Roseberry, T., Alger, N., Ghattas O.,
 [**Inexact Newton Methods for Stochastic Nonconvex Optimization with Applications to Neural Network Training**](https://arxiv.org/abs/1905.06738).
@@ -61,5 +61,32 @@ arXiv:1905.06738.
   year={2019}
 }
 }</pre></details>
+
+- \[2\] O'Leary-Roseberry, T., Alger, N., Ghattas O.,
+[**Low Rank Saddle Free Newton**](https://arxiv.org/abs/2002.02881).
+arXiv:2002.02881.
+([Download](https://arxiv.org/pdf/2002.02881.pdf))<details><summary>BibTeX</summary><pre>
+@article{o2020low,
+  title={Low Rank Saddle Free Newton: Algorithm and Analysis},
+  author={O'Leary-Roseberry, Thomas and Alger, Nick and Ghattas, Omar},
+  journal={arXiv preprint arXiv:2002.02881},
+  year={2020}
+}
+}</pre></details>
+
+
+- \[3\] O'Leary-Roseberry, T., Villa, U., Chen P., Ghattas O.,
+[**Derivative-Informed Projected Neural Networks for High-Dimensional Parametric Maps Governed by PDEs**](https://arxiv.org/abs/2011.15110).
+arXiv:2011.15110.
+([Download](https://arxiv.org/pdf/2011.15110.pdf))<details><summary>BibTeX</summary><pre>
+@article{o2020derivative,
+  title={Derivative-Informed Projected Neural Networks for High-Dimensional Parametric Maps Governed by PDEs},
+  author={O'Leary-Roseberry, Thomas and Villa, Umberto and Chen, Peng and Ghattas, Omar},
+  journal={arXiv preprint arXiv:2011.15110},
+  year={2020}
+}
+}</pre></details>
+
+
 
 
