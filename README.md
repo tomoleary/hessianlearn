@@ -33,7 +33,7 @@
 
 [![Build Status](https://travis-ci.com/tomoleary/hessianlearn.svg?branch=master)](https://travis-ci.com/tomoleary/hessianlearn)
 [![DOI](https://zenodo.org/badge/184635062.svg)](https://zenodo.org/badge/latestdoi/184635062)
-[![License](https://https://img.shields.io/github/license/tomoleary/hessianlearn)](./LICENSE.md)
+[![License](https://img.shields.io/github/license/tomoleary/hessianlearn)](./LICENSE.md)
 [![Top language](https://img.shields.io/github/languages/top/tomoleary/hessianlearn)](https://www.python.org)
 ![Code size](https://img.shields.io/github/languages/code-size/tomoleary/hessianlearn)
 [![Issues](https://img.shields.io/github/issues/tomoleary/hessianlearn)](https://github.com/tomoleary/hessianlearn/issues)
