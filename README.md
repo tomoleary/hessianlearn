@@ -38,7 +38,7 @@
 [![Issues](https://img.shields.io/github/issues/tomoleary/hessianlearn)](https://github.com/tomoleary/hessianlearn/issues)
 [![Latest commit](https://img.shields.io/github/last-commit/tomoleary/hessianlearn)](https://github.com/tomoleary/hessianlearn/commits/master)
 
-# Hessian based stochastic optimization in TensorFlow and keras
+# Hessian-based stochastic optimization in TensorFlow and keras
 
 This code implements Hessian-based stochastic optimization in TensorFlow and keras by exposing the matrix-free Hessian to users. The code is meant to allow for rapid-prototyping of Hessian-based algorithms via the matrix-free Hessian action, which allows users to inspect Hessian based information for stochastic nonconvex (neural network training) optimization problems. 
 
