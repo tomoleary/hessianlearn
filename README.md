@@ -44,7 +44,7 @@ This code implements Hessian-based stochastic optimization in TensorFlow and ker
 
 The Hessian action is exposed via matrix-vector or matrix-matrix products:
 
-<img src="https://latex.codecogs.com/gif.latex?H\widehat{w} = \frac{d}{dw}(g^T\widehat{w}) " /> 
+<img src="https://latex.codecogs.com/gif.latex?H\widehat{w}=\frac{d}{dw}(g^T\widehat{w})" /> 
 
 ## Compatibility
 
