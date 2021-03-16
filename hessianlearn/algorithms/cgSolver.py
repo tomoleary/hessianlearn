@@ -86,7 +86,7 @@ class CGSolver(ABC):
 			self.x = x
 		self.parameters = parameters
 		if Aop is None:
-			self.Aop = self.problem.H_action + self.regularization.H_action
+			self.Aop = self.problem.Hdw + self.regularization.Hdw
 		else:
 			# be careful to note what the operator requires be passed into feed_dict 
 			self.Aop = Aop
@@ -178,7 +178,7 @@ class CGSolver(ABC):
 		self.reason_id = 0
 		x = np.zeros_like(b)
 
-		feed_dict[self.problem.w_hat] = x
+		feed_dict[self.problem.dw] = x
 		Ax_0 = self.sess.run(self.Aop,feed_dict = feed_dict)
 		# Calculate initial residual r = Ax_0 -b
 		r = b - Ax_0
@@ -207,7 +207,7 @@ class CGSolver(ABC):
 				print( "Converged in ", self.iter, " iterations with final norm ", self.final_norm)
 			return x, False
 		# Check if the direction is negative before taking a step.
-		feed_dict[self.problem.w_hat] = p
+		feed_dict[self.problem.dw] = p
 		Ap = self.sess.run(self.Aop,feed_dict = feed_dict)
 		pAp = np.dot(p,Ap)
 		negative_direction = (pAp <= 0.0)
@@ -265,7 +265,7 @@ class CGSolver(ABC):
 			beta = rz / rz_0
 			p = z + beta*p
 			# Check if the direction is negative, and prepare for next iteration.
-			feed_dict[self.problem.w_hat] = p
+			feed_dict[self.problem.dw] = p
 			Ap = self.sess.run(self.Aop,feed_dict = feed_dict)
 			pAp = np.dot(p,Ap)
 			negative_direction = (pAp <= 0.0)
@@ -315,7 +315,7 @@ class CGSolver_scipy(ABC):
 		self.regularization = regularization
 		self.parameters = parameters
 		if Aop is None:
-			self.Aop = self.problem.H_action + self.regularization.H_action
+			self.Aop = self.problem.Hdw + self.regularization.Hdw
 		else:
 			# be careful to note what the operator requires be passed into feed_dict 
 			self.Aop = Aop
@@ -346,7 +346,7 @@ class CGSolver_scipy(ABC):
 		self.reason_id = 0
 		x = np.zeros_like(b)
 
-		feed_dict[self.problem.w_hat] = x
+		feed_dict[self.problem.dw] = x
 		Ax_0 = self.sess.run(self.Aop,feed_dict = feed_dict)
 		# Calculate initial residual r = Ax_0 -b
 		r = b - Ax_0
@@ -359,7 +359,7 @@ class CGSolver_scipy(ABC):
 		from scipy.sparse.linalg import LinearOperator
 
 		def Ap(p):
-			feed_dict[self.problem.w_hat] = p
+			feed_dict[self.problem.dw] = p
 			return self.sess.run(self.Aop,feed_dict = feed_dict)
 
 		n = self.problem.dimension

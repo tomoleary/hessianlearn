@@ -42,7 +42,7 @@ def randomized_eigensolver(Aop, n, k, p = None,seed = 0,verbose = False):
     -----------
     Aop : {Callable} n x n
           Hermitian matrix operator whose eigenvalues need to be estimated
-          y = Aop(w_hat) is the action of A in the direction w_hat 
+          y = Aop(dw) is the action of A in the direction dw
           
     n : int,
            number of row/columns of the operator A
@@ -69,7 +69,7 @@ def randomized_eigensolver(Aop, n, k, p = None,seed = 0,verbose = False):
     >>> import numpy as np
     >>> n = 100
     >>> A = np.diag(0.95**np.arange(n))
-    >>> Aop = lambda w_hat: np.dot(A,w_hat)
+    >>> Aop = lambda dw: np.dot(A,dw)
     >>> k = 10
     >>> p = 5
     >>> lmbda, U = randomized_eigensolver(Aop, n, k, p)
@@ -125,7 +125,7 @@ def eigensolver_from_range(Aop, Q,verbose = False):
     -----------
     Aop : {Callable} n x n
           Hermitian matrix operator whose eigenvalues need to be estimated
-          y = Aop(w_hat) is the action of A in the direction w_hat 
+          y = Aop(dw) is the action of A in the direction dw 
     Q : Array n x r
           
             
@@ -169,7 +169,7 @@ def randomized_double_pass_eigensolver(Aop, Y, k):
     -----------
     Aop : {Callable} n x n
           Hermitian matrix operator whose eigenvalues need to be estimated
-          y = Aop(w_hat) is the action of A in the direction w_hat 
+          y = Aop(dw) is the action of A in the direction dw
     Y = Aop(Omega) : precomputed action of Aop on Omega, a m x n Array of (presumably) sampled Gaussian or l-percent sparse random vectors (row)
     k :  int, 
         number of eigenvalues/vectors to be estimated, 0 < k < m
@@ -190,7 +190,7 @@ def randomized_double_pass_eigensolver(Aop, Y, k):
     >>> import numpy as np
     >>> n = 100
     >>> A = np.diag(0.95**np.arange(n))
-    >>> Aop = lambda w_hat: np.dot(A,w_hat)
+    >>> Aop = lambda dw: np.dot(A,dw)
     >>> k = 10
     >>> p = 5
     >>> Omega = np.random.randn(n, k+p)

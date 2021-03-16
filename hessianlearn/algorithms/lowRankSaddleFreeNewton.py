@@ -43,9 +43,9 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 	# Hessian approximation parameters
 	parameters['range_finding']					= [None,"Range finding, if None then r = hessian_low_rank\
 															Choose from None, 'arf', 'naarf', 'vn'"]
-	parameters['range_rel_error_tolerance']     = [100, "Error tolerance for error estimator in adaptive range finding"]
+	parameters['range_rel_error_tolerance']     = [1000, "Error tolerance for error estimator in adaptive range finding"]
 	parameters['range_abs_error_tolerance']     = [100, "Error tolerance for error estimator in adaptive range finding"]
-	parameters['range_block_size']        		= [10, "Block size used in range finder"]
+	parameters['range_block_size']        		= [5, "Block size used in range finder"]
 	parameters['rq_samples_for_naarf']        	= [100, "Number of partitions for RQ variance evaluation"]
 	parameters['hessian_low_rank']        		= [20, "Fixed rank for randomized eigenvalue decomposition"]
 	# Variance Nystrom Parameters
@@ -59,7 +59,7 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 	parameters['max_backtracking_iter']			= [5, 'Max backtracking iterations for armijo line search']
 
 	parameters['verbose']                       = [False, "Printing"]
-	parameters['record_last_rq_std']			= [True, "Record the last eigenvector RQ variance"]
+	parameters['record_last_rq_std']			= [False, "Record the last eigenvector RQ variance"]
 
 	return ParameterList(parameters)
 
@@ -144,7 +144,6 @@ class LowRankSaddleFreeNewton(Optimizer):
 		elif self.parameters['range_finding'] == 'naarf':
 			norm_g = np.linalg.norm(gradient)
 			tolerance = self.parameters['range_rel_error_tolerance']*norm_g
-			noise_tolerance = 0.01*tolerance
 			if rq_estimator_dict is None:
 				rq_estimator_dict_list = self.problem._partition_dictionaries(feed_dict,self.parameters['rq_samples_for_naarf'])
 			elif type(rq_estimator_dict) == list:
@@ -153,7 +152,7 @@ class LowRankSaddleFreeNewton(Optimizer):
 				rq_estimator_dict_list = self.problem._partition_dictionaries(rq_estimator_dict,self.parameters['rq_samples_for_naarf'])
 			else:
 				raise
-			Q = noise_aware_adaptive_range_finder(self.H,hessian_feed_dict,rq_estimator_dict_list,block_size = self.parameters['range_block_size'],noise_tolerance = noise_tolerance,epsilon = tolerance)
+			Q = noise_aware_adaptive_range_finder(self.H,hessian_feed_dict,rq_estimator_dict_list,block_size = self.parameters['range_block_size'],epsilon = tolerance)
 			self._rank = Q.shape[1]
 			H = lambda x: self.H(x,hessian_feed_dict,verbose = self.parameters['verbose'])
 			Lmbda,U = eigensolver_from_range(H,Q)
@@ -183,8 +182,8 @@ class LowRankSaddleFreeNewton(Optimizer):
 			n = self.problem.dimension
 			self._rank = self.parameters['hessian_low_rank']
 			Lmbda,U = randomized_eigensolver(H, n, self._rank,verbose=False)
-			self.lambdas = Lmbda
 		
+		self.eigenvalues = Lmbda
 		# Log the variance of the last eigenvector
 		if self.parameters['record_last_rq_std'] :
 			try:

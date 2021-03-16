@@ -30,19 +30,19 @@ from abc import ABC, abstractmethod
 class Data(ABC):
 	"""
 	This class implements the data iterator construct used in hessianlearn
-	It takes data already prepartitioned into testing and training, or partitions 
+	It takes data already prepartitioned into validation and training, or partitions 
 	the data as such and then implements iterators that are used in the training loop
 	"""
-	def __init__(self,data, batch_size,test_data = None,
-					test_data_size = None, max_epochs = np.inf,hessian_batch_size = -1,\
+	def __init__(self,data, batch_size,validation_data = None,
+					validation_data_size = None, max_epochs = np.inf,hessian_batch_size = -1,\
 					variable_batch = False,batch_increment = None,
 					shuffle = True,verbose = False,seed = 0):
 		""" 
 		The constructor for this class takes (x,y) data and partitions it into member iterators
-			-data: a list of two numpy arrays 
+			-data: a dictionary containing keys for names of data and values for the data itself
 			-batch_size: the initial batch size to be used during training
-			-test_data: if none then test and training data will be sampled and partitioned
-				from data, otherwise data will be used for training and test_data for testing
+			-validation_data: if none then validation and training data will be sampled and partitioned
+				from data, otherwise data will be used for training and validation_data for validation
 			-max_epochs: maximum numbers of times through the the data during iteration
 			-hessian_batch_size: if positive then a Hessian data batch iterator will be instantiated,
 				otherwise it will not
@@ -51,14 +51,35 @@ class Data(ABC):
 			-verbose: for printing
 			-seed: the random seed used for shuffling.
 		"""
-		assert data[0].shape[0] == data[1].shape[0]
-		self._batch_size = batch_size
+		assert type(data) is dict, 'Data takes a dictionary in the constructor'
+		data_keys = list(data.keys())
 
-		if test_data is not None:
-			self._test_data_size = len(test_data)
+		n_data_objects = len(data.keys())
+
+		data_cardinality = data[data_keys[0]].shape[0]
+
+
+		# Make sure all data have the same cardinality (first index shape)
+		for key in data_keys:
+			assert data[key].shape[0] == data_cardinality, 'Cardinality mismatch within data'
+
+		print('Data dimension agree')
+
+		if validation_data is not None:
+			assert data.keys() == validation_data.keys(), 'Validation data do not agree with train data'
+			self._validation_data_size = validation_data[data_keys[0]].shape[0]
+			# Make sure all validation data have the same cardinality
+			for key in data_keys:
+				assert validation_data[key].shape[0] == self._validation_data_size, 'Cardinality mismatch within validation data'
+			# Make sure that all of the validation data shapes agree with training data
+			for key in data_keys:
+				assert data[key][0].shape == validation_data[key][0].shape, 'Shape mismatch between train and validation'
+
 		else:
-			assert test_data_size is not None
-			self._test_data_size = test_data_size
+			assert validation_data_size is not None
+			self._validation_data_size = validation_data_size
+
+		self._batch_size = batch_size
 
 		self._train_data_size = None
 
@@ -69,32 +90,19 @@ class Data(ABC):
 		self._batch_increment = batch_increment
 		self._shuffle = shuffle
 
-		# Check and make sure data and testing_data are compatible
-		if test_data is not None:
-			assert data[0][0].shape == test_data[0][0].shape
-			assert data[1][0].shape == test_data[1][0].shape
 
-		self._input_shape = [None] + list(data[0][0].shape)
-		self._output_shape = [None] + list(data[1][0].shape)
-
-		if len(self._input_shape) == 3:
-			self._input_shape += [1]
-		if len(self._output_shape) == 3:
-			self._output_shape += [1]
-
-		data_size = len(data[0])
-		if test_data is None:
-			test_data_size = 0
+		if validation_data is None:
+			validation_data_cardinality = 0
 		else:
-			test_data_size = len(test_data[0])
-		self._total_population_size = data_size + test_data_size
+			validation_data_cardinality = validation_data[data_keys[0]].shape[0]
+		self._total_data_cardinality = data_cardinality + validation_data_cardinality
 
-		# Partition data and instantiate iterables for training and testing data
-		self._partition(data,test_data = test_data,seed = seed)
+		# Partition data and instantiate iterables for training and validation data
+		self._partition(data,validation_data = validation_data,seed = seed)
 
 	@property
-	def test(self):
-		return self._test
+	def validation(self):
+		return self._validation
 
 	@property
 	def train(self):
@@ -109,8 +117,8 @@ class Data(ABC):
 		return self._batch_factor
 
 	@property
-	def test_data_size(self):
-		return self._test_data_size
+	def validation_data_size(self):
+		return self._validation_data_size
 	
 	@property
 	def train_data_size(self):
@@ -127,52 +135,57 @@ class Data(ABC):
 	
 	
 
-	def _partition(self,data,test_data = None, seed = 0):
+	def _partition(self,data,validation_data = None, seed = 0):
 		"""
-		This method partitions the data, if test_data is none
+		This method partitions the data, if validation_data is none
 		the method will shuffle and partition data when the boolean
 		self._shuffle is True, otherwise it will partition the data
 		as it is passed in.
-			-data: the corpus of data, if test_data is not None, then data
+			-data: the corpus of data, if validation_data is not None, then data
 			is just the training data
-			-test_data: Optional, pre determined testing data partition
+			-validation_data: Optional, pre determined validationing data partition
 			-seed: random seed used for shuffling
-		This method instantiates the self.train and self.test data iterators
+		This method instantiates the self.train and self.validation data iterators
 		"""
-		if test_data is not None:
+		if validation_data is not None:
 			# Then the partition is giving implicitly by the user 
-			_test_data = xyData(test_data)
-			_train_data = xyData(data)
+			_validation_data = DictData(validation_data)
+			_train_data = DictData(data)
 		else:
 			# In this case we parititon from the entire dataset
-
-			indices = range(self._total_population_size)
-			test_indices,train_indices 	= np.split(indices,[self._test_data_size])
+			print('self._total_data_cardinality = ',self._total_data_cardinality)
+			indices = range(self._total_data_cardinality)
+			validation_indices,train_indices 	= np.split(indices,[self._validation_data_size])
 
 			if self.verbose:
 				print('Shuffling data')
 				t0 = time.time()
-			all_x,all_y = data
 			if self._shuffle:
-				random.Random(seed).shuffle(all_x)
-				random.Random(seed).shuffle(all_y)
+				for key in data:
+					random.Random(seed).shuffle(data[key])
+
 			if self.verbose:
 				duration = time.time() - t0
 				print('Shuffling took ', duration,' s')
 				print('Partitioning data')
 				t0 = time.time()
-			_test_data = xyData([all_x[test_indices],all_y[test_indices]])
-			_train_data = xyData([all_x[train_indices],all_y[train_indices]])
+
+			train_dict = {}
+			validation_dict = {}
+			for key in data:
+				train_dict[key] = data[key][train_indices]
+				validation_dict[key] = data[key][validation_indices]
+
+			_validation_data = DictData(validation_dict)
+			_train_data = DictData(train_dict)
 			if self.verbose:
 				duration = time.time() - t0
 				print('Partitioning took ', duration,' s')			
 				print('Instantiating data iterables')
-				t0 = time.time()
+				t0 = time.time()		
 
-		
-
-		# Instantiate the testing data static iterator
-		self._test = StaticIterator(_test_data)
+		# Instantiate the validation data static iterator
+		self._validation = StaticIterator(_validation_data)
 		# Instantiate the training data iterator
 		if self._variable_batch:
 			self._train = VariableBatchIterator(_train_data,self._batch_size,\
@@ -196,7 +209,7 @@ class Data(ABC):
 			duration = time.time() - t0
 			print('Instantiating iterables took ', duration,' s')
 
-		self._train_data_size = len(_train_data.x)
+		self._train_data_size = _train_data.size
 
 		self._batch_factor = [float(self._batch_size)/float(self._train_data_size),\
 					 float(self._hessian_batch_size)/float(self._train_data_size)]		
@@ -204,7 +217,7 @@ class Data(ABC):
 
 	def reset(self):
 		self._train._index = 0
-		self._test._index = 0
+		self._validation._index = 0
 
 
 
@@ -234,7 +247,6 @@ class BatchIterator(object):
 		return self._index
 	
 
-
 	def __iter__(self):
 		"""
 		Returns self (the iterator object)
@@ -246,99 +258,104 @@ class BatchIterator(object):
 		"""
 		This method defines the shuffling scheme for the iterator
 		"""
+		next_dictionary = {}
 		if self._epoch >= self._max_epochs:
 			print('Maximum epochs reached')
 			raise StopIteration
 		if self._index + self._batch_size > self._data.size:
+			prefix_dictionary = {}
 			amount_left = self._index + self._batch_size - self._data.size
-			pref_x = self._data.x[self._index:]
-			pref_y = self._data.y[self._index:]
+			for key in self._data.keys():
+				prefix_dictionary[key] = self._data[key][self._index:]
 			if self.verbose:
 				print('Reshuffling')
 			# Seeding on the epoch number for now
-			random.Random(self._epoch).shuffle(self._data.x)
-			random.Random(self._epoch).shuffle(self._data.y)
+			for key in self._data.keys():
+				random.Random(self._epoch).shuffle(self._data[key])
 			self._epoch +=1
 			self._index = amount_left
-			suff_x = self._data.x[:self._index]
-			suff_y = self._data.y[:self._index]
-			next_x = np.concatenate((pref_x,suff_x))
-			next_y = np.concatenate((pref_y,suff_y))
+			suffix_dictionary = {}
+			for key in self._data.keys():
+				suffix_dictionary[key] = self._data[key][:self._index]
+			next_data = {}
+			for key in self._data.keys():
+				next_data[key] = np.concatenate((prefix_dictionary[key],suffix_dictionary[key]))
 		else:
-			next_x = self._data.x[self._index:self._index+self._batch_size]
-			next_y = self._data.y[self._index:self._index+self._batch_size]
+			next_data = {}
+			for key in self._data.keys():
+				next_data[key] = self._data[key][self._index:self._index+self._batch_size]
 			self._index += self._batch_size
-		return next_x, next_y
+		return next_data
 
 
-class VariableBatchIterator(object):
-	"""
-	This class implements a variable batch iterator object
-	"""
-	def __init__(self,data,batch_size,max_epochs = 1000,batch_increment = None,seed = 0,verbose = False):
-		"""
-		The constructor for this class takes pre-partitioned data and instantiates a 
-		batch data iterator
-			-data: the pre partitioned data
-			-batch_size: the fixed batch size for each iteration
-			-max_epochs: The maximum number of times to go through the data
-			-seed: the seed for shuffling during iteration
-			-verbose: Boolean for printing
-		"""
-		self._data = data
-		self._batch_size = batch_size
-		self._max_epochs = max_epochs
-		self._index = 0
-		self._epoch = 0
-		self.verbose = verbose
-		if batch_increment is None:
-			self._batch_increment = batch_size
-		else:
-			self._batch_increment = batch_increment
+# class VariableBatchIterator(object):
+# 	"""
+# 	This class implements a variable batch iterator object
+# 	"""
+# 	def __init__(self,data,batch_size,max_epochs = 1000,batch_increment = None,seed = 0,verbose = False):
+# 		"""
+# 		The constructor for this class takes pre-partitioned data and instantiates a 
+# 		batch data iterator
+# 			-data: the pre partitioned data
+# 			-batch_size: the fixed batch size for each iteration
+# 			-max_epochs: The maximum number of times to go through the data
+# 			-seed: the seed for shuffling during iteration
+# 			-verbose: Boolean for printing
+# 		"""
+# 		self._data = data
+# 		self._batch_size = batch_size
+# 		self._max_epochs = max_epochs
+# 		self._index = 0
+# 		self._epoch = 0
+# 		self.verbose = verbose
+# 		if batch_increment is None:
+# 			self._batch_increment = batch_size
+# 		else:
+# 			self._batch_increment = batch_increment
 
-	@property
-	def index(self):
-		return self._index
+# 	@property
+# 	def index(self):
+# 		return self._index
 	
 
-	def __iter__(self):
-		"""
-		Returns self (the iterator object)
-		"""
-		return self
+# 	def __iter__(self):
+# 		"""
+# 		Returns self (the iterator object)
+# 		"""
+# 		return self
 		
 
-	def __next__(self):
-		"""
-		This method defines the shuffling scheme for the iterator
-		"""
-		if self._epoch >= self._max_epochs:
-			print('Maximum epochs reached')
-			raise StopIteration
-		if self._index + self._batch_size > self._data.size:
-			amount_left = self._index + self._batch_size - self._data.size
-			pref_x = self._data.x[self._index:]
-			pref_y = self._data.y[self._index:]
-			if self.verbose:
-				print('Reshuffling')
-			# Seeding on the epoch number for now
-			random.Random(self._epoch).shuffle(self._data.x)
-			random.Random(self._epoch).shuffle(self._data.y)
-			self._epoch +=1
-			self._index = amount_left
-			suff_x = self._data.x[:self._index]
-			suff_y = self._data.y[:self._index]
-			next_x = np.concatenate((pref_x,suff_x))
-			next_y = np.concatenate((pref_y,suff_y))
-			if self._batch_size + self._batch_increment < self._data.size:
-				self._batch_size += self._batch_increment
-			else:
-				self._batch_size = self._data.size
-		else:
-			next_x = self._data.x[self._index:self._index+self._batch_size]
-			next_y = self._data.y[self._index:self._index+self._batch_size]
-			self._index += self._batch_size
-		return next_x, next_y
+# 	def __next__(self):
+# 		"""
+# 		This method defines the shuffling scheme for the iterator
+# 		"""
+# 		if self._epoch >= self._max_epochs:
+# 			print('Maximum epochs reached')
+# 			raise StopIteration
+# 		if self._index + self._batch_size > self._data.size:
+# 			amount_left = self._index + self._batch_size - self._data.size
+# 			pref_x = self._data.x[self._index:]
+# 			pref_y = self._data.y[self._index:]
+# 			if self.verbose:
+# 				print('Reshuffling')
+# 			# Seeding on the epoch number for now
+# 			random.Random(self._epoch).shuffle(self._data.x)
+# 			random.Random(self._epoch).shuffle(self._data.y)
+# 			self._epoch +=1
+# 			self._index = amount_left
+# 			suff_x = self._data.x[:self._index]
+# 			suff_y = self._data.y[:self._index]
+# 			next_x = np.concatenate((pref_x,suff_x))
+# 			next_y = np.concatenate((pref_y,suff_y))
+# 			if self._batch_size + self._batch_increment < self._data.size:
+# 				self._batch_size += self._batch_increment
+# 			else:
+# 				self._batch_size = self._data.size
+# 		else:
+# 			next_x = self._data.x[self._index:self._index+self._batch_size]
+# 			next_y = self._data.y[self._index:self._index+self._batch_size]
+# 			self._index += self._batch_size
+# 		return next_x, next_y
 
 
 class StaticIterator(object):
@@ -370,14 +387,16 @@ class StaticIterator(object):
 		"""
 		# if self.index > 0:
 		# 	raise StopIteration
-		next_x = self._data.x
-		next_y = self._data.y
 		self._index += 1
-		return next_x,next_y
+		# Yes this is sort of dumb, but tensorflow requires sess calls
+		# get something of type dict
+		next_dict = {}
+		for key in self._data.keys():
+			next_dict[key] = self._data[key]
+		return next_dict
 
 
-
-class xyData (object):
+class DictData(object):
 	"""
 	This class implements a simple xy data pair object
 	"""
@@ -386,9 +405,17 @@ class xyData (object):
 		The constructor for this class takes a list of xy data
 			-data: List of [x,y] data
 		"""
-		self.x = data[0]
-		self.y = data[1]
-		self.size = len(self.x)
+		self.data = data
+		self.size = len(self.data[list(self.data.keys())[0]])
+
+	def __getitem__(self,key):
+		return self.data[key]
+
+	def __setitem__(self,key,item):
+		self.data[key] = item
+
+	def keys(self):
+		return self.data.keys()
 
 
 

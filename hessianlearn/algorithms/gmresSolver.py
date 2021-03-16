@@ -78,7 +78,7 @@ class GMRESSolver(ABC):
 		self.parameters = parameters
 
 		
-		self.Aop = self.problem.H_action + self.regularization.H_action
+		self.Aop = self.problem.Hdw + self.regularization.Hdw
 
 		# # Define preconditioner 
 		# if preconditioner is None:
@@ -104,7 +104,7 @@ class GMRESSolver(ABC):
 		self.reason_id = 0
 		x = np.zeros_like(b)
 
-		feed_dict[self.problem.w_hat] = x
+		feed_dict[self.problem.dw] = x
 		Ax_0 = self.sess.run(self.Aop,feed_dict = feed_dict)
 		# Calculate initial residual r = Ax_0 -b
 		r = b - Ax_0
@@ -117,7 +117,7 @@ class GMRESSolver(ABC):
 		from scipy.sparse.linalg import LinearOperator
 
 		def Ap(p):
-			feed_dict[self.problem.w_hat] = p
+			feed_dict[self.problem.dw] = p
 			return self.sess.run(self.Aop,feed_dict = feed_dict)
 
 		n = self.problem.dimension

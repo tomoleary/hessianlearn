@@ -34,7 +34,7 @@ def block_range_finder(A_op,n,epsilon,block_size,verbose = False,seed = 0):
     -----------
     Aop : {Callable} n x n symmetric matrix
           Hermitian matrix operator whose eigenvalues need to be estimated
-          y = Aop(w_hat) is the action of A in the direction w_hat 
+          y = Aop(dw) is the action of A in the direction dw 
     n   : size of matrix A
             
     Returns:
@@ -82,7 +82,7 @@ def block_range_finder(A_op,n,epsilon,block_size,verbose = False,seed = 0):
 
 
 def noise_aware_adaptive_range_finder(Hessian,hessian_feed_dict,rq_estimator_dict_list,\
-        block_size = None,noise_tolerance = 1e-1,epsilon = 1e-1, verbose = False,seed = 0):
+        block_size = None,noise_tolerance = 1.0,epsilon = 1e-1, max_vectors = 20, verbose = False,seed = 0):
     """
     Randomized algorithm for noise aware block range finding  (N.A.A.R.F.)
     
@@ -155,16 +155,21 @@ def noise_aware_adaptive_range_finder(Hessian,hessian_feed_dict,rq_estimator_dic
             for samp_i,sample_dictionary in enumerate(rq_estimator_dict_list):
                 RQ_samples[samp_i] = Hessian.quadratics(rq_direction,sample_dictionary)
 
-        rq_noise = np.max(np.std(RQ_samples,axis = 0))
+        rq_snr = np.abs(np.mean(RQ_samples,axis=0))/np.std(RQ_samples,axis = 0)
+        too_noisy = (rq_snr < noise_tolerance).any()
+        converged = (operator_error < epsilon) or too_noisy
         # print(80*'#')
-        # print('Rayleigh quotient noise for the last direction is ',rq_noise)
+        # print('rq_snr = ',rq_snr)
+        # print('rq_snr < noise_tolerance = ',rq_snr < noise_tolerance)
+        # print('too noisy? = ',too_noisy)
+        # print('(operator_error < epsilon) = ',(operator_error < epsilon))
         # print(80*'#')
-
-        converged = (operator_error < epsilon) or (rq_noise > noise_tolerance)
+        
         iteration+=1 
         if verbose:
             print('At iteration', iteration, 'operator error is ',operator_error,' convergence = ',(operator_error < epsilon))
-            print('At iteration', iteration, 'RQ noise is ',rq_noise,' exit condition = ',(rq_noise > noise_tolerance))
+        if big_Q.shape[-1] >= max_vectors:
+            break
 
         if iteration > n//block_size:
             break

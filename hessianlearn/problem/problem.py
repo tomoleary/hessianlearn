@@ -18,6 +18,7 @@
 from __future__ import absolute_import, division, print_function
 import numpy as np
 import tensorflow as tf
+# tf.compat.v1.enable_eager_execution()
 if int(tf.__version__[0]) > 1:
 	import tensorflow.compat.v1 as tf
 	tf.disable_v2_behavior()
@@ -58,7 +59,7 @@ class Problem(ABC):
 	It takes a neural network model and defines loss function and derivatives
 	Also defines update operations.
 	"""
-	def __init__(self,NeuralNetwork,dtype = tf.float32):
+	def __init__(self,NeuralNetwork,hessian_block_size = None,dtype = tf.float32):
 		"""
 		The Problem parent class constructor takes a neural network model (typically from tf.keras.Model)
 		Children class implement different loss functions which are implemented by the method _initialize_loss
@@ -68,6 +69,9 @@ class Problem(ABC):
 		# Boolean to indicate if only input data should be passed into loss function
 		self._is_autoencoder = False
 		self._is_gan = False
+		self._has_derivative_loss = False
+		# Hessian block size
+		self._hessian_block_size = hessian_block_size
 		# Data type
 		self._dtype = dtype
 
@@ -117,12 +121,20 @@ class Problem(ABC):
 		return self._dimension
 
 	@property
-	def w_hat(self):
-		return self._w_hat
+	def dw(self):
+		return self._dw
 
 	@property
-	def H_action(self):
-		return self._H_action
+	def Hdw(self):
+		return self._Hdw
+
+	@property
+	def dW(self):
+		return self._dW
+
+	@property
+	def HdW(self):
+		return self._HdW
 
 	@property
 	def H_quadratic(self):
@@ -143,6 +155,11 @@ class Problem(ABC):
 	@property
 	def is_gan(self):
 		return self._is_gan
+
+	@property
+	def has_derivative_loss(self):
+		return self._has_derivative_loss
+	
 	
 
 	@property
@@ -201,13 +218,40 @@ class Problem(ABC):
 
 		self._norm_g = tf.sqrt(tf.reduce_sum(self.gradient*self.gradient))
 		# Initialize vector for Hessian mat-vecs
-		self._w_hat = tf.placeholder(self.dtype,self.dimension )
+		self._dw = tf.placeholder(self.dtype,self.dimension )
 		# Define (g,dw) inner product
-		self._g_inner_w_hat = tf.tensordot(self._w_hat,self._gradient,axes = [[0],[0]])
+		self._gTdw = tf.tensordot(self._gradient,self._dw,axes = [[0],[0]])
+
 		# Define Hessian action Hdw
-		self._H_action = my_flatten(tf.gradients(self._g_inner_w_hat,self._w,stop_gradients = self._w_hat,name = 'hessian_action'))
+		self._Hdw = my_flatten(tf.gradients(self._gTdw,self._w,stop_gradients = self._dw,name = 'hessian_action'))
 		# Define Hessian quadratic forms
-		self._H_quadratic = tf.tensordot(self._w_hat,self._H_action,axes = [[0],[0]])
+		self._H_quadratic = tf.tensordot(self._dw,self._Hdw,axes = [[0],[0]])
+
+		if self._hessian_block_size is None:
+			# Default is to not initialize the blocking unless it will actually be used.
+			# It can be initialized at a later time. 
+			self._dW = None
+			self._HdW = None
+		else:
+			assert type(self._hessian_block_size) is int
+			assert self._hessian_block_size < self.dimension
+			self._initialize_hessian_blocking(self._hessian_block_size)
+
+	def _initialize_hessian_blocking(self,block_size):
+		# Hessian matrix product action
+		self._hessian_block_size = block_size
+		self._dW = tf.placeholder(self.dtype,shape = (self.dimension,block_size))
+		_gTdW = tf.tensordot(self._gradient,self._dW,axes = [[0],[0]])
+		# Unstack
+		unstacked_gTdW = tf.unstack(_gTdW)
+		# Take derivative
+		unstacked_HdW = [my_flatten(tf.gradients(_gTdW,self._w,stop_gradients = self._dW,name = 'hmat_action'+str(i))) for i,_gTdW in enumerate(unstacked_gTdW)]
+		self._HdW = tf.stack(unstacked_HdW,axis = 1)
+		
+
+
+
+		
 
 
 	def _initialize_assignment_ops(self):
@@ -304,7 +348,7 @@ class ClassificationProblem(Problem):
 	This class implements the description of basic classification problems. 
 
 	"""
-	def __init__(self,NeuralNetwork,loss_type = 'cross_entropy',dtype = tf.float32):
+	def __init__(self,NeuralNetwork,loss_type = 'cross_entropy',hessian_block_size = None,dtype = tf.float32):
 		"""
 		The class constructor is like that of the parent except it takes an additional flag 
 		for the type of the loss function to be employed.
@@ -315,7 +359,7 @@ class ClassificationProblem(Problem):
 		"""
 		assert loss_type in ['cross_entropy','least_squares','mixed','squared_hinge']
 		self._loss_type = loss_type
-		super(ClassificationProblem,self).__init__(NeuralNetwork,dtype = dtype)
+		super(ClassificationProblem,self).__init__(NeuralNetwork,hessian_block_size = hessian_block_size,dtype = dtype)
 
 	@property
 	def loss_type(self):
@@ -395,7 +439,7 @@ class RegressionProblem(Problem):
 	This class implements the description of basic regression problems. 
 
 	"""
-	def __init__(self,NeuralNetwork,y_mean = None,dtype = tf.float32):
+	def __init__(self,NeuralNetwork,y_mean = None,hessian_block_size = None,dtype = tf.float32):
 		"""
 		The constructor for this class takes:
 			-NeuralNetwork: the neural network represented as a tf.keras Model
@@ -405,7 +449,7 @@ class RegressionProblem(Problem):
 			self.y_mean = tf.constant(y_mean,dtype = dtype)
 		else:
 			self.y_mean = None
-		super(RegressionProblem,self).__init__(NeuralNetwork,dtype = dtype)
+		super(RegressionProblem,self).__init__(NeuralNetwork,hessian_block_size = hessian_block_size,dtype = dtype)
 
 	@property
 	def variance_reduction(self):
@@ -424,15 +468,15 @@ class RegressionProblem(Problem):
 		with tf.name_scope('loss'):
 			self._loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
 		with tf.name_scope('rel_error'):
-			self._rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
-							/tf.reduce_mean(tf.pow(self.y_true,2)))
+			self._rel_error = tf.sqrt(tf.reduce_mean(tf.square(self.y_true-self.y_prediction))\
+							/tf.reduce_mean(tf.square(self.y_true)))
 		self._accuracy = 1. - self._rel_error
-		with tf.name_scope('variance_reduction'):
-			# For use in constructing a regressor to serve as a control variate.
-			# 
-			assert self.y_mean is not None
-			self._variance_reduction = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
-							/tf.reduce_mean(tf.pow(self.y_true - self.y_mean,2)))
+		if self.y_mean is not None:
+			with tf.name_scope('variance_reduction'):
+				# For use in constructing a regressor to serve as a control variate.
+				# 
+				self._variance_reduction = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
+								/tf.reduce_mean(tf.pow(self.y_true - self.y_mean,2)))
 		with tf.name_scope('mad'):
 			try:
 				import tensorflow_probability as tfp
@@ -462,22 +506,153 @@ class RegressionProblem(Problem):
 		return dictionary_partitions
 
 
+class H1RegressionProblem(Problem):
+	"""
+	This class implements the description of an H1 regression problem
+
+	"""
+	def __init__(self,NeuralNetwork,y_mean = None,rank = None,hessian_block_size = None,\
+						derivative_weight = 1.0, dtype = tf.float32):
+		"""
+		The constructor for this class takes:
+			-NeuralNetwork: the neural network represented as a tf.keras Model
+
+		"""
+		if y_mean is not None:
+			self.y_mean = tf.constant(y_mean,dtype = dtype)
+		else:
+			self.y_mean = None
+
+		assert rank is not None, 'must specify rank of reduced derivative loss'
+		self._rank = rank
+
+		self._derivative_weight = derivative_weight
+		super(H1RegressionProblem,self).__init__(NeuralNetwork,hessian_block_size = hessian_block_size,dtype = dtype)
+		self._has_derivative_loss = True
+
+	@property
+	def variance_reduction(self):
+		return self._variance_reduction
+
+	@property
+	def rel_error(self):
+		return self._rel_error
+
+	@property
+	def h1_accuracy(self):
+		return self._h1_accuracy
+	
+	@property
+	def h1_rel_error(self):
+		return self._h1_rel_error
+	
+	
+	
+
+	def _initialize_loss(self):
+		"""
+		This method defines the least squares loss function as well as relative error and accuracy
+		"""
+		with tf.name_scope('loss'):
+			l2_loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
+
+			output_dimension = self.y_prediction.shape[-1]
+			input_dimension = self.x.shape[-1]
+			self._V_data = tf.placeholder(self.dtype,shape = (None,input_dimension,self._rank))
+			self._U_data = tf.placeholder(self.dtype,shape = (None,output_dimension,self._rank))
+			self._sigma_data = tf.placeholder(self.dtype,shape = (None,self._rank))
+			# Einsum with Ur
+			UTys = tf.einsum('ijk,ij->ik',self._U_data,self.y_prediction)
+			unstacked_UTys = tf.unstack(UTys,axis = 1)
+			# Taking derivatives
+			unstacked_UTdydxs = [tf.gradients(UTy,self.x,stop_gradients=self._U_data,name = 'UT_dydx'+str(i))[0] for i, UTy in enumerate(unstacked_UTys)]
+			UTdydxs = tf.stack(unstacked_UTdydxs,axis = 1)
+			# Einsum with Vr
+			UTdydxVs = tf.einsum('ijk,ikl->ijl',UTdydxs,self._V_data)
+			# Broadcast sigmas to diagonal
+			sigmas_diag = tf.matrix_diag(self._sigma_data)	
+			# Define Frobenius norm loss in reduced space (r x r)
+			h1_seminorm_loss = tf.reduce_mean(tf.square(sigmas_diag - UTdydxVs))
+
+			self._loss = l2_loss + self._derivative_weight*h1_seminorm_loss
+
+		with tf.name_scope('rel_error'):
+			self._rel_error = tf.sqrt(tf.reduce_mean(tf.square(self.y_true-self.y_prediction))\
+							/tf.reduce_mean(tf.square(self.y_true)))
+		self._accuracy = 1. - self._rel_error
+		with tf.name_scope('h1_rel_error'):
+			self._h1_rel_error = tf.sqrt(h1_seminorm_loss\
+							/tf.reduce_mean(tf.square(sigmas_diag)))
+
+		self._h1_accuracy = 1. - self._h1_rel_error
+
+		if self.y_mean is not None:
+			with tf.name_scope('variance_reduction'):
+				# For use in constructing a regressor to serve as a control variate.
+				# 
+				self._variance_reduction = tf.sqrt(tf.reduce_mean(tf.pow(self.y_true-self.y_prediction,2))\
+								/tf.reduce_mean(tf.pow(self.y_true - self.y_mean,2)))
+		else:
+			self._variance_reduction = None
+
+
+	def _partition_dictionaries(self,data_dictionary,n_partitions):
+		"""
+		This method partitions one data dictionary into n_partitions.
+		For regression this is just inputs to outputs.
+		"""
+		assert type(n_partitions) == int
+		data_xs = data_dictionary[self.x]
+		data_ys = data_dictionary[self.y_true]
+		if n_partitions > len(data_xs):
+			n_partitions = len(data_xs)
+		chunk_size = int(data_xs.shape[0]/n_partitions)
+		dictionary_partitions = []
+		for chunk_i in range(n_partitions):
+			# Array slicing should be a view, not a copy
+			# So this should not be a memory issue
+			my_chunk_x = data_xs[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
+			my_chunk_y = data_ys[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
+			dictionary_partitions.append({self.x:my_chunk_x, self.y_true: my_chunk_y})
+		return dictionary_partitions
+
+
 class AutoencoderProblem(Problem):
 	"""
 	This class implements the description of basic autoencoder problems. 
 
 	"""
-	def __init__(self,NeuralNetwork,dtype = tf.float32):
+	def __init__(self,NeuralNetwork,hessian_block_size = None,dtype = tf.float32):
 		"""
 		The constructor for this class takes:
 			-NeuralNetwork: the tf.keras Model representation of the neural network
 		"""
-		super(AutoencoderProblem,self).__init__(NeuralNetwork,dtype = dtype)
+		super(AutoencoderProblem,self).__init__(NeuralNetwork,hessian_block_size = hessian_block_size,dtype = dtype)
 		self._is_autoencoder = True
 
 	@property
 	def rel_error(self):
 		return self._rel_error
+
+	def _initialize_network(self,NeuralNetwork):
+		"""
+		This method defines the neural network model
+			-NeuralNetwork: the neural network as a tf.keras.model.Model
+
+		Must set member variable self._output_shape
+		"""
+		self._NN = NeuralNetwork
+		self.x = self.NN.inputs[0]
+		
+		self.y_prediction = self.NN(self.x)
+
+
+		if len(self.y_prediction.shape) > 2:
+			self._output_dimension =  1.
+			for shape in self.y_prediction.shape[1:]:
+				self._output_dimension *= shape.value
+		else:
+			self._output_dimension = self.y_prediction.shape[-1].value
 
 
 	def _initialize_loss(self):
@@ -485,7 +660,9 @@ class AutoencoderProblem(Problem):
 		This method defines the least squares loss function as well as relative error and accuracy
 		"""
 		with tf.name_scope('loss'): # 
-			self._loss = tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)) 
+			# self._loss = tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)) 
+
+			self._loss = tf.reduce_mean(tf.keras.losses.MSE(self.x,self.y_prediction))
 			self._rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
 							/tf.reduce_mean(tf.pow(self.x,2)))
 			self._accuracy = 1. - self.rel_error
@@ -515,7 +692,7 @@ class VariationalAutoencoderProblem(Problem):
 	This class implements the description of basic variational autoencoder problems. 
 
 	"""
-	def __init__(self,NeuralNetwork,z_mean,z_log_sigma,loss_type = 'least_squares',dtype = tf.float32):
+	def __init__(self,NeuralNetwork,z_mean,z_log_sigma,loss_type = 'least_squares',hessian_block_size = None,dtype = tf.float32):
 		"""
 		The constructor for this class takes:
 			-NeuralNetwork: the tf.keras Model representation of the neural network
@@ -530,7 +707,7 @@ class VariationalAutoencoderProblem(Problem):
 		self.z_mean = z_mean
 		self.z_log_sigma = z_log_sigma
 		
-		super(VariationalAutoencoderProblem,self).__init__(NeuralNetwork,dtype = dtype)
+		super(VariationalAutoencoderProblem,self).__init__(NeuralNetwork,hessian_block_size = hessian_block_size,dtype = dtype)
 		self._is_autoencoder = True
 
 	@property
@@ -587,7 +764,7 @@ class GenerativeAdversarialNetworkProblem(Problem):
 	This class implements the description of basic generative adversarial network problems. 
 
 	"""
-	def __init__(self,generator,discriminator,loss_type = 'least_squares',dtype = tf.float32):
+	def __init__(self,generator,discriminator,loss_type = 'least_squares',hessian_block_size = None,dtype = tf.float32):
 		"""
 		The constructor for this class takes:
 			-generator: the tf.keras.model.Model description of the generator neural network
@@ -596,7 +773,7 @@ class GenerativeAdversarialNetworkProblem(Problem):
 		assert loss_type in ['cross_entropy','least_squares']
 		self._loss_type = loss_type
 
-		super(GenerativeAdversarialNetworkProblem,self).__init__([generator,discriminator],dtype = dtype)
+		super(GenerativeAdversarialNetworkProblem,self).__init__([generator,discriminator],hessian_block_size = hessian_block_size,dtype = dtype)
 
 		self._is_gan = True
 
@@ -738,25 +915,65 @@ class GenerativeAdversarialNetworkProblem(Problem):
 		self._norm_g = tf.sqrt(tf.reduce_sum(self.gradient*self.gradient))
 
 		# Hessian mat-vecs
-		self._w_hat = tf.placeholder(self.dtype, self.dimension)
+		self._dw = tf.placeholder(self.dtype, self.dimension)
+
 		# Split the placeholder
-		self._generator_w_hat,self._discriminator_w_hat = tf.split(self._w_hat,[self._generator_dimension,self._discriminator_dimension])
+		self._generator_dw,self._discriminator_dw = tf.split(self._dw,[self._generator_dimension,self._discriminator_dimension])
 
 		# Define generator (g,dw) inner product
-		self._generator_g_inner_w_hat = tf.tensordot(self._generator_w_hat,self._generator_gradient,axes = [[0],[0]])
+		self._generator_gTdw = tf.tensordot(self._generator_dw,self._generator_gradient,axes = [[0],[0]])
 		# Define discriminator (g,dw) inner product
-		self._discriminator_g_inner_w_hat = tf.tensordot(self._discriminator_w_hat,self._discriminator_gradient,axes = [[0],[0]])
+		self._discriminator_gTdw = tf.tensordot(self._discriminator_dw,self._discriminator_gradient,axes = [[0],[0]])
 		# Define Hessian action Hdw
-		self._generator_H_action = my_flatten(tf.gradients(self._generator_g_inner_w_hat,self._generator_w,\
-										stop_gradients = self._generator_w_hat,name = 'generator_hessian_action'))
+		self._generator_Hdw = my_flatten(tf.gradients(self._generator_gTdw,self._generator_w,\
+										stop_gradients = self._generator_dw,name = 'generator_hessian_action'))
 
-		self._discriminator_H_action = my_flatten(tf.gradients(self._discriminator_g_inner_w_hat,self._discriminator_w,\
-										stop_gradients = self._discriminator_w_hat,name = 'discriminator_hessian_action'))
+		self._discriminator_Hdw = my_flatten(tf.gradients(self._discriminator_gTdw,self._discriminator_w,\
+										stop_gradients = self._discriminator_dw,name = 'discriminator_hessian_action'))
 
-		self._H_action = tf.concat([self._generator_H_action,self._discriminator_H_action],axis = 0)
+		self._Hdw = tf.concat([self._generator_Hdw,self._discriminator_Hdw],axis = 0)
 
 		# Define Hessian quadratic forms
-		self._H_quadratic = tf.tensordot(self._w_hat,self._H_action,axes = [[0],[0]])
+		self._H_quadratic = tf.tensordot(self._dw,self._Hdw,axes = [[0],[0]])
+
+		if self._hessian_block_size is None:
+			# Default is to not initialize the blocking unless it will actually be used.
+			# It can be initialized at a later time. 
+			self._dW = None
+			self._HdW = None
+		else:
+			assert type(self._hessian_block_size) is int
+			assert self._hessian_block_size < self.dimension
+			self._initialize_hessian_blocking(self._hessian_block_size)
+
+	def _initialize_hessian_blocking(self,block_size):
+		# Hessian matrix product action
+		self._hessian_block_size = block_size
+
+		self._dW = tf.placeholder(self.dtype,shape = (self.dimension,block_size))
+
+		self._generator_dW, self._discriminator_dW = tf.split(self._dW,[self._generator_dimension,self._discriminator_dimension],axis = 0)
+
+
+		_generator_gTdW = tf.tensordot(self._generator_gradient,self._generator_dW,axes = [[0],[0]])
+
+		_discriminator_gTdW = tf.tensordot(self._discriminator_gradient,self._discriminator_dW,axes = [[0],[0]])
+
+		# Unstack
+		unstacked_generator_gTdW = tf.unstack(_generator_gTdW)
+		# Take derivative
+		unstacked_generator_HdW = [my_flatten(tf.gradients(_generator_gTdW,self._generator_w,stop_gradients = self._generator_dW,name = 'generator_hmat_action'+str(i)))\
+																										 for i,_generator_gTdW in enumerate(unstacked_generator_gTdW)]
+		self._generator_HdW = tf.stack(unstacked_generator_HdW,axis = 1)
+
+		unstacked_discriminator_gTdW = tf.unstack(_discriminator_gTdW)
+		# Take derivative
+		unstacked_discriminator_HdW = [my_flatten(tf.gradients(_discriminator_gTdW,self._discriminator_w,stop_gradients = self._discriminator_dW,name = 'discriminator_hmat_action'+str(i)))\
+																										 for i,_discriminator_gTdW in enumerate(unstacked_discriminator_gTdW)]
+		self._discriminator_HdW = tf.stack(unstacked_discriminator_HdW,axis = 1)
+
+		self._HdW = tf.concat([self._generator_HdW,self._discriminator_HdW],axis = 0)
+
 
 	def _partition_dictionaries(self,data_dictionary,n_partitions):
 		"""
@@ -777,6 +994,7 @@ class GenerativeAdversarialNetworkProblem(Problem):
 			my_chunk_noise = data_noise[chunk_i*chunk_size:(chunk_i+1)*chunk_size]
 			dictionary_partitions.append({self.x:my_chunk_x, self.noise: my_chunk_noise})
 		return dictionary_partitions
+
 
 
 

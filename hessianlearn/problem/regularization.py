@@ -18,9 +18,12 @@
 from __future__ import absolute_import, division, print_function
 import numpy as np
 import tensorflow as tf
+# tf.compat.v1.enable_eager_execution()
 if int(tf.__version__[0]) > 1:
 	import tensorflow.compat.v1 as tf
-	tf.disable_v2_behavior()
+	# tf.disable_v2_behavior()
+	# tf.enable_eager_execution()
+
 from  ..utilities import ParameterList
 from abc import ABC, abstractmethod
 
@@ -47,8 +50,8 @@ class Regularization (ABC):
 		return self._gradient
 
 	@property
-	def H_action(self):
-		return self._H_action
+	def Hdw(self):
+		return self._Hdw
 
 class L2Regularization(Regularization):
 	"""
@@ -72,7 +75,7 @@ class L2Regularization(Regularization):
 		
 		self._gradient = self.parameters['gamma']*self.problem._flat_w
 
-		self._H_action = self.parameters['gamma']*self.problem.w_hat
+		self._Hdw = self.parameters['gamma']*self.problem.dw
 
 
 

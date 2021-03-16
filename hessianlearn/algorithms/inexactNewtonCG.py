@@ -109,21 +109,21 @@ class InexactNewtonCG(Optimizer):
 		if hessian_feed_dict is None:
 			hessian_feed_dict = feed_dict
 		
-		self.gradient = self.sess.run(self.grad,feed_dict = feed_dict)
+		gradient = self.sess.run(self.grad,feed_dict = feed_dict)
 
 
 
 		if self.parameters['globalization'] is None:
 			self.alpha = self.parameters['alpha']
-			p,on_boundary = self.cg_solver.solve(-self.gradient,hessian_feed_dict)
+			p,on_boundary = self.cg_solver.solve(-gradient,hessian_feed_dict)
 			self._sweeps += [1,2*self.cg_solver.iter]
 			self.p = p
 			update = self.alpha*p
 			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 
 		if self.parameters['globalization'] == 'line_search':
-			w_dir,on_boundary = self.cg_solver.solve(-self.gradient,hessian_feed_dict)
-			w_dir_inner_g = np.inner(w_dir,self.gradient)
+			w_dir,on_boundary = self.cg_solver.solve(-gradient,hessian_feed_dict)
+			w_dir_inner_g = np.inner(w_dir,gradient)
 			initial_cost = self.sess.run(self.problem.loss,feed_dict = feed_dict)
 			cost_at_candidate = lambda p : self._loss_at_candidate(p,feed_dict = feed_dict)
 			self.alpha, line_search, line_search_iter = ArmijoLineSearch(w_dir,w_dir_inner_g,\
@@ -138,14 +138,14 @@ class InexactNewtonCG(Optimizer):
 				self.initialize_trust_region()
 			# Set trust region radius
 			self.cg_solver.set_trust_region_radius(self.trust_region.radius)
-			p,on_boundary = self.cg_solver.solve(-self.gradient,feed_dict)
+			p,on_boundary = self.cg_solver.solve(-gradient,feed_dict)
 			self._sweeps += [1,2*self.cg_solver.iter]
 			self.p = p
 			# Solve for candidate step
-			p, on_boundary  = self.cg_solver.solve(-self.gradient,hessian_feed_dict)
-			pg = np.dot(p,self.gradient)
+			p, on_boundary  = self.cg_solver.solve(-gradient,hessian_feed_dict)
+			pg = np.dot(p,gradient)
 			# Calculate predicted reduction
-			feed_dict[self.cg_solver.problem.w_hat] = p
+			feed_dict[self.cg_solver.problem.dw] = p
 			Hp 					= self.sess.run(self.cg_solver.Aop,feed_dict)
 			pHp = np.dot(p,Hp)
 			predicted_reduction = -pg-0.5*pHp

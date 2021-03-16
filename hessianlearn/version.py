@@ -15,12 +15,5 @@
 # Author: Tom O'Leary-Roseberry
 # Contact: tom.olearyroseberry@utexas.edu
 
-from __future__ import absolute_import, division, print_function
-
-from .data import *
-
-# from .mnist import load_mnist
-
-# from .lfw import load_lfw
-
-# from .cifar10 import load_cifar10
+version_info = (0, 1, 0)
+__version__ = '.'.join([str(x) for x in version_info])

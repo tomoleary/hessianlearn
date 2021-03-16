@@ -19,10 +19,11 @@
 from __future__ import absolute_import, division, print_function
 import numpy as np
 import tensorflow as tf
+tf.compat.v1.enable_eager_execution()
 if int(tf.__version__[0]) > 1:
 	import tensorflow.compat.v1 as tf
-	tf.disable_v2_behavior()
-
+	# tf.disable_v2_behavior()
+	tf.enable_eager_execution()
 
 class Preconditioner(object):
 	"""
