@@ -74,11 +74,15 @@ neural_network = tf.keras.models.Model(...)
 hessianlearn implements various training [`problem`](https://github.com/tomoleary/hessianlearn/blob/master/hessianlearn/problem/problem.py) constructs (regression, classification, autoencoders, variational autoencoders, generative adversarial networks). Instantiate a `problem`, a `data` object (which takes a dictionary with keys that correspond to the corresponding `placeholders` in `problem`) and `regularization`
 
 ```python
-# Instantiate the problem (this handles the loss function, construction of hessian and gradient etc.)
+# Instantiate the problem (this handles the loss function,
+# construction of hessian and gradient etc.)
 problem = RegressionProblem(neural_network,dtype = tf.float32)
-# Instantiate the data object, this handles the train / validation split as well as iterating during training
-data = Data({problem.x:x_data,problem.y_true},train_batch_size,validation_data_size = validation_data_size)
-# Instantiate the regularization: L2Regularization is Tikhonov, gamma = 0 is no regularization
+# Instantiate the data object, this handles the train / validation split
+# as well as iterating during training
+data = Data({problem.x:x_data,problem.y_true},train_batch_size,\
+	validation_data_size = validation_data_size)
+# Instantiate the regularization: L2Regularization is Tikhonov,
+# gamma = 0 is no regularization
 regularization = L2Regularization(problem,gamma = 0)
 ```
 
