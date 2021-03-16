@@ -388,10 +388,15 @@ class StaticIterator(object):
 		# if self.index > 0:
 		# 	raise StopIteration
 		self._index += 1
-		return self._data
+		# Yes this is sort of dumb, but tensorflow requires sess calls
+		# get something of type dict
+		next_dict = {}
+		for key in self._data.keys():
+			next_dict[key] = self._data[key]
+		return next_dict
 
 
-class DictData (object):
+class DictData(object):
 	"""
 	This class implements a simple xy data pair object
 	"""

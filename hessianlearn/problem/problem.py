@@ -523,13 +523,12 @@ class H1RegressionProblem(Problem):
 		else:
 			self.y_mean = None
 
-		self._has_derivative_loss = True
-
 		assert rank is not None, 'must specify rank of reduced derivative loss'
 		self._rank = rank
 
 		self._derivative_weight = derivative_weight
 		super(H1RegressionProblem,self).__init__(NeuralNetwork,hessian_block_size = hessian_block_size,dtype = dtype)
+		self._has_derivative_loss = True
 
 	@property
 	def variance_reduction(self):
@@ -538,6 +537,15 @@ class H1RegressionProblem(Problem):
 	@property
 	def rel_error(self):
 		return self._rel_error
+
+	@property
+	def h1_accuracy(self):
+		return self._h1_accuracy
+	
+	@property
+	def h1_rel_error(self):
+		return self._h1_rel_error
+	
 	
 	
 
@@ -550,28 +558,34 @@ class H1RegressionProblem(Problem):
 
 			output_dimension = self.y_prediction.shape[-1]
 			input_dimension = self.x.shape[-1]
-			self._Vr_data = tf.placeholder(self.dtype,shape = (None,input_dimension,self._rank))
-			self._Ur_data = tf.placeholder(self.dtype,shape = (None,output_dimension,self._rank))
-			self._sigmar_data = tf.placeholder(self.dtype,shape = (None,self._rank))
+			self._V_data = tf.placeholder(self.dtype,shape = (None,input_dimension,self._rank))
+			self._U_data = tf.placeholder(self.dtype,shape = (None,output_dimension,self._rank))
+			self._sigma_data = tf.placeholder(self.dtype,shape = (None,self._rank))
 			# Einsum with Ur
-			UrTys = tf.einsum('ijk,ij->ik',self._Ur_data,self.y_prediction)
-			unstacked_UrTys = tf.unstack(UrTys,axis = 1)
+			UTys = tf.einsum('ijk,ij->ik',self._U_data,self.y_prediction)
+			unstacked_UTys = tf.unstack(UTys,axis = 1)
 			# Taking derivatives
-			unstacked_UrTdydxs = [tf.gradients(UrTy,self.x,stop_gradients=self._Ur_data,name = 'UrT_dydx'+str(i))[0] for i, UrTy in enumerate(unstacked_UrTys)]
-			UrTdydxs = tf.stack(unstacked_UrTdydxs,axis = 1)
+			unstacked_UTdydxs = [tf.gradients(UTy,self.x,stop_gradients=self._U_data,name = 'UT_dydx'+str(i))[0] for i, UTy in enumerate(unstacked_UTys)]
+			UTdydxs = tf.stack(unstacked_UTdydxs,axis = 1)
 			# Einsum with Vr
-			UrTdydxVrs = tf.einsum('ijk,ikl->ijl',UrTdydxs,self._Vr_data)
+			UTdydxVs = tf.einsum('ijk,ikl->ijl',UTdydxs,self._V_data)
 			# Broadcast sigmas to diagonal
-			sigmars_diag = tf.matrix_diag(self._sigmar_data)	
+			sigmas_diag = tf.matrix_diag(self._sigma_data)	
 			# Define Frobenius norm loss in reduced space (r x r)
-			h1_seminorm_loss = tf.reduce_mean(tf.pow(sigmars_diag - UrTdydxVrs,2))
+			h1_seminorm_loss = tf.reduce_mean(tf.square(sigmas_diag - UTdydxVs))
 
-			self._loss = l2_loss
+			self._loss = l2_loss + self._derivative_weight*h1_seminorm_loss
 
 		with tf.name_scope('rel_error'):
 			self._rel_error = tf.sqrt(tf.reduce_mean(tf.square(self.y_true-self.y_prediction))\
 							/tf.reduce_mean(tf.square(self.y_true)))
 		self._accuracy = 1. - self._rel_error
+		with tf.name_scope('h1_rel_error'):
+			self._h1_rel_error = tf.sqrt(h1_seminorm_loss\
+							/tf.reduce_mean(tf.square(sigmas_diag)))
+
+		self._h1_accuracy = 1. - self._h1_rel_error
+
 		if self.y_mean is not None:
 			with tf.name_scope('variance_reduction'):
 				# For use in constructing a regressor to serve as a control variate.
