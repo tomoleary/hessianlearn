@@ -1,7 +1,6 @@
 <!-- # hessianlearn -->
 
 
-<!-- 			Hessian based stochastic optimization in tensorflow and keras -->
 
 	      ___          ___          ___          ___                     ___          ___     
 	     /__/\        /  /\        /  /\        /  /\       ___         /  /\        /__/\    
@@ -31,9 +30,6 @@
 
 
 
-					https://arxiv.org/abs/1905.06738
-					https://arxiv.org/abs/2002.02881
-
 
 [![Build Status](https://travis-ci.com/tomoleary/hessianlearn.svg?branch=master)](https://travis-ci.com/tomoleary/hessianlearn)
 [![License](https://https://img.shields.io/github/license/tomoleary/hessianlearn)](./LICENSE.md)
@@ -44,6 +40,19 @@
 
 # Hessian based stochastic optimization in TensorFlow and keras
 
+This code implements Hessian-based stochastic optimization in TensorFlow and keras by exposing the matrix-free Hessian to users. The code is meant to allow for rapid-prototyping of Hessian-based algorithms via the matrix-free Hessian action, which allows users to inspect Hessian based information for stochastic nonconvex (neural network training) optimization problems. 
+
+The Hessian action is exposed via matrix-vector or matrix-matrix products:
+
+<img src="https://latex.codecogs.com/gif.latex?H\widehat{w} = \frac{d}{dw}(g^T\widehat{w}) " /> 
+
+## Compatibility
+
+The code is compatible with Tensorflow v1 and v2, but certain features of v2 are disabled (like eager execution). This is because the Hessian matrix products in hessianlearn are implemented using `placeholders` which have been deprecated in v2. For this reason hessianlearn cannot work with data generators and things like this that require eager execution. If any compatibility issues are found, please open an [issue](https://github.com/tomoleary/hessianlearn/issues).
+
+## Usage
+
+Blah blah blah 
 
 
 # References
