@@ -42,9 +42,15 @@
 
 This code implements Hessian-based stochastic optimization in TensorFlow and keras by exposing the matrix-free Hessian to users. The code is meant to allow for rapid-prototyping of Hessian-based algorithms via the matrix-free Hessian action, which allows users to inspect Hessian based information for stochastic nonconvex (neural network training) optimization problems. 
 
-The Hessian action is exposed via matrix-vector or matrix-matrix products:
+The Hessian action is exposed via matrix-vector products:
+<p align="center">
+	<img src="https://latex.codecogs.com/gif.latex?H\widehat{w}=\frac{d}{dw}(g^T\widehat{w})" /> 
+</p>
 
-<img src="https://latex.codecogs.com/gif.latex?H\widehat{w}=\frac{d}{dw}(g^T\widehat{w})" /> 
+and matrix-matrix products:
+<p align="center">
+	<img src="https://latex.codecogs.com/gif.latex?H\widehat{W}=\frac{d}{dw}(g^T\widehat{W})" /> 
+</p>
 
 ## Compatibility
 
