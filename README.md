@@ -57,8 +57,42 @@ and matrix-matrix products:
 The code is compatible with Tensorflow v1 and v2, but certain features of v2 are disabled (like eager execution). This is because the Hessian matrix products in hessianlearn are implemented using `placeholders` which have been deprecated in v2. For this reason hessianlearn cannot work with data generators and things like this that require eager execution. If any compatibility issues are found, please open an [issue](https://github.com/tomoleary/hessianlearn/issues).
 
 ## Usage
+Set `HESSIANLEARN_PATH` environmental variable
 
-Blah blah blah 
+Train a keras model
+
+```python
+import tensorflow as tf
+sys.path.append( os.environ.get('HESSIANLEARN_PATH'))
+from hessianlearn import *
+
+# Define keras neural network model
+neural_network = tf.keras.models.Model(...)
+
+```
+
+hessianlearn implements various training [`problem`](https://github.com/tomoleary/hessianlearn/blob/master/hessianlearn/problem/problem.py) constructs (regression, classification, autoencoders, variational autoencoders, generative adversarial networks). Instantiate a `problem`, a `data` object (which takes a dictionary with keys that correspond to the corresponding `placeholders` in `problem`) and `regularization`
+
+```python
+# Instantiate the problem (this handles the loss function, construction of hessian and gradient etc.)
+problem = RegressionProblem(neural_network,dtype = tf.float32)
+# Instantiate the data object, this handles the train / validation split as well as iterating during training
+data = Data({problem.x:x_data,problem.y_true},train_batch_size,validation_data_size = validation_data_size)
+# Instantiate the regularization: L2Regularization is Tikhonov, gamma = 0 is no regularization
+regularization = L2Regularization(problem,gamma = 0)
+```
+
+Pass these objects into the `HessianlearnModel` which handles the training
+
+```python
+HLModel = HessianlearnModel(problem,regularization,data)
+HLModel.fit()
+```
+
+
+## Examples
+
+[Tutorial 0](https://github.com/tomoleary/hessianlearn/blob/mat_mats/tutorial/Tutorial%200%20MNIST%20Autoencoder.ipynb)
 
 
 # References
