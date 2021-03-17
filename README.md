@@ -97,7 +97,7 @@ HLModel.fit()
 
 ## Examples
 
-[Tutorial 0: MNIST Autoencoder](https://github.com/tomoleary/hessianlearn/blob/mat_mats/tutorial/Tutorial%200%20MNIST%20Autoencoder.ipynb)
+[Tutorial 0: MNIST Autoencoder](https://github.com/tomoleary/hessianlearn/blob/master/tutorial/Tutorial%200%20MNIST%20Autoencoder.ipynb)
 
 
 # References
