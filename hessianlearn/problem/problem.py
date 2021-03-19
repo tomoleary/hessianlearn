@@ -512,7 +512,7 @@ class H1RegressionProblem(Problem):
 
 	"""
 	def __init__(self,NeuralNetwork,y_mean = None,rank = None,hessian_block_size = None,\
-						derivative_weight = 1.0, dtype = tf.float32):
+						l2_weight = 1.0, h1_weight = 1.0, dtype = tf.float32):
 		"""
 		The constructor for this class takes:
 			-NeuralNetwork: the neural network represented as a tf.keras Model
@@ -526,7 +526,9 @@ class H1RegressionProblem(Problem):
 		assert rank is not None, 'must specify rank of reduced derivative loss'
 		self._rank = rank
 
-		self._derivative_weight = derivative_weight
+		self._l2_weight = l2_weight
+		self._h1_weight = h1_weight
+
 		super(H1RegressionProblem,self).__init__(NeuralNetwork,hessian_block_size = hessian_block_size,dtype = dtype)
 		self._has_derivative_loss = True
 
@@ -555,6 +557,8 @@ class H1RegressionProblem(Problem):
 		"""
 		with tf.name_scope('loss'):
 			l2_loss = tf.losses.mean_squared_error(labels=self.y_true, predictions=self.y_prediction)
+			self._rel_error = tf.sqrt(l2_loss\
+							/tf.reduce_mean(tf.square(self.y_true)))
 
 			output_dimension = self.y_prediction.shape[-1]
 			input_dimension = self.x.shape[-1]
@@ -574,17 +578,14 @@ class H1RegressionProblem(Problem):
 			# Define Frobenius norm loss in reduced space (r x r)
 			h1_seminorm_loss = tf.reduce_mean(tf.square(sigmas_diag - UTdydxVs))
 
-			self._loss = l2_loss + self._derivative_weight*h1_seminorm_loss
-
-		with tf.name_scope('rel_error'):
-			self._rel_error = tf.sqrt(tf.reduce_mean(tf.square(self.y_true-self.y_prediction))\
-							/tf.reduce_mean(tf.square(self.y_true)))
-		self._accuracy = 1. - self._rel_error
-		with tf.name_scope('h1_rel_error'):
 			self._h1_rel_error = tf.sqrt(h1_seminorm_loss\
 							/tf.reduce_mean(tf.square(sigmas_diag)))
 
-		self._h1_accuracy = 1. - self._h1_rel_error
+			self._loss = self._l2_weight*self._rel_error + self._h1_weight*self._h1_rel_error
+
+			self._accuracy = 1. - self._rel_error
+
+			self._h1_accuracy = 1. - self._h1_rel_error
 
 		if self.y_mean is not None:
 			with tf.name_scope('variance_reduction'):

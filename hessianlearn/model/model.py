@@ -477,7 +477,7 @@ class HessianlearnModel(ABC):
 
 				################################################################################
 				# Save the best weights based on validation accuracy or loss
-				if hasattr(self.problem,'accuracy') and val_acc == max_val_acc:
+				if hasattr(self.problem,'accuracy') and val_acc == max_val_acc and not self.problem._has_derivative_loss:
 					weight_dictionary = {}
 					for layer in self.problem._NN.layers:
 						weight_dictionary[layer.name] = self.problem._NN.get_layer(layer.name).get_weights()
