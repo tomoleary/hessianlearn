@@ -101,8 +101,8 @@ class Hessian(ABC):
 					# For looping for now
 					HdW = np.zeros_like(x)
 					for i in range(n_vectors):
-						feed_dict[problem.dw] = x[:,i]
-						HdW[:,i] = sess.run(problem.Hdw,feed_dict)
+						feed_dict[self.problem.dw] = x[:,i]
+						HdW[:,i] = self.sess.run(self.problem.Hdw,feed_dict)
 					return HdW
 				else:
 					dW = np.zeros(self.problem.dimension,self.problem._hessian_block_size)
@@ -114,20 +114,23 @@ class Hessian(ABC):
 			elif n_vectors > self.problem._hessian_block_size:
 				HdW = np.zeros_like(x)
 				block_size = self.problem._hessian_block_size
-				blocks, remainder = np.divmod(block_size,block_size)
+				blocks, remainder = np.divmod(HdW.shape[-1],block_size)
 				for i in range(blocks):
 					feed_dict[self.problem._dW] = x[:,i*block_size:(i+1)*block_size]
 					HdW[:,i*block_size:(i+1)*block_size] = self.sess.run(self.problem.HdW,feed_dict)
 				# The last vectors are done as a for loop or a zeroed out array
-				if remainder < 0.2*self.problem._hessian_block_size:
+				if remainder == 0:
+					pass
+				elif remainder > 0 and remainder < 0.2*self.problem._hessian_block_size:
 					for i in range(n_vectors):
-						feed_dict[problem.dw] = x[:,blocks*block_size+i]
-						HdW[:,blocks*block_size+i] = sess.run(problem.Hdw,feed_dict)
+						feed_dict[self.problem.dw] = x[:,blocks*block_size+i]
+						HdW[:,blocks*block_size+i] = self.sess.run(self.problem.Hdw,feed_dict)
 				else:
-					dW = np.zeros(self.problem.dimension,self.problem._hessian_block_size)
+					dW = np.zeros((self.problem.dimension,self.problem._hessian_block_size))
 					dW[:,:remainder] = x[:,-remainder:]
 					feed_dict[self.problem._dW] = dW
-					HdW[:,-remainder:] = sess.run(problem.Hdw,feed_dict)
+					HdW[:,-remainder:] = self.sess.run(self.problem.Hdw,feed_dict)
+				return HdW
 		else:
 			# Many different Hessian mat-vecs interpreted as a tensor?
 			print('This case is not yet implemented'.center(80))

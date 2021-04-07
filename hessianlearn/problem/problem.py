@@ -70,6 +70,7 @@ class Problem(ABC):
 		self._is_autoencoder = False
 		self._is_gan = False
 		self._has_derivative_loss = False
+		self._is_vae = False
 		# Hessian block size
 		self._hessian_block_size = hessian_block_size
 		# Data type
@@ -159,6 +160,11 @@ class Problem(ABC):
 	@property
 	def has_derivative_loss(self):
 		return self._has_derivative_loss
+
+	@property
+	def is_vae(self):
+		return self._is_vae
+	
 	
 	
 
@@ -239,6 +245,7 @@ class Problem(ABC):
 
 	def _initialize_hessian_blocking(self,block_size):
 		# Hessian matrix product action
+		print('Initializing Hessian, and block size = ',block_size)
 		self._hessian_block_size = block_size
 		self._dW = tf.placeholder(self.dtype,shape = (self.dimension,block_size))
 		_gTdW = tf.tensordot(self._gradient,self._dW,axes = [[0],[0]])
@@ -693,7 +700,7 @@ class VariationalAutoencoderProblem(Problem):
 	This class implements the description of basic variational autoencoder problems. 
 
 	"""
-	def __init__(self,NeuralNetwork,z_mean,z_log_sigma,loss_type = 'least_squares',hessian_block_size = None,dtype = tf.float32):
+	def __init__(self,NeuralNetwork,z_mean,z_log_var,loss_type = 'least_squares',hessian_block_size = None,dtype = tf.float32):
 		"""
 		The constructor for this class takes:
 			-NeuralNetwork: the tf.keras Model representation of the neural network
@@ -706,10 +713,11 @@ class VariationalAutoencoderProblem(Problem):
 		assert loss_type in ['cross_entropy','least_squares']
 		self._loss_type = loss_type
 		self.z_mean = z_mean
-		self.z_log_sigma = z_log_sigma
+		self.z_log_var = z_log_var
 		
 		super(VariationalAutoencoderProblem,self).__init__(NeuralNetwork,hessian_block_size = hessian_block_size,dtype = dtype)
 		self._is_autoencoder = True
+		self._is_vae = True
 
 	@property
 	def loss_type(self):
@@ -718,7 +726,30 @@ class VariationalAutoencoderProblem(Problem):
 	@property
 	def rel_error(self):
 		return self._rel_error
+
+	@property
+	def is_vae(self):
+		return self._is_vae
 	
+	def _initialize_network(self,NeuralNetwork):
+		"""
+		This method defines the neural network model
+			-NeuralNetwork: the neural network as a tf.keras.model.Model
+
+		Must set member variable self._output_shape
+		"""
+		self._NN = NeuralNetwork
+		self.x = self.NN.inputs[0]
+		
+		self.y_prediction = self.NN(self.x)
+
+
+		if len(self.y_prediction.shape) > 2:
+			self._output_dimension =  1.
+			for shape in self.y_prediction.shape[1:]:
+				self._output_dimension *= shape.value
+		else:
+			self._output_dimension = self.y_prediction.shape[-1].value
 
 	def _initialize_loss(self):
 		"""
@@ -727,15 +758,21 @@ class VariationalAutoencoderProblem(Problem):
 		"""
 		with tf.name_scope('loss'): # 
 			if self.loss_type == 'cross_entropy':
-				pass
+				self._reconstruction_loss = tf.reduce_mean(tf.keras.losses.binary_crossentropy(self.x,self.y_prediction))
+				original_dim = np.prod(self.NN.input_shape[1:])
+				self._reconstruction_loss *= original_dim
+
 			elif self.loss_type == 'least_squares':
 				# VAE tutorials rescale the mse by the input dimension
-				least_squares_loss = np.prod(self.NN.input_shape[1:])*tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)) 
-				kl_loss = tf.reduce_mean(-0.5*tf.reduce_sum(1 + self.z_log_sigma - tf.pow(self.z_mean,2) - tf.exp(self.z_log_sigma),axis = -1))
-				# kl_loss = 0.0
-				self._loss = least_squares_loss + kl_loss
+				original_dim = np.prod(self.NN.input_shape[1:])
+				self._reconstruction_loss = original_dim*tf.reduce_mean(tf.keras.losses.MSE(self.x,self.y_prediction))
+				
 			else:
 				raise
+
+		self._kl_loss = tf.reduce_mean(-0.5*tf.reduce_sum(1 + self.z_log_var - tf.pow(self.z_mean,2) - tf.exp(self.z_log_var),axis = -1))
+
+		self._loss = self._reconstruction_loss + self._kl_loss
 
 		self._rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
 						/tf.reduce_mean(tf.pow(self.x,2)))

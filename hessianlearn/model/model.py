@@ -74,21 +74,23 @@ def HessianlearnModelSettings(settings = {}):
 	settings['optimizer']                	= ['lrsfn', "String to denote choice of optimizer"]
 	settings['alpha']                		= [5e-2, "Initial steplength, or learning rate"]
 	settings['hessian_low_rank']			= [20, "Low rank to be used for LRSFN / SFN"]
-	settings['fixed_step']					= [False, " True means steps of length alpha will be taken at each iteration"]
+	settings['globalization']				= [None, "None means steps of length alpha will be taken at each iteration"]
 	settings['max_backtrack']				= [10, "Maximum number of backtracking iterations for each line search"]
+
+	# Spectral step settings for LRSFN
+	settings['spectral_step_alpha']			= [1e-2, 'Used in min condition for spectral step']
 
 	# Range finding settings for LRSFN
 	settings['range_finding']				= [None,"Range finding, if None then r = hessian_low_rank\
 															Choose from None, 'arf', 'naarf','vn' "]
 	settings['range_rel_error_tolerance']   = [5, "Error tolerance for error estimator in adaptive range finding"]
 	settings['range_abs_error_tolerance']   = [50, "Error tolerance for error estimator in adaptive range finding"]
-	settings['range_block_size']        	= [10, "Block size used in range finder"]
+	settings['range_block_size']        	= [20, "Block size used in range finder"]
 	settings['max_sweeps']					= [10,"Maximum number of times through the data (measured in epoch equivalents"]
 
 	settings['max_bad_vectors_nystrom']     = [5, "Number of maximum bad vectors for variance based Nystrom"]
 	settings['max_vectors_nystrom']       	= [40, "Number of maximum vectors for variance based Nystrom"]
 	settings['nystrom_std_tolerance']       = [0.5, "Noise to eigenvalue ratio used for Nystrom truncation"]
-
 
 	# Initial weights for specific layers 
 	settings['layer_weights'] 				= [{},"Dictionary of layer name key and weight \
@@ -189,7 +191,7 @@ class HessianlearnModel(ABC):
 			self._logger['globalization'] = 'line_search'
 			optimizer.parameters['max_backtracking_iter'] = 8
 		elif settings['optimizer'] == 'incg':
-			if not settings['fixed_step']:
+			if not settings['globalization'] is None:
 				print('Using inexact Newton CG optimizer with line search'.center(80))
 				print(('Batch size = '+str(self.data._batch_size)).center(80))
 				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
@@ -208,7 +210,7 @@ class HessianlearnModel(ABC):
 				self._logger['alpha'][0] = settings['alpha']
 		elif settings['optimizer'] == 'lrsfn':
 			self.settings['printing_items']['rank'] = 'hessian_low_rank'
-			if not settings['fixed_step']:
+			if settings['globalization'] == 'line_search':
 				print('Using low rank SFN optimizer with line search'.center(80))
 				print(('Batch size = '+str(self.data._batch_size)).center(80))
 				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
@@ -224,8 +226,22 @@ class HessianlearnModel(ABC):
 				optimizer.parameters['max_bad_vectors_nystrom'] = settings['max_bad_vectors_nystrom'] 
 				optimizer.parameters['max_vectors_nystrom']  = settings['max_vectors_nystrom'] 
 				optimizer.parameters['nystrom_std_tolerance']  = settings['nystrom_std_tolerance'] 
-
-			else:
+			elif settings['globalization'] == 'spectral_step':
+				print('Using low rank SFN optimizer with spectral step'.center(80))
+				print(('Batch size = '+str(self.data._batch_size)).center(80))
+				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
+				print(('Hessian low rank = '+str(settings['hessian_low_rank'])).center(80))
+				optimizer = LowRankSaddleFreeNewton(self.problem,self.regularization,sess)
+				optimizer.parameters['globalization'] = 'spectral_step'
+				optimizer.parameters['hessian_low_rank'] = settings['hessian_low_rank']
+				optimizer.parameters['spectral_step_alpha'] = settings['spectral_step_alpha']
+				optimizer.parameters['range_finding'] = settings['range_finding']
+				optimizer.parameters['range_rel_error_tolerance'] =	settings['range_rel_error_tolerance']
+				optimizer.parameters['range_block_size'] =	settings['range_block_size']
+				optimizer.parameters['max_bad_vectors_nystrom'] = settings['max_bad_vectors_nystrom'] 
+				optimizer.parameters['max_vectors_nystrom']  = settings['max_vectors_nystrom'] 
+				optimizer.parameters['nystrom_std_tolerance']  = settings['nystrom_std_tolerance'] 
+			elif settings['globalization'] is None:
 				print('Using low rank SFN optimizer with fixed step'.center(80))
 				print(('Batch size = '+str(self.data._batch_size)).center(80))
 				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
@@ -242,6 +258,8 @@ class HessianlearnModel(ABC):
 				optimizer.parameters['nystrom_std_tolerance']  = settings['nystrom_std_tolerance'] 
 				optimizer.alpha = settings['alpha']
 				self._logger['alpha'][0] = settings['alpha']
+			else:
+				raise NotImplementedError('Unsupported choice of globalization for LRSFN')
 			if self.settings['range_finding'] is None:
 				self._logger['hessian_low_rank'][0] = settings['hessian_low_rank']
 		elif settings['optimizer'] == 'sgd':
@@ -302,7 +320,12 @@ class HessianlearnModel(ABC):
 			logger['val_h1_loss'] = {}
 			logger['train_h1_acc'] = {}
 			logger['val_h1_acc'] = {}
-			
+
+		if self.problem.is_vae:
+			logger['train_recon_loss'] = {}
+			logger['train_kl_loss'] = {}
+			logger['test_recon_loss'] = {}
+			logger['test_kl_loss'] = {}
 
 
 
@@ -315,12 +338,17 @@ class HessianlearnModel(ABC):
 		if self.settings['logger_outname'] is None:
 			logger_outname = str(datetime.date.today())+'-'+self.settings['optimizer']+'-dW='+str(self.problem.dimension)
 			if self.settings['optimizer'] in ['lrsfn','incg','gd']:
-				if self.settings['fixed_step']:
+				if self.settings['globalization'] is None:
 					logger_outname += '-alpha='+str(self.settings['alpha'])
-				if self.settings['optimizer'] == 'lrsfn':
+				elif self.settings['globalization'] == 'spectral_step':
+					logger_outname += 'spectral_step'
+				if self.settings['optimizer'] == 'lrsfn' and self.settings['range_finding'] is None:
+					logger_outname += '-rank='+str(self.settings['hessian_low_rank'])
+				elif self.settings['optimizer'] == 'lrsfn':
 					logger_outname += '-rank='+str(self.settings['hessian_low_rank'])
 			else:
-				logger_outname += '-alpha='+str(self.settings['alpha'])
+				assert type(self.settings['range_finding']) is str
+				logger_outname += self.settings['range_finding']
 
 			if self.settings['problem_name'] is not None:
 				logger_outname = self.settings['problem_name']+'-'+logger_outname
@@ -510,7 +538,7 @@ class HessianlearnModel(ABC):
 					print(80*'#')
 					print('Encountered nan, exiting'.center(80))
 					print(80*'#')
-					return
+					break
 				################################################################################
 				# Actual optimization takes place here
 				try:
@@ -521,6 +549,7 @@ class HessianlearnModel(ABC):
 				# Recording the spectrum
 				if not self.settings['record_spectrum'] and self.settings['optimizer'] == 'lrsfn':
 					self._logger['train_eigenvalues'][iteration] = self.optimizer.eigenvalues
+					print('lambda_1 = ',self.optimizer.eigenvalues[0],'lambda_r = ',self.optimizer.eigenvalues[-1])
 				elif self.settings['record_spectrum'] and iteration%self.settings['spec_frequency'] ==0:
 					self._record_spectrum(iteration)
 				elif self.settings['record_last_rq_std'] and self.settings['optimizer'] == 'lrsfn':

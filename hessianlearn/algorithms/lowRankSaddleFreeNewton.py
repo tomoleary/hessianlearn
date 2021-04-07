@@ -43,9 +43,9 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 	# Hessian approximation parameters
 	parameters['range_finding']					= [None,"Range finding, if None then r = hessian_low_rank\
 															Choose from None, 'arf', 'naarf', 'vn'"]
-	parameters['range_rel_error_tolerance']     = [1000, "Error tolerance for error estimator in adaptive range finding"]
+	parameters['range_rel_error_tolerance']     = [0.1, "Error tolerance for error estimator in adaptive range finding"]
 	parameters['range_abs_error_tolerance']     = [100, "Error tolerance for error estimator in adaptive range finding"]
-	parameters['range_block_size']        		= [5, "Block size used in range finder"]
+	parameters['range_block_size']        		= [20, "Block size used in range finder"]
 	parameters['rq_samples_for_naarf']        	= [100, "Number of partitions for RQ variance evaluation"]
 	parameters['hessian_low_rank']        		= [20, "Fixed rank for randomized eigenvalue decomposition"]
 	# Variance Nystrom Parameters
@@ -55,8 +55,9 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 	
 
 	# Globaliziation parameters
-	parameters['globalization']					= [None, 'Choose from trust_region, line_search or none']
+	parameters['globalization']					= [None, 'Choose from trust_region, line_search, spectral_step or none']
 	parameters['max_backtracking_iter']			= [5, 'Max backtracking iterations for armijo line search']
+	parameters['spectral_step_alpha']			= [1e-2, 'Used in min condition for spectral step']
 
 	parameters['verbose']                       = [False, "Printing"]
 	parameters['record_last_rq_std']			= [False, "Record the last eigenvector RQ variance"]
@@ -135,10 +136,12 @@ class LowRankSaddleFreeNewton(Optimizer):
 		if self.parameters['range_finding'] == 'arf':
 			H = lambda x: self.H(x,hessian_feed_dict,verbose = self.parameters['verbose'])
 			n = self.problem.dimension
-			norm_g = np.linalg.norm(gradient)
-			tolerance = self.parameters['range_rel_error_tolerance']*norm_g
+			# norm_g = np.linalg.norm(gradient)
+			# tolerance = self.parameters['range_rel_error_tolerance']*norm_g
+			tolerance = self.parameters['range_rel_error_tolerance']
 			Q = block_range_finder(H,n,tolerance,self.parameters['range_block_size'])
 			self._rank = Q.shape[1]
+			print('Shape Q = ',Q.shape)
 			Lmbda,U = eigensolver_from_range(H,Q)
 
 		elif self.parameters['range_finding'] == 'naarf':
@@ -238,6 +241,11 @@ class LowRankSaddleFreeNewton(Optimizer):
 			update = self.alpha*self.p
 			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 
+		elif self.parameters['globalization'] is 'spectral_step':
+			self.alpha = min(self.parameters['spectral_step_alpha'],0.1/Lmbda_abs[0])
+			self._sweeps += [1,2*self._rank]
+			update = self.alpha*self.p
+			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 
 		elif self.parameters['globalization'] == 'line_search':
 			w_dir_inner_g = np.inner(self.p,gradient)

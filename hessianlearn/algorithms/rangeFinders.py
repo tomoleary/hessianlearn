@@ -45,6 +45,7 @@ def block_range_finder(A_op,n,epsilon,block_size,verbose = False,seed = 0):
 
     my_state = np.random.RandomState(seed=seed)
     w = my_state.randn(n,1)
+    w /= np.linalg.norm(w)
     Action = A_op(w)
     big_Q = None
     converged = False
