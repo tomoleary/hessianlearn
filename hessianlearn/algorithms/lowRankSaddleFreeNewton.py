@@ -141,7 +141,6 @@ class LowRankSaddleFreeNewton(Optimizer):
 			tolerance = self.parameters['range_rel_error_tolerance']
 			Q = block_range_finder(H,n,tolerance,self.parameters['range_block_size'])
 			self._rank = Q.shape[1]
-			print('Shape Q = ',Q.shape)
 			Lmbda,U = eigensolver_from_range(H,Q)
 
 		elif self.parameters['range_finding'] == 'naarf':

@@ -245,7 +245,6 @@ class Problem(ABC):
 
 	def _initialize_hessian_blocking(self,block_size):
 		# Hessian matrix product action
-		print('Initializing Hessian, and block size = ',block_size)
 		self._hessian_block_size = block_size
 		self._dW = tf.placeholder(self.dtype,shape = (self.dimension,block_size))
 		_gTdW = tf.tensordot(self._gradient,self._dW,axes = [[0],[0]])

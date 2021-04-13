@@ -36,6 +36,8 @@ def block_range_finder(A_op,n,epsilon,block_size,verbose = False,seed = 0):
           Hermitian matrix operator whose eigenvalues need to be estimated
           y = Aop(dw) is the action of A in the direction dw 
     n   : size of matrix A
+    epsilon : relative reduction in error
+
             
     Returns:
     --------
@@ -45,8 +47,8 @@ def block_range_finder(A_op,n,epsilon,block_size,verbose = False,seed = 0):
 
     my_state = np.random.RandomState(seed=seed)
     w = my_state.randn(n,1)
-    w /= np.linalg.norm(w)
     Action = A_op(w)
+    initial_error = np.linalg.norm(Action)
     big_Q = None
     converged = False
     iteration = 0
@@ -67,7 +69,7 @@ def block_range_finder(A_op,n,epsilon,block_size,verbose = False,seed = 0):
         # Error estimation
         Approximate_Error = Action - big_Q@(big_Q.T@Action)
         error = np.linalg.norm(Approximate_Error)
-        converged = error < epsilon
+        converged = error < epsilon*initial_error
         iteration+=1 
         if verbose:
             print('At iteration', iteration, ' error is ',error,' converged = ',converged)
