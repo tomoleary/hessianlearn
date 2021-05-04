@@ -356,7 +356,7 @@ class HessianlearnModel(ABC):
 				if type(self.settings['range_finding']) is str:
 					logger_outname += self.settings['range_finding']
 					if self.settings['range_finding'] == 'arf':
-						logger_outname += self.settings['range_rel_error_tolerance']
+						logger_outname += str(self.settings['range_rel_error_tolerance'])
 				elif hasattr(self.optimizer,'rank'):
 					logger_outname += '-rank='+str(self.settings['hessian_low_rank'])
 
