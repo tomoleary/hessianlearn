@@ -217,9 +217,13 @@ class LowRankSaddleFreeNewton(Optimizer):
 			gamma_damping = self.parameters['default_damping']
 			# Using this condition instead of fixed gamma allows one to take larger step sizes
 			# but does not appear to improve accuracy
-			# gamma_damping = max(0.9*Lmbda_abs[-1],self.parameters['default_damping'])
+			gamma_damping = max(0.5*np.abs(Lmbda[-1]),self.parameters['default_damping'])
 		else:
 			gamma_damping = self.regularization.parameters['gamma']
+		# print('Lmbda[0] = ',Lmbda[0])
+		# print('Lmbda[-1] = ',Lmbda[-1])
+		# print('gamma_damping = ',gamma_damping)
+
 		Lmbda_abs = np.abs(Lmbda)
 		Lmbda_diags = diags(Lmbda_abs)
 		# Build terms for Woodbury inversion
@@ -241,6 +245,7 @@ class LowRankSaddleFreeNewton(Optimizer):
 			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 
 		elif self.parameters['globalization'] is 'spectral_step':
+			# self.alpha = min(self.parameters['spectral_step_alpha'],0.1/Lmbda_abs[0])
 			self.alpha = min(self.parameters['spectral_step_alpha'],0.1/Lmbda_abs[0])
 			self._sweeps += [1,2*self._rank]
 			update = self.alpha*self.p

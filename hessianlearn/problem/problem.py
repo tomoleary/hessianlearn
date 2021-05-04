@@ -670,9 +670,10 @@ class AutoencoderProblem(Problem):
 			# self._loss = tf.reduce_mean(tf.pow(self.x-self.y_prediction,2)) 
 
 			self._loss = tf.reduce_mean(tf.keras.losses.MSE(self.x,self.y_prediction))
-			self._rel_error = tf.sqrt(tf.reduce_mean(tf.pow(self.x-self.y_prediction,2))\
-							/tf.reduce_mean(tf.pow(self.x,2)))
-			self._accuracy = 1. - self.rel_error
+			squared_difference = tf.square(self.x - self.y_prediction)
+			normalized_squared_difference = tf.reduce_mean(squared_difference,axis=-1)\
+                                    /tf.reduce_mean(tf.square(self.x),axis =-1)
+			self._accuracy = 1. - tf.sqrt(tf.reduce_mean(normalized_squared_difference))
 
 	def _partition_dictionaries(self,data_dictionary,n_partitions):
 		"""
