@@ -357,7 +357,7 @@ class HessianlearnModel(ABC):
 					logger_outname += self.settings['range_finding']
 					if self.settings['range_finding'] == 'arf':
 						logger_outname += str(self.settings['range_rel_error_tolerance'])
-				elif hasattr(self.optimizer,'rank'):
+				else:
 					logger_outname += '-rank='+str(self.settings['hessian_low_rank'])
 
 			if self.settings['problem_name'] is not None:
