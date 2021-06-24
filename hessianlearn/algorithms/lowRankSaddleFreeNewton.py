@@ -217,7 +217,7 @@ class LowRankSaddleFreeNewton(Optimizer):
 			gamma_damping = self.parameters['default_damping']
 			# Using this condition instead of fixed gamma allows one to take larger step sizes
 			# but does not appear to improve accuracy
-			gamma_damping = max(0.5*np.abs(Lmbda[-1]),self.parameters['default_damping'])
+			gamma_damping = max(0.9*np.abs(Lmbda[-1]),self.parameters['default_damping'])
 		else:
 			gamma_damping = self.regularization.parameters['gamma']
 		# print('Lmbda[0] = ',Lmbda[0])
