@@ -22,7 +22,7 @@ import pickle
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 os.environ["KMP_WARNINGS"] = "FALSE" 
-# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import pickle
 import tensorflow as tf
 import time, datetime
@@ -61,6 +61,7 @@ parser.add_argument("-keras_opt", dest='keras_opt',required=False, default = 'ad
 parser.add_argument('-keras_alpha',dest = 'keras_alpha',required= False,default = 1e-3,help='keras learning rate',type = float)
 parser.add_argument('-max_sweeps',dest = 'max_sweeps',required= False,default = 2,help='max sweeps',type = float)
 
+parser.add_argument("-loss_type", dest='loss_type',required=False, default = 'mixed', help="loss type either cross_entrop or mixed",type=str)
 parser.add_argument('-seed',dest = 'seed',required= False,default = 0,help='seed',type = int)
 
 
@@ -139,9 +140,19 @@ elif args.keras_opt == 'sgd':
 else: 
     raise
 
+if args.loss_type == 'mixed':
+    def mixed(y_true, y_pred):
+        squared_difference = tf.square(y_true - y_pred)
+        return tf.reduce_mean(squared_difference, axis=-1) +tf.keras.losses.CategoricalCrossentropy(from_logits = True)(y_true, y_pred)
+    loss = mixed
+else:
+    loss = tf.keras.losses.CategoricalCrossentropy(from_logits = True)
+
+
 classifier.compile(optimizer=optimizer,
-                  loss=tf.keras.losses.CategoricalCrossentropy(from_logits = True),
+                  loss=loss,
                   metrics=['accuracy'])
+
 
 loss_train_0, acc_train_0 = classifier.evaluate(x_train,y_train,verbose=2)
 print('acc_train = ',acc_train_0)
@@ -197,7 +208,7 @@ with open(keras_aux_logger_name,'wb+') as f:
 # Instantiate the data, problem, regularization.
 
 t0_problem_construction = time.time()
-problem = ClassificationProblem(classifier,loss_type='mixed',dtype=tf.float32)
+problem = ClassificationProblem(classifier,loss_type=args.loss_type,dtype=tf.float32)
 print('Finished constructing the problem, and it took ',time.time() - t0_problem_construction , 's')
 
 
