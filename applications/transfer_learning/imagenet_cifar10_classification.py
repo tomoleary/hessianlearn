@@ -175,7 +175,7 @@ keras_directory = 'keras_logging_cifar10/'
 # CSV logging
 if not os.path.exists(keras_directory):
     os.makedirs(keras_directory)
-keras_logger_name = keras_directory+str(datetime.date.today())+args.keras_opt+str(args.keras_alpha)+'_'+str(args.keras_epochs)+'.csv'
+keras_logger_name = keras_directory+str(datetime.date.today())+args.keras_opt+str(args.keras_alpha)+'_'+str(args.keras_epochs)+'_seed'str(args.seed)+'.csv'
 callbacks.append(tf.keras.callbacks.CSVLogger(keras_logger_name, append=True, separator=';'))
 
 classifier.fit(x_train[:], y_train[:], epochs=args.keras_epochs,batch_size = 32,\
