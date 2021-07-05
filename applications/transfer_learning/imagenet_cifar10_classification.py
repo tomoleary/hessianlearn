@@ -22,12 +22,14 @@ import pickle
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 os.environ["KMP_WARNINGS"] = "FALSE" 
-# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+import pickle
 import tensorflow as tf
 import time, datetime
 # if int(tf.__version__[0]) > 1:
-# 	import tensorflow.compat.v1 as tf
-# 	tf.disable_v2_behavior()
+#   import tensorflow.compat.v1 as tf
+#   tf.disable_v2_behavior()
+
 
 # Memory issue with GPUs
 gpu_devices = tf.config.experimental.list_physical_devices('GPU')
@@ -38,21 +40,19 @@ import sys
 sys.path.append( os.environ.get('HESSIANLEARN_PATH', "../../"))
 from hessianlearn import *
 
-
 # Parse run specifications
 from argparse import ArgumentParser
 
 parser = ArgumentParser(add_help=True)
 parser.add_argument("-optimizer", dest='optimizer',required=False, default = 'lrsfn', help="optimizer type",type=str)
-parser.add_argument('-globalization',dest = 'globalization',\
-					required= False,default = 'None',help='str for globalization',type = str)
+parser.add_argument('-fixed_step',dest = 'fixed_step',\
+					required= False,default = 1,help='boolean for fixed step vs globalization',type = int)
 parser.add_argument('-alpha',dest = 'alpha',required = False,default = 1e-5,help= 'learning rate alpha',type=float)
 parser.add_argument('-hessian_low_rank',dest = 'hessian_low_rank',required= False,default = 40,help='low rank for sfn',type = int)
 parser.add_argument('-record_spectrum',dest = 'record_spectrum',\
 					required= False,default = 0,help='boolean for recording spectrum',type = int)
-parser.add_argument('-range_finding',dest = 'range_finding',required= False,default = 'arf',help='range finding',type = str)
-parser.add_argument('-range_finding_tolerance',dest = 'range_finding_tolerance',required= False,default = 0.9,help='range finding tolerance',type = float)
 
+parser.add_argument("-resnet_weights", dest='resnet_weights',required=False, default = 'imagenet', help="initialization for network weights",type=str)
 
 parser.add_argument('-batch_size',dest = 'batch_size',required= False,default = 32,help='batch size',type = int)
 parser.add_argument('-hess_batch_size',dest = 'hess_batch_size',required= False,default = 8,help='hess batch size',type = int)
@@ -61,7 +61,9 @@ parser.add_argument("-keras_opt", dest='keras_opt',required=False, default = 'ad
 parser.add_argument('-keras_alpha',dest = 'keras_alpha',required= False,default = 1e-3,help='keras learning rate',type = float)
 parser.add_argument('-max_sweeps',dest = 'max_sweeps',required= False,default = 2,help='max sweeps',type = float)
 
+parser.add_argument("-loss_type", dest='loss_type',required=False, default = 'mixed', help="loss type either cross_entrop or mixed",type=str)
 parser.add_argument('-seed',dest = 'seed',required= False,default = 0,help='seed',type = int)
+
 
 args = parser.parse_args()
 
@@ -111,18 +113,13 @@ y_test = y_test_full[2000:]
 resnet_input_shape = (200,200,3)
 input_tensor = tf.keras.Input(shape = resnet_input_shape)
 
-pretrained_resnet50 = tf.keras.applications.resnet50.ResNet50(weights = 'imagenet',include_top=False,input_tensor=input_tensor)
-
-# print(80*'#')
-# print('RESNET50 base summary'.center(80))
-# print(pretrained_resnet50.summary())
-
-# print(80*'#')
+if args.resnet_weights == 'None':
+    pretrained_resnet50 = tf.keras.applications.resnet50.ResNet50(weights = None,include_top=False,input_tensor=input_tensor)
+else:
+    pretrained_resnet50 = tf.keras.applications.resnet50.ResNet50(weights = 'imagenet',include_top=False,input_tensor=input_tensor)
 
 for layer in pretrained_resnet50.layers[:143]:
     layer.trainable = False
-
-
 
 classifier = tf.keras.models.Sequential()
 classifier.add(tf.keras.layers.Input(shape=(32,32,3)))
@@ -130,10 +127,11 @@ classifier.add(tf.keras.layers.Lambda(lambda image: tf.image.resize(image, resne
 classifier.add(pretrained_resnet50)
 classifier.add(tf.keras.layers.Flatten())
 classifier.add(tf.keras.layers.BatchNormalization())
-classifier.add(tf.keras.layers.Dense(64, activation='relu'))
+classifier.add(tf.keras.layers.Dense(128, activation='relu'))
 classifier.add(tf.keras.layers.Dropout(0.5))
 classifier.add(tf.keras.layers.BatchNormalization())
-classifier.add(tf.keras.layers.Dense(10, activation='softmax'))
+classifier.add(tf.keras.layers.Dense(100, activation='softmax'))
+
 
 if args.keras_opt == 'adam':
     optimizer = tf.keras.optimizers.Adam(learning_rate = args.keras_alpha,epsilon = 1e-8)
@@ -142,16 +140,29 @@ elif args.keras_opt == 'sgd':
 else: 
     raise
 
+if args.loss_type == 'mixed':
+    def mixed(y_true, y_pred):
+        squared_difference = tf.square(y_true - y_pred)
+        return tf.reduce_mean(squared_difference, axis=-1) +tf.keras.losses.CategoricalCrossentropy(from_logits = True)(y_true, y_pred)
+    loss = mixed
+else:
+    loss = tf.keras.losses.CategoricalCrossentropy(from_logits = True)
+
+
 classifier.compile(optimizer=optimizer,
-                  loss=tf.keras.losses.CategoricalCrossentropy(from_logits = True),
+                  loss=loss,
                   metrics=['accuracy'])
 
+
+loss_train_0, acc_train_0 = classifier.evaluate(x_train,y_train,verbose=2)
+print('acc_train = ',acc_train_0)
 loss_test_0, acc_test_0 = classifier.evaluate(x_test,y_test,verbose=2)
 print('acc_test = ',acc_test_0)
 loss_val_0, acc_val_0 = classifier.evaluate(x_val,y_val,verbose=2)
 print('acc_val = ',acc_val_0)
 
-aux_keras_data = {'loss_test_0':loss_test_0,'acc_test_0':acc_test_0,\
+aux_keras_data = {'loss_train_0':loss_train_0,'acc_traun_0':acc_train_0,\
+                    'loss_test_0':loss_test_0,'acc_test_0':acc_test_0,\
                     'loss_val_0':loss_val_0, 'acc_val_0':acc_val_0}
 
 no_callback = True
@@ -197,13 +208,13 @@ with open(keras_aux_logger_name,'wb+') as f:
 # Instantiate the data, problem, regularization.
 
 t0_problem_construction = time.time()
-problem = ClassificationProblem(classifier,loss_type='mixed',dtype=tf.float32)
+problem = ClassificationProblem(classifier,loss_type=args.loss_type,dtype=tf.float32)
 print('Finished constructing the problem, and it took ',time.time() - t0_problem_construction , 's')
 
 
 # Instante the data object
 data = Data({problem.x:x_train,problem.y_true:y_train},settings['batch_size'],\
-  validation_data = {problem.x:x_val,problem.y_true:y_val},hessian_batch_size = settings['hess_batch_size'],seed = args.seed)
+  validation_data = {problem.x:x_val,problem.y_true:y_val},hessian_batch_size = settings['hess_batch_size'],seed=args.seed)
 
 settings['tikhonov_gamma'] = 0.0
 
@@ -216,28 +227,21 @@ HLModelSettings = HessianlearnModelSettings()
 
 HLModelSettings['optimizer'] = args.optimizer
 HLModelSettings['alpha'] = args.alpha
-if args.globalization == 'None':
-    HLModelSettings['globalization'] = None
-else:
-    HLModelSettings['globalization'] = args.globalization
+HLModelSettings['globalization'] = None
 HLModelSettings['hessian_low_rank'] = args.hessian_low_rank
-if args.range_finding == 'None':
-    HLModelSettings['range_finding'] = None
-else:
-    HLModelSettings['range_finding'] = args.range_finding
-HLModelSettings['range_rel_error_tolerance'] = args.range_finding_tolerance
 HLModelSettings['max_backtrack'] = 20
 HLModelSettings['max_sweeps'] = args.max_sweeps
 HLModelSettings['layer_weights'] = set_weights
 
 HLModelSettings['problem_name'] = 'cifar10_resnet_classification_seed'+str(args.seed)
-
+if args.resnet_weights == 'None':
+    HLModelSettings['problem_name'] += '_random_guess'
 HLModelSettings['record_spectrum'] = bool(args.record_spectrum)
 HLModelSettings['rq_data_size'] = 100
 HLModelSettings['printing_sweep_frequency'] = None
 HLModelSettings['printing_items']               = {'time':'time','sweeps':'sweeps','Loss':'train_loss','acc train':'train_acc',\
                                                       '||g||':'||g||','Loss val':'val_loss','acc val':'val_acc',\
-                                                      'maxacc val':'max_val_acc','alpha':'alpha','rank':'hessian_low_rank'}
+                                                      'maxacc val':'max_val_acc','alpha':'alpha'}
 
 
 HLModel = HessianlearnModel(problem,regularization,data,settings = HLModelSettings)
@@ -247,7 +251,7 @@ if args.max_sweeps > 0:
 
 
 loss_test_final, acc_test_final = classifier.evaluate(x_test,y_test,verbose=2)
-loss_val_final, acc_val_final = classifier.evaluate(x_test,y_test,verbose=2)
+loss_val_final, acc_val_final = classifier.evaluate(x_val,y_val,verbose=2)
 
 hl_aux_data = {'loss_test_0':loss_test_0,'acc_test_0':acc_test_0,\
                 'loss_val_0':loss_val_0,'acc_val_0':acc_val_0,\
@@ -275,4 +279,5 @@ loss_test_total, acc_test_total = classifier.evaluate(x_test,y_test,verbose=2)
 print(80*'#')
 print('After hessianlearn training'.center(80))
 print('acc_test_total = ',acc_test_total)
+
 
