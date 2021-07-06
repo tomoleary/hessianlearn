@@ -127,10 +127,10 @@ classifier.add(tf.keras.layers.Lambda(lambda image: tf.image.resize(image, resne
 classifier.add(pretrained_resnet50)
 classifier.add(tf.keras.layers.Flatten())
 classifier.add(tf.keras.layers.BatchNormalization())
-classifier.add(tf.keras.layers.Dense(128, activation='relu'))
+classifier.add(tf.keras.layers.Dense(64, activation='relu'))
 classifier.add(tf.keras.layers.Dropout(0.5))
 classifier.add(tf.keras.layers.BatchNormalization())
-classifier.add(tf.keras.layers.Dense(100, activation='softmax'))
+classifier.add(tf.keras.layers.Dense(10, activation='softmax'))
 
 
 if args.keras_opt == 'adam':
