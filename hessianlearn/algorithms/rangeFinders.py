@@ -72,7 +72,7 @@ def block_range_finder(A_op,n,epsilon,block_size,verbose = False,seed = 0):
         converged = error < epsilon*initial_error
         iteration+=1 
         if verbose:
-            print('At iteration', iteration, ' error is ',error,' converged = ',converged)
+            print('At iteration', iteration, ' error/initial_error is ',error/initial_error,' tolerance is ',epsilon,' converged = ',converged)
         if iteration > n//block_size:
             break
     # I believe that the extra action of A_op in forming B for the QB factorization 
