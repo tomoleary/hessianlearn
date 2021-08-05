@@ -114,7 +114,6 @@ input_tensor = tf.keras.Input(shape = resnet_input_shape)
 
 pretrained_resnet50 = tf.keras.applications.resnet50.ResNet50(weights = 'imagenet',include_top=False,input_tensor=input_tensor)
 
-
 for layer in pretrained_resnet50.layers[:143]:
     layer.trainable = False
 
