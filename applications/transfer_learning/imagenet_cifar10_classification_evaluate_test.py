@@ -112,13 +112,13 @@ y_test = y_test_full[2000:]
 resnet_input_shape = (200,200,3)
 input_tensor = tf.keras.Input(shape = resnet_input_shape)
 
-pretrained_resnet50 = tf.keras.applications.resnet50.ResNet50(weights = 'imagenet',include_top=False,input_tensor=input_tensor)
-
+if args.resnet_weights == 'None':
+    pretrained_resnet50 = tf.keras.applications.resnet50.ResNet50(weights = None,include_top=False,input_tensor=input_tensor)
+else:
+    pretrained_resnet50 = tf.keras.applications.resnet50.ResNet50(weights = 'imagenet',include_top=False,input_tensor=input_tensor)
 
 for layer in pretrained_resnet50.layers[:143]:
     layer.trainable = False
-
-
 
 classifier = tf.keras.models.Sequential()
 classifier.add(tf.keras.layers.Input(shape=(32,32,3)))
@@ -126,7 +126,7 @@ classifier.add(tf.keras.layers.Lambda(lambda image: tf.image.resize(image, resne
 classifier.add(pretrained_resnet50)
 classifier.add(tf.keras.layers.Flatten())
 classifier.add(tf.keras.layers.BatchNormalization())
-classifier.add(tf.keras.layers.Dense(128, activation='relu'))
+classifier.add(tf.keras.layers.Dense(64, activation='relu'))
 classifier.add(tf.keras.layers.Dropout(0.5))
 classifier.add(tf.keras.layers.BatchNormalization())
 classifier.add(tf.keras.layers.Dense(10, activation='softmax'))
