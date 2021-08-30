@@ -22,7 +22,7 @@ import pickle
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 os.environ["KMP_WARNINGS"] = "FALSE" 
-# os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import pickle
 import tensorflow as tf
 import time, datetime
