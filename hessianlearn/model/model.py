@@ -449,6 +449,10 @@ class HessianlearnModel(ABC):
 				# Much more efficient to have the actual optimizer / minimize() function
 				# return this information since it has to query the graph
 				# This is a place to cut down on computational graph queries
+				try:
+					self.problem.NN.reset_metrics()
+				except:
+					pass
 				if hasattr(self.problem,'accuracy'):
 					if self.problem.has_derivative_loss:
 						norm_g, train_loss, train_acc, train_h1_acc = sess.run([self.problem.norm_g,self.problem.loss,\
@@ -478,7 +482,10 @@ class HessianlearnModel(ABC):
 					validate_this_iteration = True
 				else:
 					validate_this_iteration = self._check_sweep_remainder_condition(iteration,self.settings['validate_frequency'])
-
+				try:
+					self.problem.NN.reset_metrics()
+				except:
+					pass
 				if hasattr(self.problem,'accuracy'):
 					if validate_this_iteration:
 						validation_start = time.time()
