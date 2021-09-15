@@ -59,7 +59,7 @@ class Problem(ABC):
 	It takes a neural network model and defines loss function and derivatives
 	Also defines update operations.
 	"""
-	def __init__(self,NeuralNetwork,hessian_block_size = None,dtype = tf.float32):
+	def __init__(self,NeuralNetwork,hessian_block_size = None,dtype = None):
 		"""
 		The Problem parent class constructor takes a neural network model (typically from tf.keras.Model)
 		Children class implement different loss functions which are implemented by the method _initialize_loss
@@ -74,7 +74,10 @@ class Problem(ABC):
 		# Hessian block size
 		self._hessian_block_size = hessian_block_size
 		# Data type
-		self._dtype = dtype
+		if dtype is None:
+			self._dtype = NeuralNetwork.inputs[0].dtype
+		else:
+			self._dtype = dtype
 
 		# Initialize the neural network(s)
 		self._initialize_network(NeuralNetwork)
