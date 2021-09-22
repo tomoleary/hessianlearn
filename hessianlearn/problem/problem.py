@@ -59,7 +59,7 @@ class Problem(ABC):
 	It takes a neural network model and defines loss function and derivatives
 	Also defines update operations.
 	"""
-	def __init__(self,NeuralNetwork,hessian_block_size = None,dtype = tf.float32):
+	def __init__(self,NeuralNetwork,hessian_block_size = None,dtype = None):
 		"""
 		The Problem parent class constructor takes a neural network model (typically from tf.keras.Model)
 		Children class implement different loss functions which are implemented by the method _initialize_loss
@@ -74,7 +74,10 @@ class Problem(ABC):
 		# Hessian block size
 		self._hessian_block_size = hessian_block_size
 		# Data type
-		self._dtype = dtype
+		if dtype is None:
+			self._dtype = NeuralNetwork.inputs[0].dtype
+		else:
+			self._dtype = dtype
 
 		# Initialize the neural network(s)
 		self._initialize_network(NeuralNetwork)
@@ -438,7 +441,40 @@ class ClassificationProblem(Problem):
 			dictionary_partitions.append({self.x:my_chunk_x, self.y_true: my_chunk_y})
 		return dictionary_partitions
 
+class KerasModelProblem(Problem):
+	"""
+	This class implements an hessianlearn Problem that inherits losses and metrics from tf.keras.. 
 
+	"""
+	def __init__(self,NeuralNetwork,hessian_block_size = None,dtype = tf.float32):
+		"""
+		The constructor for this class takes:
+			-NeuralNetwork: the neural network represented as a tf.keras Model
+
+		"""
+		super(KerasModelProblem,self).__init__(NeuralNetwork,hessian_block_size = hessian_block_size,dtype = dtype)
+	
+	def _initialize_loss(self):
+		"""
+		This method defines the least squares loss function as well as relative error and accuracy
+		"""
+		with tf.name_scope('loss'):
+			self._loss = self._NN.loss_functions[0](self.y_true,self.y_prediction)
+			# In the case that they are weighted based on different outputs, the different 
+			# outputs will likely need to be indexed accordingly to the correct output
+			# For now we can only handle single output losses
+			# self._loss = self.NN._loss_weights_list[0]*self.NN.loss_functions[0]
+			# for weight,loss in zip(self.NN._loss_weights_list,self.NN.loss)[1:]:
+			# 	self._loss += weight*loss
+		with tf.name_scope('accuracy'):
+			print('Warning: assuming metric[0] is an accuracy metric, this needs to be fixed')
+			# And I will fix it when I write a new HessianlearnModelFromKeras class
+			m_0 = self.NN.metrics[0]
+			print('metric 0  name = ',m_0.name)
+			self._accuracy = self.NN.metrics[0](self.y_true,self.y_prediction)
+			# Note that the zeroth metric name may always be loss, but not the same for metrics
+			# So metrics and metrics_names may be off by one index
+			print('Note the name of the metric being used for accuracy is: ',self.NN.metrics_names[1])
 
 class RegressionProblem(Problem):
 	"""
