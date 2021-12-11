@@ -432,17 +432,12 @@ class KerasModelProblem(Problem):
 		This method defines the least squares loss function as well as relative error and accuracy
 		"""
 		with tf.name_scope('loss'):
-			print(80*'#')
-			print('Number of loss functions = ',len(self._NN.loss_functions))
-			print('Number of loss function weights = ',len(self._NN._loss_weights_list))
-			print(80*'#')
-			self._loss = self._NN.loss_functions[0](self.y_true,self.y_prediction)
-			# In the case that they are weighted based on different outputs, the different 
-			# outputs will likely need to be indexed accordingly to the correct output
-			# For now we can only handle single output losses
-			# self._loss = self.NN._loss_weights_list[0]*self.NN.loss_functions[0]
-			# for weight,loss in zip(self.NN._loss_weights_list,self.NN.loss)[1:]:
-			# 	self._loss += weight*loss
+			if len(self._NN.loss_functions) == 1:
+				self._loss = self._NN.loss_functions[0](self.y_true,self.y_prediction)
+			else:
+				weights_and_losses = zip(self.NN._loss_weights_list,self._NN.loss_functions)
+				self._loss = sum([weight_i*loss_i(self.y_true,self.y_prediction) for weight_i, loss_i in weights_and_losses])
+
 		with tf.name_scope('accuracy'):
 			print('Warning: assuming metric[0] is an accuracy metric, this needs to be fixed')
 			# And I will fix it when I write a new HessianlearnModelFromKeras class

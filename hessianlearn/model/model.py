@@ -135,9 +135,6 @@ class HessianlearnModel(ABC):
 		self._optimizer = None
 
 
-
-
-
 	@property
 	def sess(self):
 		return self._sess
