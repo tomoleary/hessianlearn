@@ -404,7 +404,6 @@ class HessianlearnModel(ABC):
 			val_dict = next(iter(self.data.validation))
 			if self.problem.is_autoencoder:
 				assert not hasattr(self.problem,'y_true')
-				# val_dict = {self.problem.x: val_data[self.problem.x]}
 			elif self.problem.is_gan:
 				random_state_gan = np.random.RandomState(seed = 0)
 				# Should the first dimension here agree with the size of the validation data?
@@ -599,7 +598,6 @@ class HessianlearnModel(ABC):
 		k_rank = self.settings['target_rank']
 		p_oversample = self.settings['oversample']
 		
-		
 		if self.settings['rayleigh_quotients']:
 			print('It is working')
 			my_t0 = time.time()
@@ -608,11 +606,37 @@ class HessianlearnModel(ABC):
 			val_data = self.data.val._data
 
 			if self.problem.is_autoencoder:
-				full_train_dict = {self.problem.x:train_data[self.problem.x]}
-				full_val_dict = {self.problem.x:val_data[self.problem.x]}
+				if not (type(self.problem.x) is list):
+					full_train_dict = {self.problem.x:train_data[self.problem.x]}
+					full_val_dict = {self.problem.x:val_data[self.problem.x]}
+				else:
+					full_train_dict,full_val_dict = {},{}
+					for input_key in self.problem.x:
+						full_train_dict[input_key] = train_data[input_key]
+						full_val_dict[input_key] = val_data[input_key]
 			else:
-				full_train_dict = {self.problem.x:train_data[self.problem.x],self.problem.y_true:train_data[self.problem.y_true]}
-				full_val_dict = {self.problem.x:val_data[self.problem.x],self.problem.y_true:val_data[self.problem.y_true]}
+				if not (type(self.problem.x) is list) and not (type(self.problem.y_true) is list):
+					full_train_dict = {self.problem.x:train_data[self.problem.x],self.problem.y_true:train_data[self.problem.y_true]}
+					full_val_dict = {self.problem.x:val_data[self.problem.x],self.problem.y_true:val_data[self.problem.y_true]}
+				else:
+					full_train_dict, full_val_dict = {}, {}
+					if type(self.problem.x) is list:
+						for input_key in self.problem.x:
+							full_train_dict[input_key] = train_data[input_key]
+							full_val_dict[input_key] = val_data[input_key]
+					else:
+						full_train_dict[self.problem.x] = train_data[self.problem.x]
+						full_val_dict[self.problem.x] = val_data[self.problem.x]
+					if type(self.problem.y_true) is list:
+						for output_key in self.problem.y_true:
+							full_train_dict[output_key] = train_data[output_key]
+							full_val_dict[output_key] = val_data[output_key]
+					else:
+						full_train_dict[self.problem.y_true] = train_data[self.problem.y_true]
+						full_val_dict[self.problem.y_true] = val_data[self.problem.y_true]
+
+
+
 
 			d_full_train, U_full_train = low_rank_hessian(self.optimizer,full_train_dict,k_rank,p_oversample,verbose=True)
 			self._logger['full_train_eigenvalues'][iteration] = d_full_train

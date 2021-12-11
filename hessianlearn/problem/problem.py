@@ -184,6 +184,9 @@ class Problem(ABC):
 		Must set member variable self._output_shape
 		"""
 		self._NN = NeuralNetwork
+		assert len(self.NN.inputs) == 1 and len(self.NN.outputs) == 1,\
+		 'This class only supports single input / output networks. For multi input / output look\
+		  at hessianlearn.problem.KerasModelProblem'
 		self.x = self.NN.inputs[0]
 		
 		self.y_prediction = self.NN(self.x)
@@ -362,22 +365,77 @@ class KerasModelProblem(Problem):
 			-NeuralNetwork: the neural network represented as a tf.keras Model
 
 		"""
-		# self._n_inputs = len(kerasModel.inputs)
-		# for input_i in kerasModel.inputs[1:]:
-		# 	assert input_i.dtype == kerasModel.inputs[0], 'Different datatypes are not yet supported, but this can be done in principle'
-		# self._n_outputs = len(kerasModel.outputs)
-		# for output_i in kerasModel.outputs[1:]:
-		# 	assert output_i.dtype == kerasModel.outputs[0], 'Different datatypes are not yet supported, but this can be done in principle'
-
+		assert NeuralNetwork._is_compiled, 'Must first compile the network before passing it in.'
+		# Assertion about data type conformity:
 		dtype = NeuralNetwork.inputs[0].dtype
+		# This may be a redundant check since the tf.keras.Model.compile method may
+		# enforce type conformity anyways
+		for input_i in NeuralNetwork.inputs[1:]:
+			assert input_i.dtype == dtype
+		for output_i in NeuralNetwork.outputs:
+			assert output_i.dtype == dtype
 
 		super(KerasModelProblem,self).__init__(NeuralNetwork,hessian_block_size = hessian_block_size,dtype = dtype)
+
+	def _initialize_network(self,NeuralNetwork):
+		"""
+		This method defines the neural network model
+			-NeuralNetwork: the neural network as a tf.keras.model.Model
+
+		Must set member variable self._output_shape
+		"""
+		self._NN = NeuralNetwork
+
+		if len(self.NN.inputs) == 1:
+			self.x = self.NN.inputs[0]
+		else:
+			self.x = self.NN.inputs
+		
+		self.y_prediction = self.NN(self.x)
+
+		if len(self.NN.outputs) == 1:
+			# Simply do things the old way
+			# Why does the following not work:
+			# self.y_true = self.NN.outputs[0]
+			# Instead I have to use a placeholder for true output
+			output_shape = self.NN.output_shape
+
+			self.y_true = tf.placeholder(self.dtype, output_shape,name='output_placeholder')
+
+			if len(self.y_prediction.shape) > 2:
+				self._output_dimension =  1.
+				for shape in self.y_prediction.shape[1:]:
+					self._output_dimension *= shape.value
+			else:
+				self._output_dimension = self.y_prediction.shape[-1].value
+		else:
+			# Why does the following not work:
+			# self.y_true = self.NN.outputs[0]
+			# Instead I have to use a placeholder for true output
+
+			self.y_true = []
+			for i,shape in enumerate(self.NN.output_shape):
+				self.y_true.append(tf.placeholder(self.dtype, shape,name='output_placeholder_'+str(i)))
+
+			self._output_dimension = 0
+			for prediction in self.y_prediction:		
+				if len(prediction.shape) > 2:
+					_output_dimension =  1.
+					for shape in prediction.shape[1:]:
+						_output_dimension *= shape.value
+				else:
+					_output_dimension = prediction.shape[-1].value
+				self._output_dimension += _output_dimension
 	
 	def _initialize_loss(self):
 		"""
 		This method defines the least squares loss function as well as relative error and accuracy
 		"""
 		with tf.name_scope('loss'):
+			print(80*'#')
+			print('Number of loss functions = ',len(self._NN.loss_functions))
+			print('Number of loss function weights = ',len(self._NN._loss_weights_list))
+			print(80*'#')
 			self._loss = self._NN.loss_functions[0](self.y_true,self.y_prediction)
 			# In the case that they are weighted based on different outputs, the different 
 			# outputs will likely need to be indexed accordingly to the correct output
