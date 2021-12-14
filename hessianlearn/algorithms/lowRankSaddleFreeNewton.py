@@ -95,6 +95,8 @@ class LowRankSaddleFreeNewton(Optimizer):
 
 		self._rq_std = 0.0
 
+		self.eigenvalues = None
+
 	@property
 	def rank(self):
 		return self._rank

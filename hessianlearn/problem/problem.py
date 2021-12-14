@@ -377,6 +377,11 @@ class KerasModelProblem(Problem):
 
 		super(KerasModelProblem,self).__init__(NeuralNetwork,hessian_block_size = hessian_block_size,dtype = dtype)
 
+	# @property
+	# def metrics_list(self):
+	# 	return self._metrics_list
+	
+
 	def _initialize_network(self,NeuralNetwork):
 		"""
 		This method defines the neural network model
@@ -447,6 +452,9 @@ class KerasModelProblem(Problem):
 			# Note that the zeroth metric name may always be loss, but not the same for metrics
 			# So metrics and metrics_names may be off by one index
 			print('Note the name of the metric being used for accuracy is: ',self.NN.metrics_names[1])
+
+		# with tf.name_scope('metrics'):
+		# 	self._metrics_list = [m(self.y_true,self.y_prediction) for m in self.NN.metrics]
 
 
 class ClassificationProblem(Problem):

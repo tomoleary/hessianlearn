@@ -26,6 +26,7 @@ if int(tf.__version__[0]) > 1:
 	# tf.enable_eager_execution()
 
 from abc import ABC, abstractmethod
+import warnings
 
 import sys, os, pickle, time, datetime
 
@@ -64,6 +65,7 @@ def KerasModelWrapperSettings(settings = {}):
 	settings['printing_sweep_frequency']    = [1, "Print only every this many sweeps"]
 	settings['validate_frequency']			= [1, "Only compute validation quantities every X sweeps"]
 	settings['save_weights']				= [True, "Whether or not to save the best weights"]
+	settings['max_sweeps']					= [10,"Maximum number of times through the data (measured in epoch equivalents"]
 
 
 	settings['verbose']         			= [True, "Boolean for printing"]
@@ -87,50 +89,29 @@ def KerasModelWrapperSettings(settings = {}):
 
 class KerasModelWrapper(ABC):
 	def __init__(self,kerasModel,regularization= None,optimizer = None,\
-		hessian_block_size = None, settings = KerasModelWrapperSettings({})):
+		optimizer_parameters = None,hessian_block_size = None, settings = KerasModelWrapperSettings({})):
+		warnings.warn('Experimental Class! Be Wary')
+		# Check hessian blocking condition here?
+		if optimizer_parameters is not None:
+			if ('hessian_low_rank' in optimizer_parameters.data.keys()) and (hessian_block_size is not None):
+				hessian_block_size = max(optimizer_parameters['hessian_low_rank'],hessian_block_size)
 
-
-		exit()
 
 		self._problem = KerasModelProblem(kerasModel,hessian_block_size = hessian_block_size)
 		if regularization is None:
 			# If regularization is not passed in, default to zero Tikhonov
-			self.regularization = L2Regularization(self._problem, 0.0)
+			self._regularization = L2Regularization(self._problem, 0.0)
 		else:
 			self._regularization = regularization
 
 		self.settings = settings
 
 		if optimizer is not None:
-			# Set optimizer should also initialize Hessian blocking
-
-			# The optimizer can be set without instancing the sess. 
-
-			# Sess should only be created inside of fit
-			self.set_optimizer(optimizer)
-
-		# self._optimizer = None
-
-		# This goes inside of the fit method
-		if self.settings['verbose']:
-			print(80*'#')
-			print(('Size of configuration space:  '+str(self.problem.dimension)).center(80))
-			print(('Size of training data: '+str(self.data.train_data_size)).center(80))
-			print(('Approximate data cardinality needed: '\
-				+str(int(float(self.problem.dimension)/self.problem.output_dimension	))).center(80))
-			print(80*'#')
-
-
-		self._data = data
-
-		self._derivative_data = derivative_data
-
-		# self._sess = None
-
-		# Initialize logging should set logger['alpha'][0] to be the initial alpha in the opt parameters
-
-		# initialize_logging can be called from within set_optimizer
-
+			if optimizer_parameters is None:
+				self.set_optimizer(optimizer,regularization = self.regularization)
+			else:
+				self.set_optimizer(optimizer,regularization = self.regularization,parameters = optimizer_parameters)
+		
 
 
 	@property
@@ -152,14 +133,30 @@ class KerasModelWrapper(ABC):
 	@property
 	def regularization(self):
 		return self._regularization
+
+	@property
+	def set_optimizer(self):
+		return self._set_optimizer
+	
 	
 
 	@property
 	def logger(self):
 		return self._logger
 
-	def _set_optimizer(optimizer):
-		self._optimizer = optimizer(self.problem, self.regularization,sess = None)
+	def _set_optimizer(self,optimizer,parameters = None):
+		if parameters is None:
+			self._optimizer = optimizer(self.problem, regularization = self.regularization,sess = None)
+		else:
+			self._optimizer = optimizer(self.problem, regularization = self.regularization,sess = None,parameters = parameters)
+		# If larger Hessian spectrum is requested, reinitialize blocking for faster Hessian evaluations
+		if 'hessian_low_rank' in self._optimizer.parameters.data.keys():
+			if self.problem._hessian_block_size is None:
+				self.problem._initialize_hessian_blocking(self.optimizer.parameters['hessian_low_rank'])
+			elif self.problem._hessian_block_size < self.optimizer.parameters['hessian_low_rank']:
+				self.problem._initialize_hessian_blocking(self.optimizer.parameters['hessian_low_rank'])
+
+
 
 
 	def _initialize_logging(self):
@@ -185,69 +182,46 @@ class KerasModelWrapper(ABC):
 		logger['val_acc'] = {}
 		logger['train_acc'] = {}
 
-
 		logger['max_val_acc'] = {}
 		logger['alpha'] = {}
+
+		for metric in self.problem.NN.metrics:
+			logger[metric.name] = {}
 
 		if self.settings['record_spectrum']:
 			logger['full_train_eigenvalues'] = {}
 			logger['train_eigenvalues'] = {}
 			logger['val_eigenvalues'] = {}
 
-		elif self.settings['optimizer'] == 'lrsfn':
+		elif 'eigenvalues' in dir(self._optimizer):
 			logger['train_eigenvalues'] = {}
-
-		if hasattr(self.problem,'_variance_reduction'):
-			logger['val_variance_reduction'] = {}
-
-		if self.problem.has_derivative_loss:
-			logger['train_h1_loss'] = {}
-			logger['val_h1_loss'] = {}
-			logger['train_h1_acc'] = {}
-			logger['val_h1_acc'] = {}
-
-		if self.problem.is_vae:
-			logger['train_recon_loss'] = {}
-			logger['train_kl_loss'] = {}
-			logger['test_recon_loss'] = {}
-			logger['test_kl_loss'] = {}
-
 
 
 		self._logger = logger
 
-		if not os.path.isdir(self.settings['problem_name']+'_logging/'):
-			os.makedirs(self.settings['problem_name']+'_logging/')
+		os.makedirs(self.settings['problem_name']+'_logging/',exist_ok = True)
+		os.makedirs(self.settings['problem_name']+'_best_weights/',exist_ok = True)
+		
 
 		# Set outname for logging file
 		if self.settings['logger_outname'] is None:
-			logger_outname = str(datetime.date.today())+'-'+self.settings['optimizer']+'-dW='+str(self.problem.dimension)
-			if self.settings['optimizer'] in ['lrsfn','incg','gd']:
-				if self.settings['globalization'] is None:
-					logger_outname += '-alpha='+str(self.settings['alpha'])
-				elif self.settings['globalization'] == 'spectral_step':
-					logger_outname += 'spectral_step'
-				if self.settings['optimizer'] == 'lrsfn' and self.settings['range_finding'] is None:
-					logger_outname += '-rank='+str(self.settings['hessian_low_rank'])
-				elif self.settings['optimizer'] == 'lrsfn':
-					logger_outname += '-rank='+str(self.settings['hessian_low_rank'])
-			else:
-				if type(self.settings['range_finding']) is str:
-					logger_outname += self.settings['range_finding']
-					if self.settings['range_finding'] == 'arf':
-						logger_outname += str(self.settings['range_rel_error_tolerance'])
-				else:
-					logger_outname += '-rank='+str(self.settings['hessian_low_rank'])
-
-			if self.settings['problem_name'] is not None:
-				logger_outname = self.settings['problem_name']+'-'+logger_outname
+			logger_outname = str(datetime.date.today())+'-dW='+str(self.problem.dimension)
 		else:
 			logger_outname = self.settings['logger_outname']
 		self.logger_outname = logger_outname
 	
 
 
-	def _fit(self,options = None, w_0 = None):
+	def _fit(self,data,options = None, w_0 = None):
+		self.data = data
+		if self.settings['verbose']:
+			print(80*'#')
+			print(('Size of configuration space:  '+str(self.problem.dimension)).center(80))
+			print(('Size of training data: '+str(self.data.train_data_size)).center(80))
+			print(('Approximate data cardinality needed: '\
+				+str(int(float(self.problem.dimension)/self.problem.output_dimension	))).center(80))
+			print(80*'#')
+
 		with tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=self.settings['intra_threads'],\
 											inter_op_parallelism_threads=self.settings['inter_threads'])) as sess:
 			# Re initialize data
@@ -255,7 +229,7 @@ class KerasModelWrapper(ABC):
 			# Initialize logging:
 			self._initialize_logging()
 			# Initialize the optimizer
-			self._initialize_optimizer(sess)
+			self._optimizer.set_sess(sess)
 			# After optimizer is instantiated, we call the global variables initializer
 			sess.run(tf.global_variables_initializer())
 			################################################################################
@@ -312,6 +286,29 @@ class KerasModelWrapper(ABC):
 					train_dict[self.problem.noise] = noise
 					noise_hess = random_state_gan.normal(size = (self.data.hessian_batch_size, self.problem.noise_dimension))
 					hess_dict[self.problem.noise] = noise_hess 
+
+
+				
+
+
+
+
+
+
+
+				metric_names = [metric.name for metric in self.problem.NN.metrics]
+				# metrics_as_tensors = [metric(self.problem.y_true,self.problem.y_prediction) for metric in self.problem.NN.metrics] 
+				# metric_evals = sess.run(metrics_as_tensors,train_dict)
+
+				print('metric_names = ',metric_names)
+				print('train_dict.keys = ',train_dict.keys())
+
+				# metric_evals = sess.run(self.problem.metrics_list,train_dict)
+
+				# for name,evalu in zip(metric_names,metric_evals):
+				# 	print('For metric',name,' we have: ',evalu)
+
+
 				################################################################################
 				# Log time / sweep number
 				# Every element of dictionary is 
@@ -332,12 +329,7 @@ class KerasModelWrapper(ABC):
 				except:
 					pass
 				if hasattr(self.problem,'accuracy'):
-					if self.problem.has_derivative_loss:
-						norm_g, train_loss, train_acc, train_h1_acc = sess.run([self.problem.norm_g,self.problem.loss,\
-										self.problem.accuracy,self.problem.h1_accuracy],train_dict)
-						self._logger['train_h1_acc'][iteration] = train_h1_acc
-					else:
-						norm_g, train_loss, train_acc = sess.run([self.problem.norm_g,self.problem.loss,self.problem.accuracy],train_dict)
+					norm_g, train_loss, train_acc = sess.run([self.problem.norm_g,self.problem.loss,self.problem.accuracy],train_dict)
 					self._logger['train_acc'][iteration] = train_acc
 				else:
 					norm_g, train_loss = sess.run([self.problem.norm_g,self.problem.loss],train_dict)
@@ -400,12 +392,14 @@ class KerasModelWrapper(ABC):
 
 				################################################################################
 				# Save the best weights based on validation accuracy or loss
-				if hasattr(self.problem,'accuracy') and val_acc == max_val_acc and not self.problem._has_derivative_loss:
+				if hasattr(self.problem,'accuracy') and val_acc == max_val_acc:
 					weight_dictionary = {}
 					for layer in self.problem._NN.layers:
 						weight_dictionary[layer.name] = self.problem._NN.get_layer(layer.name).get_weights()
 					self._best_weights = weight_dictionary
 					if self.settings['save_weights']:
+						# Save the weights individually, not in the logger
+
 						self._logger['best_weights'] = weight_dictionary
 				elif val_loss == min_val_loss:
 					weight_dictionary = {}
@@ -442,15 +436,17 @@ class KerasModelWrapper(ABC):
 					self.optimizer.minimize(train_dict)
 				################################################################################
 				# Recording the spectrum
-				if not self.settings['record_spectrum'] and self.settings['optimizer'] == 'lrsfn':
-					self._logger['train_eigenvalues'][iteration] = self.optimizer.eigenvalues
-					# print('lambda_1 = ',self.optimizer.eigenvalues[0],'lambda_r = ',self.optimizer.eigenvalues[-1])
+				if not self.settings['record_spectrum'] and 'eigenvalues' in dir(self._optimizer):
+					try:
+						self._logger['train_eigenvalues'][iteration] = self.optimizer.eigenvalues
+					except:
+						pass
 				elif self.settings['record_spectrum'] and iteration%self.settings['spec_frequency'] ==0:
 					self._record_spectrum(iteration)
-				elif self.settings['record_last_rq_std'] and self.settings['optimizer'] == 'lrsfn':
-					logger['last_rq_std'][iteration] = self.optimizer._rq_std
 				with open(self.settings['problem_name']+'_logging/'+ self.logger_outname +'.pkl', 'wb+') as f:
 					pickle.dump(self.logger, f, pickle.HIGHEST_PROTOCOL)
+				with open(self.settings['problem_name']+'_best_weights/'+ self.logger_outname +'.pkl', 'wb+') as f:
+					pickle.dump(self._best_weights, f, pickle.HIGHEST_PROTOCOL)
 				################################################################################
 				# Check if max_sweeps condition has been met
 				if sweeps > max_sweeps:
@@ -519,22 +515,6 @@ class KerasModelWrapper(ABC):
 
 			d_full_train, U_full_train = low_rank_hessian(self.optimizer,full_train_dict,k_rank,p_oversample,verbose=True)
 			self._logger['full_train_eigenvalues'][iteration] = d_full_train
-			# Initialize array for Rayleigh quotient samples
-			RQ_samples = np.zeros((self.settings['rq_samps'],U_full_train.shape[1]))
-
-			partitioned_dictionaries_train = self.problem._partition_dictionaries(full_train_dict,self.settings['rq_samps'])
-
-			try:
-				from tqdm import tqdm
-				for samp_i,sample_dictionary in enumerate(tqdm(partitioned_dictionaries_train)):
-					RQ_samples[samp_i] = self.optimizer.H.quadratics(U_full_train,sample_dictionary)
-			except:
-				print('Issue with tqdm')
-				for samp_i,sample_dictionary in enumerate(partitioned_dictionaries_train):
-					RQ_samples[samp_i] = self.optimizer.H.quadratics(U_full_train,sample_dictionary)
-
-			RQ_sample_std = np.std(RQ_samples,axis = 0)
-			self._logger['rq_std'][iteration] = RQ_sample_std
 
 		else:
 			d_full,_ = low_rank_hessian(self.optimizer,train_dict,k_rank,p_oversample)

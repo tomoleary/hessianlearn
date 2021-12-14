@@ -16,3 +16,5 @@
 # Contact: tom.olearyroseberry@utexas.edu
 
 from .model import HessianlearnModel, HessianlearnModelSettings
+
+from .kerasModelWrapper import KerasModelWrapper, KerasModelWrapperSettings

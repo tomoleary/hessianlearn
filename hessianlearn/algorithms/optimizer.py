@@ -88,6 +88,18 @@ class Optimizer(ABC):
 	def regularization(self):
 		return self._regularization
 
+	@property
+	def set_sess(self):
+		return self._set_sess
+	
+
+	def _set_sess(self,sess):
+		r"""
+		Sets the tf.Session()
+		"""
+		self._sess = sess
+		if 'H' in dir(self):
+			self.H._sess = sess
 
 	def minimize(self):
 		r"""
