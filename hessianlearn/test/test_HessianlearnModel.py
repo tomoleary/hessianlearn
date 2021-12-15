@@ -60,11 +60,11 @@ class TestHessianlearnModel(unittest.TestCase):
 		])
 		# Instantiate the problem, regularization.
 		problem = ClassificationProblem(classifier,loss_type = 'least_squares',dtype=tf.float32)
-		regularization = L2Regularization(problem,gamma =0.001)
+		regularization = L2Regularization(problem,gamma =0.)
 		# Instante the data object
 		train_dict = {problem.x:x_train, problem.y_true:y_train}
 		validation_dict = {problem.x:x_test, problem.y_true:y_test}
-		data = Data(train_dict,256,validation_data = validation_dict,hessian_batch_size = 32)
+		data = Data(train_dict,32,validation_data = validation_dict,hessian_batch_size = 8)
 		# Instantiate the model object
 		HLModelSettings = HessianlearnModelSettings()
 		HLModelSettings['max_sweeps'] = 1.
