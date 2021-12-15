@@ -18,16 +18,15 @@ from __future__ import absolute_import, division, print_function
 
 import unittest 
 import numpy as np
-import tensorflow as tf
-if int(tf.__version__[0]) > 1:
-	import tensorflow.compat.v1 as tf
-	tf.disable_v2_behavior()
-
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 os.environ["KMP_WARNINGS"] = "FALSE" 
 
+import tensorflow as tf
+if int(tf.__version__[0]) > 1:
+	import tensorflow.compat.v1 as tf
+	tf.disable_v2_behavior()
 
 
 import sys
