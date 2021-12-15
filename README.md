@@ -170,7 +170,7 @@ arXiv:2002.02881.
 
 - \[3\] O'Leary-Roseberry, T., Villa, U., Chen P., Ghattas O.,
 [**Derivative-Informed Projected Neural Networks for High-Dimensional Parametric Maps Governed by PDEs**](https://www.sciencedirect.com/science/article/pii/S0045782521005302).
-Computer Methods in Applied Mechanics and Engineering. Volume 388,1 January 2022, 114199.
+Computer Methods in Applied Mechanics and Engineering. Volume 388, 1 January 2022, 114199.
 ([Download](https://arxiv.org/pdf/2011.15110.pdf))<details><summary>BibTeX</summary><pre>
 @article{OLearyRoseberryVillaChenEtAl2022,
   title={Derivative-informed projected neural networks for high-dimensional parametric maps governed by {PDE}s},
