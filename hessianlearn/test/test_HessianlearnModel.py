@@ -69,8 +69,10 @@ class TestHessianlearnModel(unittest.TestCase):
 		HLModelSettings['max_sweeps'] = 1.
 		HLModel = HessianlearnModel(problem,regularization,data,settings = HLModelSettings)
 
-		for optimizer in ['lrsfn','adam','gd','incg','sgd']:
+		for optimizer in ['lrsfn','adam','gd','sgd','incg']:
 			HLModel.settings['optimizer'] = optimizer
+			if optimizer == 'incg':
+				HLModel.settings['alpha'] = 1e-4
 			HLModel.fit()
 			first_loss = HLModel.logger['train_loss'][0]
 			last_iteration = max(HLModel.logger['train_loss'].keys())
