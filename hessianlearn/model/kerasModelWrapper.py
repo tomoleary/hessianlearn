@@ -185,8 +185,9 @@ class KerasModelWrapper(ABC):
 		logger['max_val_acc'] = {}
 		logger['alpha'] = {}
 
-		for metric_name in self.problem.metric_dict.keys():
-			logger[metric_name] = {}
+		if hasattr(self.problem, 'metric_dict'):
+			for metric_name in self.problem.metric_dict.keys():
+				logger[metric_name] = {}
 
 		if self.settings['record_spectrum']:
 			logger['full_train_eigenvalues'] = {}

@@ -318,6 +318,10 @@ class HessianlearnModel(ABC):
 		if hasattr(self.problem,'_variance_reduction'):
 			logger['val_variance_reduction'] = {}
 
+		if hasattr(self.problem, 'metric_dict'):
+			for metric_name in self.problem.metric_dict.keys():
+				logger[metric_name] = {}
+
 		if self.problem.has_derivative_loss:
 			logger['train_h1_loss'] = {}
 			logger['val_h1_loss'] = {}
