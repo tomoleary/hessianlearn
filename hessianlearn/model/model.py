@@ -485,6 +485,11 @@ class HessianlearnModel(ABC):
 				if hasattr(self.problem,'accuracy'):
 					if validate_this_iteration:
 						validation_start = time.time()
+						if hasattr(self.problem,'metric_dict'):
+							metric_names = list(self.problem.metric_dict.keys())
+							metric_values = sess.run(list(self.problem.metric_dict.values()),train_dict)
+							for metric_name,metric_value in zip(metric_names,metric_values):
+								self.logger[metric_name][iteration] = metric_value
 						if hasattr(self.problem,'_variance_reduction'):
 							if self.problem.has_derivative_loss:
 								val_loss,	val_acc, val_h1_acc, val_var_red =\

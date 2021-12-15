@@ -377,9 +377,9 @@ class KerasModelProblem(Problem):
 
 		super(KerasModelProblem,self).__init__(NeuralNetwork,hessian_block_size = hessian_block_size,dtype = dtype)
 
-	# @property
-	# def metrics_list(self):
-	# 	return self._metrics_list
+	@property
+	def metric_dict(self):
+		return self._metric_dict
 	
 
 	def _initialize_network(self,NeuralNetwork):
@@ -453,8 +453,14 @@ class KerasModelProblem(Problem):
 			# So metrics and metrics_names may be off by one index
 			print('Note the name of the metric being used for accuracy is: ',self.NN.metrics_names[1])
 
-		# with tf.name_scope('metrics'):
-		# 	self._metrics_list = [m(self.y_true,self.y_prediction) for m in self.NN.metrics]
+		with tf.name_scope('metrics'):
+			self._metric_dict = {}
+			for metric in self.NN.metrics:
+				self._metric_dict[metric.name] = metric(self.y_true,self.y_prediction)
+
+			# self._metrics_list = []
+			# for i in range(len(self.NN.metrics)):
+			# 	self._metrics_list.append(self.NN.metrics[i](self.y_true,self.y_prediction))
 
 
 class ClassificationProblem(Problem):

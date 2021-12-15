@@ -185,8 +185,8 @@ class KerasModelWrapper(ABC):
 		logger['max_val_acc'] = {}
 		logger['alpha'] = {}
 
-		for metric in self.problem.NN.metrics:
-			logger[metric.name] = {}
+		for metric_name in self.problem.metric_dict.keys():
+			logger[metric_name] = {}
 
 		if self.settings['record_spectrum']:
 			logger['full_train_eigenvalues'] = {}
@@ -287,27 +287,19 @@ class KerasModelWrapper(ABC):
 					noise_hess = random_state_gan.normal(size = (self.data.hessian_batch_size, self.problem.noise_dimension))
 					hess_dict[self.problem.noise] = noise_hess 
 
+				try:
+					self.problem.NN.reset_metrics()
+				except:
+					pass
 
-				
-
-
-
-
-
-
-
-				metric_names = [metric.name for metric in self.problem.NN.metrics]
-				# metrics_as_tensors = [metric(self.problem.y_true,self.problem.y_prediction) for metric in self.problem.NN.metrics] 
-				# metric_evals = sess.run(metrics_as_tensors,train_dict)
-
-				print('metric_names = ',metric_names)
-				print('train_dict.keys = ',train_dict.keys())
-
+				# metric_names = [metric.name for metric in self.problem.NN.metrics]
 				# metric_evals = sess.run(self.problem.metrics_list,train_dict)
 
 				# for name,evalu in zip(metric_names,metric_evals):
 				# 	print('For metric',name,' we have: ',evalu)
 
+				metric_names = list(self.problem.metric_dict.keys())
+				metric_evals = sess.run(list(self.problem.metric_dict.values()),train_dict)
 
 				################################################################################
 				# Log time / sweep number
@@ -359,6 +351,11 @@ class KerasModelWrapper(ABC):
 				if hasattr(self.problem,'accuracy'):
 					if validate_this_iteration:
 						validation_start = time.time()
+						if hasattr(self.problem,'metric_dict'):
+							metric_names = list(self.problem.metric_dict.keys())
+							metric_values = sess.run(list(self.problem.metric_dict.values()),train_dict)
+							for metric_name,metric_value in zip(metric_names,metric_values):
+								self.logger[metric_name][iteration] = metric_value
 						if hasattr(self.problem,'_variance_reduction'):
 							if self.problem.has_derivative_loss:
 								val_loss,	val_acc, val_h1_acc, val_var_red =\
