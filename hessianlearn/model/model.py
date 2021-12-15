@@ -72,7 +72,7 @@ def HessianlearnModelSettings(settings = {}):
 
 	# Optimizer settings
 	settings['optimizer']                	= ['lrsfn', "String to denote choice of optimizer"]
-	settings['alpha']                		= [5e-2, "Initial steplength, or learning rate"]
+	settings['alpha']                		= [1e-3, "Initial steplength, or learning rate"]
 	settings['hessian_low_rank']			= [20, "Low rank to be used for LRSFN / SFN"]
 	settings['globalization']				= [None, "None means steps of length alpha will be taken at each iteration"]
 	settings['max_backtrack']				= [10, "Maximum number of backtracking iterations for each line search"]

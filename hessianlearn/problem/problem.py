@@ -444,23 +444,18 @@ class KerasModelProblem(Problem):
 				self._loss = sum([weight_i*loss_i(self.y_true,self.y_prediction) for weight_i, loss_i in weights_and_losses])
 
 		with tf.name_scope('accuracy'):
-			print('Warning: assuming metric[0] is an accuracy metric, this needs to be fixed')
-			# And I will fix it when I write a new HessianlearnModelFromKeras class
+			# The current convention is to pull out the first metric to be used
+			# an an 'accuracy' in printing. All metrics will be logged, however,
+			# and the end-user can specify what gets printed at each iteration
+			# by specifying printing items in the settings for the model class
 			m_0 = self.NN.metrics[0]
-			print('metric 0  name = ',m_0.name)
 			self._accuracy = self.NN.metrics[0](self.y_true,self.y_prediction)
-			# Note that the zeroth metric name may always be loss, but not the same for metrics
-			# So metrics and metrics_names may be off by one index
-			print('Note the name of the metric being used for accuracy is: ',self.NN.metrics_names[1])
+
 
 		with tf.name_scope('metrics'):
 			self._metric_dict = {}
 			for metric in self.NN.metrics:
 				self._metric_dict[metric.name] = metric(self.y_true,self.y_prediction)
-
-			# self._metrics_list = []
-			# for i in range(len(self.NN.metrics)):
-			# 	self._metrics_list.append(self.NN.metrics[i](self.y_true,self.y_prediction))
 
 
 class ClassificationProblem(Problem):

@@ -59,7 +59,7 @@ class TestHessianlearnModel(unittest.TestCase):
 		    tf.keras.layers.Dense(10)
 		])
 		# Instantiate the problem, regularization.
-		problem = ClassificationProblem(classifier,loss_type = 'least_squares',dtype=tf.float32)
+		problem = ClassificationProblem(classifier,loss_type = 'cross_entropy',dtype=tf.float32)
 		regularization = L2Regularization(problem,gamma =0.)
 		# Instante the data object
 		train_dict = {problem.x:x_train, problem.y_true:y_train}
