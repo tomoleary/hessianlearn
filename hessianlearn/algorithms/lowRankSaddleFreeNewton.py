@@ -35,7 +35,7 @@ from ..problem import L2Regularization, HessianWrapper
 
 
 def ParametersLowRankSaddleFreeNewton(parameters = {}):
-	parameters['alpha']                         = [1e0, "Initial steplength, or learning rate"]
+	parameters['alpha']                         = [1e-3, "Initial steplength, or learning rate"]
 	parameters['rel_tolerance']                 = [1e-3, "Relative convergence when sqrt(g,g)/sqrt(g_0,g_0) <= rel_tolerance"]
 	parameters['abs_tolerance']                 = [1e-4,"Absolute converge when sqrt(g,g) <= abs_tolerance"]
 	parameters['default_damping']        		= [1e-3, "Levenberg-Marquardt damping when no regularization is used"]
@@ -94,6 +94,8 @@ class LowRankSaddleFreeNewton(Optimizer):
 		self._rank = 0
 
 		self._rq_std = 0.0
+
+		self.eigenvalues = None
 
 	@property
 	def rank(self):

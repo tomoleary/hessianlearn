@@ -118,6 +118,5 @@ class InexactNewtonMINRES(Optimizer):
 
 
 		
-		
 
 		

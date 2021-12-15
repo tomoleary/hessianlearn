@@ -88,7 +88,7 @@ settings['hess_batch_size'] = args.hess_batch_size
 
 ################################################################################
 # Instantiate data
-(x_train, y_train), (_x_test, _y_test) = tf.keras.datasets.cifar100.load_data()
+(x_train, y_train), (_x_test, _y_test) = tf.keras.datasets.cifar10.load_data()
 
 # # Normalize the data
 # x_train = x_train.astype('float32') / 255.
@@ -117,18 +117,16 @@ pretrained_resnet50 = tf.keras.applications.resnet50.ResNet50(weights = 'imagene
 for layer in pretrained_resnet50.layers[:143]:
     layer.trainable = False
 
-
-
 classifier = tf.keras.models.Sequential()
 classifier.add(tf.keras.layers.Input(shape=(32,32,3)))
 classifier.add(tf.keras.layers.Lambda(lambda image: tf.image.resize(image, resnet_input_shape[:2])))
 classifier.add(pretrained_resnet50)
 classifier.add(tf.keras.layers.Flatten())
 classifier.add(tf.keras.layers.BatchNormalization())
-classifier.add(tf.keras.layers.Dense(128, activation='relu'))
+classifier.add(tf.keras.layers.Dense(64, activation='relu'))
 classifier.add(tf.keras.layers.Dropout(0.5))
 classifier.add(tf.keras.layers.BatchNormalization())
-classifier.add(tf.keras.layers.Dense(100, activation='softmax'))
+classifier.add(tf.keras.layers.Dense(10, activation='softmax'))
 
 
 if args.keras_opt == 'adam':
@@ -164,7 +162,7 @@ print('acc_val final = ',acc_val_final)
 
 ################################################################################
 # Evaluate again on all the data.
-(x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar100.load_data()
+(x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
 
 # # Normalize the data
 # x_train = x_train.astype('float32') / 255.

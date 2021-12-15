@@ -137,13 +137,12 @@ class InexactNewtonCG(Optimizer):
 			if not self.trust_region_initialized:
 				self.initialize_trust_region()
 			# Set trust region radius
-			self.cg_solver.set_trust_region_radius(self.trust_region.radius)
-			p,on_boundary = self.cg_solver.solve(-gradient,feed_dict)
-			self._sweeps += [1,2*self.cg_solver.iter]
-			self.p = p
+			self.cg_solver.set_trust_region_radius(self.trust_region.radius)		
 			# Solve for candidate step
 			p, on_boundary  = self.cg_solver.solve(-gradient,hessian_feed_dict)
 			pg = np.dot(p,gradient)
+			self._sweeps += [1,2*self.cg_solver.iter]
+			self.p = p
 			# Calculate predicted reduction
 			feed_dict[self.cg_solver.problem.dw] = p
 			Hp 					= self.sess.run(self.cg_solver.Aop,feed_dict)

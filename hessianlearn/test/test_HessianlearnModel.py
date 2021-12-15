@@ -18,16 +18,15 @@ from __future__ import absolute_import, division, print_function
 
 import unittest 
 import numpy as np
-import tensorflow as tf
-if int(tf.__version__[0]) > 1:
-	import tensorflow.compat.v1 as tf
-	tf.disable_v2_behavior()
-
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 os.environ["KMP_WARNINGS"] = "FALSE" 
 
+import tensorflow as tf
+if int(tf.__version__[0]) > 1:
+	import tensorflow.compat.v1 as tf
+	tf.disable_v2_behavior()
 
 
 import sys
@@ -59,19 +58,21 @@ class TestHessianlearnModel(unittest.TestCase):
 		    tf.keras.layers.Dense(10)
 		])
 		# Instantiate the problem, regularization.
-		problem = ClassificationProblem(classifier,loss_type = 'least_squares',dtype=tf.float32)
-		regularization = L2Regularization(problem,gamma =0.001)
+		problem = ClassificationProblem(classifier,loss_type = 'cross_entropy',dtype=tf.float32)
+		regularization = L2Regularization(problem,gamma =0.)
 		# Instante the data object
 		train_dict = {problem.x:x_train, problem.y_true:y_train}
 		validation_dict = {problem.x:x_test, problem.y_true:y_test}
-		data = Data(train_dict,256,validation_data = validation_dict,hessian_batch_size = 32)
+		data = Data(train_dict,32,validation_data = validation_dict,hessian_batch_size = 8)
 		# Instantiate the model object
 		HLModelSettings = HessianlearnModelSettings()
 		HLModelSettings['max_sweeps'] = 1.
 		HLModel = HessianlearnModel(problem,regularization,data,settings = HLModelSettings)
 
-		for optimizer in ['lrsfn','adam','gd','incg','sgd']:
+		for optimizer in ['lrsfn','adam','gd','sgd','incg']:
 			HLModel.settings['optimizer'] = optimizer
+			if optimizer == 'incg':
+				HLModel.settings['alpha'] = 1e-4
 			HLModel.fit()
 			first_loss = HLModel.logger['train_loss'][0]
 			last_iteration = max(HLModel.logger['train_loss'].keys())

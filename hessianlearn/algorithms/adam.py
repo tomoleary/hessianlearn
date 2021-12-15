@@ -89,14 +89,15 @@ class Adam(Optimizer):
 		gradient = self.sess.run(self.grad,feed_dict = feed_dict)
 		
 		self.m = self.parameters['beta_1']*self.m + (1-self.parameters['beta_1'])*gradient 
-		# m_hat = [m/(1 - self.parameters['beta_1']**self.iter) for m in self.m]
+		m_hat = self.m / (1.0 - self.parameters['beta_1']**self._iter)
 
 		g_sq_vec = np.square(gradient) 
 		self.v = self.parameters['beta_2']*self.v + (1-self.parameters['beta_2'])*g_sq_vec 
-		v_root = np.sqrt(self.v)
+		v_hat = self.v / (1.0 - self.parameters['beta_2']**self._iter)
+		v_root = np.sqrt(v_hat)
 
 
-		update = -alpha*self.m/(v_root +self.parameters['epsilon'])
+		update = -alpha*m_hat/(v_root +self.parameters['epsilon'])
 		self.p = update
 		self._sweeps += [1,0]
 		self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})

@@ -26,12 +26,14 @@ if int(tf.__version__[0]) > 1:
 	# tf.enable_eager_execution()
 
 from abc import ABC, abstractmethod
+import warnings
 
 import sys, os, pickle, time, datetime
-# sys.path.append( os.environ.get('HESSIANLEARN_PATH', "../../"))
-# from hessianlearn import *
+
 
 from ..utilities.parameterList import ParameterList
+
+from ..problem.problem import KerasModelProblem
 
 # from ..algorithms import *
 
@@ -52,7 +54,7 @@ from ..algorithms.varianceBasedNystrom import variance_based_nystrom
 
 
 
-def HessianlearnModelSettings(settings = {}):
+def KerasModelWrapperSettings(settings = {}):
 	settings['problem_name']         		= ['', "string for name used in file naming"]
 	settings['title']         				= [None, "string for name used in plotting"]
 	settings['logger_outname']         		= [None, "string for name used in logger file naming"]
@@ -63,6 +65,7 @@ def HessianlearnModelSettings(settings = {}):
 	settings['printing_sweep_frequency']    = [1, "Print only every this many sweeps"]
 	settings['validate_frequency']			= [1, "Only compute validation quantities every X sweeps"]
 	settings['save_weights']				= [True, "Whether or not to save the best weights"]
+	settings['max_sweeps']					= [10,"Maximum number of times through the data (measured in epoch equivalents"]
 
 
 	settings['verbose']         			= [True, "Boolean for printing"]
@@ -70,30 +73,7 @@ def HessianlearnModelSettings(settings = {}):
 	settings['intra_threads']         		= [2, "Setting for intra op parallelism"]
 	settings['inter_threads']         		= [2, "Setting for inter op parallelism"]
 
-	# Optimizer settings
-	settings['optimizer']                	= ['lrsfn', "String to denote choice of optimizer"]
-	settings['alpha']                		= [1e-3, "Initial steplength, or learning rate"]
-	settings['hessian_low_rank']			= [20, "Low rank to be used for LRSFN / SFN"]
-	settings['globalization']				= [None, "None means steps of length alpha will be taken at each iteration"]
-	settings['max_backtrack']				= [10, "Maximum number of backtracking iterations for each line search"]
 
-	# Spectral step settings for LRSFN
-	settings['spectral_step_alpha']			= [1e-2, 'Used in min condition for spectral step']
-
-	# Levenberg-Marquardt for LRSFN
-	settings['default_damping']        		= [1e-3, "Levenberg-Marquardt damping when no regularization is used"]
-
-	# Range finding settings for LRSFN
-	settings['range_finding']				= [None,"Range finding, if None then r = hessian_low_rank\
-															Choose from None, 'arf', 'naarf','vn' "]
-	settings['range_rel_error_tolerance']   = [0.1, "Error tolerance for error estimator in adaptive range finding"]
-	settings['range_abs_error_tolerance']   = [50, "Error tolerance for error estimator in adaptive range finding"]
-	settings['range_block_size']        	= [20, "Block size used in range finder"]
-	settings['max_sweeps']					= [10,"Maximum number of times through the data (measured in epoch equivalents"]
-
-	settings['max_bad_vectors_nystrom']     = [5, "Number of maximum bad vectors for variance based Nystrom"]
-	settings['max_vectors_nystrom']       	= [40, "Number of maximum vectors for variance based Nystrom"]
-	settings['nystrom_std_tolerance']       = [0.5, "Noise to eigenvalue ratio used for Nystrom truncation"]
 
 	# Initial weights for specific layers 
 	settings['layer_weights'] 				= [{},"Dictionary of layer name key and weight \
@@ -101,38 +81,37 @@ def HessianlearnModelSettings(settings = {}):
 
 	# Settings for recording spectral information during training
 	settings['record_spectrum']         	= [False, "Boolean for recording spectrum during training"]
-	settings['record_last_rq_std']         	= [False, "Boolean for recording last RQ std for last eigenvector of LRSFN"]
-	settings['spec_frequency'] 				= [10, "Frequency for recording of spectrum"]
-	settings['rayleigh_quotients']         	= [True, "Boolean for recording of spectral variance during training"]
-	settings['rq_data_size'] 				= [None,"Amount of training data to be used, None means all"]
-	settings['rq_samps']					= [100,"Number of partitions used for sample average statistics of RQs"]
 	settings['target_rank']					= [100,"Target rank for randomized eigenvalue solver"]
 	settings['oversample']					= [10,"Oversampling for randomized eigenvalue solver"]
 
 	return ParameterList(settings)
 
 
-class HessianlearnModel(ABC):
-	def __init__(self,problem,regularization,data,derivative_data = None,settings = HessianlearnModelSettings({})):
+class KerasModelWrapper(ABC):
+	def __init__(self,kerasModel,regularization= None,optimizer = None,\
+		optimizer_parameters = None,hessian_block_size = None, settings = KerasModelWrapperSettings({})):
+		warnings.warn('Experimental Class! Be Wary')
+		# Check hessian blocking condition here?
+		if optimizer_parameters is not None:
+			if ('hessian_low_rank' in optimizer_parameters.data.keys()) and (hessian_block_size is not None):
+				hessian_block_size = max(optimizer_parameters['hessian_low_rank'],hessian_block_size)
 
-		self._problem = problem
-		self._regularization = regularization
-		self._data = data
 
-		self._derivative_data = derivative_data
+		self._problem = KerasModelProblem(kerasModel,hessian_block_size = hessian_block_size)
+		if regularization is None:
+			# If regularization is not passed in, default to zero Tikhonov
+			self._regularization = L2Regularization(self._problem, 0.0)
+		else:
+			self._regularization = regularization
 
 		self.settings = settings
 
-		if self.settings['verbose']:
-			print(80*'#')
-			print(('Size of configuration space:  '+str(self.problem.dimension)).center(80))
-			print(('Size of training data: '+str(self.data.train_data_size)).center(80))
-			print(('Approximate data cardinality needed: '\
-				+str(int(float(self.problem.dimension)/self.problem.output_dimension	))).center(80))
-			print(80*'#')
-
-		# self._sess = None
-		self._optimizer = None
+		if optimizer is not None:
+			if optimizer_parameters is None:
+				self.set_optimizer(optimizer,regularization = self.regularization)
+			else:
+				self.set_optimizer(optimizer,regularization = self.regularization,parameters = optimizer_parameters)
+		
 
 
 	@property
@@ -154,127 +133,29 @@ class HessianlearnModel(ABC):
 	@property
 	def regularization(self):
 		return self._regularization
-	
-	@property
-	def data(self):
-		return self._data
 
 	@property
-	def derivative_data(self):
-		return self._derivative_data
+	def set_optimizer(self):
+		return self._set_optimizer
+	
+	
 
 	@property
 	def logger(self):
 		return self._logger
 
-	def _initialize_optimizer(self, sess,settings = None):
-		assert sess is not None
-		if settings == None:
-			settings = self.settings
-		if 'rank' in self.settings['printing_items'].keys():
-			_ = self.settings['printing_items'].pop('rank',None)
-
-		self._logger['optimizer'] = settings['optimizer']
-		if settings['optimizer'] == 'adam':
-			print(('Using Adam optimizer').center(80))
-			print(('Batch size = '+str(self.data._batch_size)).center(80))
-			optimizer = Adam(self.problem,self.regularization,sess)
-			optimizer.parameters['alpha'] = settings['alpha']
-			optimizer.alpha = settings['alpha']
-			self._logger['alpha'][0] = settings['alpha']
-
-		elif settings['optimizer'] == 'gd':
-			print('Using gradient descent optimizer with line search'.center(80))
-			print(('Batch size = '+str(self.data._batch_size)).center(80))
-			optimizer = GradientDescent(self.problem,self.regularization,sess)
-			optimizer.parameters['globalization'] = 'line_search'
-			self._logger['globalization'] = 'line_search'
-			optimizer.parameters['max_backtracking_iter'] = 8
-		elif settings['optimizer'] == 'incg':
-			if not settings['globalization'] is None:
-				print('Using inexact Newton CG optimizer with line search'.center(80))
-				print(('Batch size = '+str(self.data._batch_size)).center(80))
-				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
-				optimizer = InexactNewtonCG(self.problem,self.regularization,sess)
-				optimizer.parameters['globalization'] = 'line_search'
-				self._logger['globalization'] = 'line_search'
-				optimizer.parameters['max_backtracking_iter'] = settings['max_backtrack']
-			else:
-				print('Using inexact Newton CG optimizer with fixed step'.center(80))
-				print(('Batch size = '+str(self.data._batch_size)).center(80))
-				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
-				optimizer = InexactNewtonCG(self.problem,self.regularization,sess)
-				optimizer.parameters['globalization'] = None
-				optimizer.parameters['alpha'] = settings['alpha']
-				optimizer.alpha = settings['alpha']
-				self._logger['alpha'][0] = settings['alpha']
-		elif settings['optimizer'] == 'lrsfn':
-			self.settings['printing_items']['rank'] = 'hessian_low_rank'
-			if settings['globalization'] == 'line_search':
-				print('Using low rank SFN optimizer with line search'.center(80))
-				print(('Batch size = '+str(self.data._batch_size)).center(80))
-				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
-				print(('Hessian low rank = '+str(settings['hessian_low_rank'])).center(80))
-				optimizer = LowRankSaddleFreeNewton(self.problem,self.regularization,sess)
-				optimizer.parameters['globalization'] = 'line_search'
-				self._logger['globalization'] = 'line_search'
-				optimizer.parameters['max_backtracking_iter'] = settings['max_backtrack']
-				optimizer.parameters['hessian_low_rank'] = settings['hessian_low_rank']
-				optimizer.parameters['range_finding'] = settings['range_finding']
-				optimizer.parameters['range_rel_error_tolerance'] =	settings['range_rel_error_tolerance']
-				optimizer.parameters['range_block_size'] =	settings['range_block_size']
-				optimizer.parameters['max_bad_vectors_nystrom'] = settings['max_bad_vectors_nystrom'] 
-				optimizer.parameters['max_vectors_nystrom']  = settings['max_vectors_nystrom'] 
-				optimizer.parameters['nystrom_std_tolerance']  = settings['nystrom_std_tolerance'] 
-				optimizer.parameters['default_damping']   = settings['default_damping']
-			elif settings['globalization'] == 'spectral_step':
-				print('Using low rank SFN optimizer with spectral step'.center(80))
-				print(('Batch size = '+str(self.data._batch_size)).center(80))
-				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
-				print(('Hessian low rank = '+str(settings['hessian_low_rank'])).center(80))
-				optimizer = LowRankSaddleFreeNewton(self.problem,self.regularization,sess)
-				optimizer.parameters['globalization'] = 'spectral_step'
-				optimizer.parameters['hessian_low_rank'] = settings['hessian_low_rank']
-				optimizer.parameters['spectral_step_alpha'] = settings['spectral_step_alpha']
-				optimizer.parameters['range_finding'] = settings['range_finding']
-				optimizer.parameters['range_rel_error_tolerance'] =	settings['range_rel_error_tolerance']
-				optimizer.parameters['range_block_size'] =	settings['range_block_size']
-				optimizer.parameters['max_bad_vectors_nystrom'] = settings['max_bad_vectors_nystrom'] 
-				optimizer.parameters['max_vectors_nystrom']  = settings['max_vectors_nystrom'] 
-				optimizer.parameters['nystrom_std_tolerance']  = settings['nystrom_std_tolerance'] 
-				optimizer.parameters['default_damping']   = settings['default_damping']
-			elif settings['globalization'] is None:
-				print('Using low rank SFN optimizer with fixed step'.center(80))
-				print(('Batch size = '+str(self.data._batch_size)).center(80))
-				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
-				print(('Hessian low rank = '+str(settings['hessian_low_rank'])).center(80))
-				optimizer = LowRankSaddleFreeNewton(self.problem,self.regularization,sess)
-				optimizer.parameters['globalization'] = None
-				optimizer.parameters['hessian_low_rank'] = settings['hessian_low_rank']
-				optimizer.parameters['alpha'] = settings['alpha']
-				optimizer.parameters['range_finding'] = settings['range_finding']
-				optimizer.parameters['range_rel_error_tolerance'] =	settings['range_rel_error_tolerance']
-				optimizer.parameters['range_block_size'] =	settings['range_block_size']
-				optimizer.parameters['max_bad_vectors_nystrom'] = settings['max_bad_vectors_nystrom'] 
-				optimizer.parameters['max_vectors_nystrom']  = settings['max_vectors_nystrom'] 
-				optimizer.parameters['nystrom_std_tolerance']  = settings['nystrom_std_tolerance'] 
-				optimizer.alpha = settings['alpha']
-				optimizer.parameters['default_damping']   = settings['default_damping']
-				self._logger['alpha'][0] = settings['alpha']
-			else:
-				raise NotImplementedError('Unsupported choice of globalization for LRSFN')
-			if self.settings['range_finding'] is None:
-				self._logger['hessian_low_rank'][0] = settings['hessian_low_rank']
-		elif settings['optimizer'] == 'sgd':
-			print(('Using stochastic gradient descent optimizer').center(80))
-			print(('Batch size = '+str(self._data._batch_size)).center(80))
-			optimizer = GradientDescent(self.problem,self.regularization,sess)
-			optimizer.parameters['alpha'] = settings['alpha']
-			optimizer.alpha = settings['alpha']
-			self._logger['alpha'][0] = settings['alpha']
+	def _set_optimizer(self,optimizer,parameters = None):
+		if parameters is None:
+			self._optimizer = optimizer(self.problem, regularization = self.regularization,sess = None)
 		else:
-			raise NotImplementedError('Unsupported choice of optimizer')
-		self._optimizer = optimizer
+			self._optimizer = optimizer(self.problem, regularization = self.regularization,sess = None,parameters = parameters)
+		# If larger Hessian spectrum is requested, reinitialize blocking for faster Hessian evaluations
+		if 'hessian_low_rank' in self._optimizer.parameters.data.keys():
+			if self.problem._hessian_block_size is None:
+				self.problem._initialize_hessian_blocking(self.optimizer.parameters['hessian_low_rank'])
+			elif self.problem._hessian_block_size < self.optimizer.parameters['hessian_low_rank']:
+				self.problem._initialize_hessian_blocking(self.optimizer.parameters['hessian_low_rank'])
+
 
 
 
@@ -301,75 +182,47 @@ class HessianlearnModel(ABC):
 		logger['val_acc'] = {}
 		logger['train_acc'] = {}
 
-
 		logger['max_val_acc'] = {}
 		logger['alpha'] = {}
-
-		if self.settings['record_spectrum']:
-			logger['full_train_eigenvalues'] = {}
-			logger['train_eigenvalues'] = {}
-			logger['val_eigenvalues'] = {}
-			logger['rq_std'] = {}
-		elif self.settings['record_last_rq_std']:
-			logger['last_rq_std'] = {}
-		elif self.settings['optimizer'] == 'lrsfn':
-			logger['train_eigenvalues'] = {}
-
-		if hasattr(self.problem,'_variance_reduction'):
-			logger['val_variance_reduction'] = {}
 
 		if hasattr(self.problem, 'metric_dict'):
 			for metric_name in self.problem.metric_dict.keys():
 				logger[metric_name] = {}
 
-		if self.problem.has_derivative_loss:
-			logger['train_h1_loss'] = {}
-			logger['val_h1_loss'] = {}
-			logger['train_h1_acc'] = {}
-			logger['val_h1_acc'] = {}
+		if self.settings['record_spectrum']:
+			logger['full_train_eigenvalues'] = {}
+			logger['train_eigenvalues'] = {}
+			logger['val_eigenvalues'] = {}
 
-		if self.problem.is_vae:
-			logger['train_recon_loss'] = {}
-			logger['train_kl_loss'] = {}
-			logger['test_recon_loss'] = {}
-			logger['test_kl_loss'] = {}
-
+		elif 'eigenvalues' in dir(self._optimizer):
+			logger['train_eigenvalues'] = {}
 
 
 		self._logger = logger
 
-		if not os.path.isdir(self.settings['problem_name']+'_logging/'):
-			os.makedirs(self.settings['problem_name']+'_logging/')
+		os.makedirs(self.settings['problem_name']+'_logging/',exist_ok = True)
+		os.makedirs(self.settings['problem_name']+'_best_weights/',exist_ok = True)
+		
 
 		# Set outname for logging file
 		if self.settings['logger_outname'] is None:
-			logger_outname = str(datetime.date.today())+'-'+self.settings['optimizer']+'-dW='+str(self.problem.dimension)
-			if self.settings['optimizer'] in ['lrsfn','incg','gd']:
-				if self.settings['globalization'] is None:
-					logger_outname += '-alpha='+str(self.settings['alpha'])
-				elif self.settings['globalization'] == 'spectral_step':
-					logger_outname += 'spectral_step'
-				if self.settings['optimizer'] == 'lrsfn' and self.settings['range_finding'] is None:
-					logger_outname += '-rank='+str(self.settings['hessian_low_rank'])
-				elif self.settings['optimizer'] == 'lrsfn':
-					logger_outname += '-rank='+str(self.settings['hessian_low_rank'])
-			else:
-				if type(self.settings['range_finding']) is str:
-					logger_outname += self.settings['range_finding']
-					if self.settings['range_finding'] == 'arf':
-						logger_outname += str(self.settings['range_rel_error_tolerance'])
-				else:
-					logger_outname += '-rank='+str(self.settings['hessian_low_rank'])
-
-			if self.settings['problem_name'] is not None:
-				logger_outname = self.settings['problem_name']+'-'+logger_outname
+			logger_outname = str(datetime.date.today())+'-dW='+str(self.problem.dimension)
 		else:
 			logger_outname = self.settings['logger_outname']
 		self.logger_outname = logger_outname
 	
 
 
-	def _fit(self,options = None, w_0 = None):
+	def _fit(self,data,options = None, w_0 = None):
+		self.data = data
+		if self.settings['verbose']:
+			print(80*'#')
+			print(('Size of configuration space:  '+str(self.problem.dimension)).center(80))
+			print(('Size of training data: '+str(self.data.train_data_size)).center(80))
+			print(('Approximate data cardinality needed: '\
+				+str(int(float(self.problem.dimension)/self.problem.output_dimension	))).center(80))
+			print(80*'#')
+
 		with tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=self.settings['intra_threads'],\
 											inter_op_parallelism_threads=self.settings['inter_threads'])) as sess:
 			# Re initialize data
@@ -377,7 +230,7 @@ class HessianlearnModel(ABC):
 			# Initialize logging:
 			self._initialize_logging()
 			# Initialize the optimizer
-			self._initialize_optimizer(sess)
+			self._optimizer.set_sess(sess)
 			# After optimizer is instantiated, we call the global variables initializer
 			sess.run(tf.global_variables_initializer())
 			################################################################################
@@ -434,6 +287,21 @@ class HessianlearnModel(ABC):
 					train_dict[self.problem.noise] = noise
 					noise_hess = random_state_gan.normal(size = (self.data.hessian_batch_size, self.problem.noise_dimension))
 					hess_dict[self.problem.noise] = noise_hess 
+
+				try:
+					self.problem.NN.reset_metrics()
+				except:
+					pass
+
+				# metric_names = [metric.name for metric in self.problem.NN.metrics]
+				# metric_evals = sess.run(self.problem.metrics_list,train_dict)
+
+				# for name,evalu in zip(metric_names,metric_evals):
+				# 	print('For metric',name,' we have: ',evalu)
+
+				metric_names = list(self.problem.metric_dict.keys())
+				metric_evals = sess.run(list(self.problem.metric_dict.values()),train_dict)
+
 				################################################################################
 				# Log time / sweep number
 				# Every element of dictionary is 
@@ -454,12 +322,7 @@ class HessianlearnModel(ABC):
 				except:
 					pass
 				if hasattr(self.problem,'accuracy'):
-					if self.problem.has_derivative_loss:
-						norm_g, train_loss, train_acc, train_h1_acc = sess.run([self.problem.norm_g,self.problem.loss,\
-										self.problem.accuracy,self.problem.h1_accuracy],train_dict)
-						self._logger['train_h1_acc'][iteration] = train_h1_acc
-					else:
-						norm_g, train_loss, train_acc = sess.run([self.problem.norm_g,self.problem.loss,self.problem.accuracy],train_dict)
+					norm_g, train_loss, train_acc = sess.run([self.problem.norm_g,self.problem.loss,self.problem.accuracy],train_dict)
 					self._logger['train_acc'][iteration] = train_acc
 				else:
 					norm_g, train_loss = sess.run([self.problem.norm_g,self.problem.loss],train_dict)
@@ -527,12 +390,14 @@ class HessianlearnModel(ABC):
 
 				################################################################################
 				# Save the best weights based on validation accuracy or loss
-				if hasattr(self.problem,'accuracy') and val_acc == max_val_acc and not self.problem._has_derivative_loss:
+				if hasattr(self.problem,'accuracy') and val_acc == max_val_acc:
 					weight_dictionary = {}
 					for layer in self.problem._NN.layers:
 						weight_dictionary[layer.name] = self.problem._NN.get_layer(layer.name).get_weights()
 					self._best_weights = weight_dictionary
 					if self.settings['save_weights']:
+						# Save the weights individually, not in the logger
+
 						self._logger['best_weights'] = weight_dictionary
 				elif val_loss == min_val_loss:
 					weight_dictionary = {}
@@ -569,15 +434,17 @@ class HessianlearnModel(ABC):
 					self.optimizer.minimize(train_dict)
 				################################################################################
 				# Recording the spectrum
-				if not self.settings['record_spectrum'] and self.settings['optimizer'] == 'lrsfn':
-					self._logger['train_eigenvalues'][iteration] = self.optimizer.eigenvalues
-					# print('lambda_1 = ',self.optimizer.eigenvalues[0],'lambda_r = ',self.optimizer.eigenvalues[-1])
+				if not self.settings['record_spectrum'] and 'eigenvalues' in dir(self._optimizer):
+					try:
+						self._logger['train_eigenvalues'][iteration] = self.optimizer.eigenvalues
+					except:
+						pass
 				elif self.settings['record_spectrum'] and iteration%self.settings['spec_frequency'] ==0:
 					self._record_spectrum(iteration)
-				elif self.settings['record_last_rq_std'] and self.settings['optimizer'] == 'lrsfn':
-					logger['last_rq_std'][iteration] = self.optimizer._rq_std
 				with open(self.settings['problem_name']+'_logging/'+ self.logger_outname +'.pkl', 'wb+') as f:
 					pickle.dump(self.logger, f, pickle.HIGHEST_PROTOCOL)
+				with open(self.settings['problem_name']+'_best_weights/'+ self.logger_outname +'.pkl', 'wb+') as f:
+					pickle.dump(self._best_weights, f, pickle.HIGHEST_PROTOCOL)
 				################################################################################
 				# Check if max_sweeps condition has been met
 				if sweeps > max_sweeps:
@@ -646,22 +513,6 @@ class HessianlearnModel(ABC):
 
 			d_full_train, U_full_train = low_rank_hessian(self.optimizer,full_train_dict,k_rank,p_oversample,verbose=True)
 			self._logger['full_train_eigenvalues'][iteration] = d_full_train
-			# Initialize array for Rayleigh quotient samples
-			RQ_samples = np.zeros((self.settings['rq_samps'],U_full_train.shape[1]))
-
-			partitioned_dictionaries_train = self.problem._partition_dictionaries(full_train_dict,self.settings['rq_samps'])
-
-			try:
-				from tqdm import tqdm
-				for samp_i,sample_dictionary in enumerate(tqdm(partitioned_dictionaries_train)):
-					RQ_samples[samp_i] = self.optimizer.H.quadratics(U_full_train,sample_dictionary)
-			except:
-				print('Issue with tqdm')
-				for samp_i,sample_dictionary in enumerate(partitioned_dictionaries_train):
-					RQ_samples[samp_i] = self.optimizer.H.quadratics(U_full_train,sample_dictionary)
-
-			RQ_sample_std = np.std(RQ_samples,axis = 0)
-			self._logger['rq_std'][iteration] = RQ_sample_std
 
 		else:
 			d_full,_ = low_rank_hessian(self.optimizer,train_dict,k_rank,p_oversample)
