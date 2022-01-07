@@ -184,7 +184,7 @@ Computer Methods in Applied Mechanics and Engineering. Volume 388, 1 January 202
 }</pre></details>
 
 
-- \[4\] Thomas O'Leary-Roseberry, Xiaosong Du, Anirban Chaudhuri, Joaquim R. R. A. Martins, Karen Willcox, Omar Ghattas,
+- \[4\] O'Leary-Roseberry, T., Du, X., Chaudhuri, A., Martins, J., Willcox, K., Ghattas, O.,
 [**Adaptive Projected Residual Networks for Learning Parametric Maps from Sparse Data**](https://arxiv.org/abs/2112.07096).
 arXiv:2112.07096.
 ([Download](https://arxiv.org/pdf/2112.07096.pdf))<details><summary>BibTeX</summary><pre>
