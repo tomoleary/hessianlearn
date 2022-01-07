@@ -33,10 +33,10 @@
 
 * Examples of CIFAR10, CIFAR100 classification from pre-trained Imagenet ResNet50 model in `transfer_learning/`
 
-* Pre-trained model serves as well conditioned initial guess for transfer learning. In this setting Newton methods perform well due to their excellent properties in local convergence. Low Rank Saddle Free Newton is able to zero in on highly generalizable local minimizers bypassing indefinite regions. Below are validation accuracies of best choices of fixed step-length for Adam, SGD and LRSFN.
+* Pre-trained model serves as well conditioned initial guess for transfer learning. In this setting Newton methods perform well due to their excellent properties in local convergence. Low Rank Saddle Free Newton is able to zero in on highly generalizable local minimizers bypassing indefinite regions. Below are validation accuracies of best choices of fixed step-length for Adam, SGD and LRSFN with fixed rank of 40.
 
 <p align="center">
-	<img src="https://github.com/tomoleary/images/main/hessianlearn/cifar100transfer.png" width="75%" /> 
+	<img src="https://github.com/tomoleary/images/blob/main/hessianlearn/cifar100transfer.png" width="75%" /> 
 </p>
 
 * For more information see the following manuscript

@@ -139,6 +139,18 @@ HLModel.fit(data)
 [Tutorial 0: MNIST Autoencoder](https://github.com/tomoleary/hessianlearn/blob/master/tutorial/Tutorial%200%20MNIST%20Autoencoder.ipynb)
 
 
+## Applications
+
+### Transfer Learning
+
+* Examples of CIFAR10, CIFAR100 classification from pre-trained Imagenet ResNet50 model in `applications/transfer_learning/`
+
+* Pre-trained model serves as well conditioned initial guess for transfer learning. In this setting Newton methods perform well due to their excellent properties in local convergence. Low Rank Saddle Free Newton is able to zero in on highly generalizable local minimizers bypassing indefinite regions. Below are validation accuracies of best choices of fixed step-length for Adam, SGD and LRSFN with fixed rank of 40.
+
+<p align="center">
+	<img src="https://github.com/tomoleary/images/blob/main/hessianlearn/cifar100transfer.png" width="75%" /> 
+</p>
+
 # References
 
 These manuscripts motivate and use the hessianlearn library for stochastic nonconvex optimization
