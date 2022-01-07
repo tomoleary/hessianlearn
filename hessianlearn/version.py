@@ -15,5 +15,5 @@
 # Author: Tom O'Leary-Roseberry
 # Contact: tom.olearyroseberry@utexas.edu
 
-version_info = (0, 1, 0)
+version_info = (0, 2, 0)
 __version__ = '.'.join([str(x) for x in version_info])
