@@ -119,9 +119,9 @@ HLModel = KerasModelWrapper(neural_network)
 # Then the end user can pass in an optimizer 
 # (e.g. custom end-user optimizer)
 optimizer = LowRankSaddleFreeNewton # The class constructor, not an instance
-optparameters = LowRankSaddleFreeNewtonParameters()
-optimizer_parameters['hessian_low_rank'] = 40
-HLModel.set_optimizer(optimizer,optimizer_parameters = optparameters)
+opt_parameters = LowRankSaddleFreeNewtonParameters()
+opt_parameters['hessian_low_rank'] = 40
+HLModel.set_optimizer(optimizer,optimizer_parameters = opt_parameters)
 # The data object still needs to key on to the specific computational
 # graph variables that data will be passed in for.
 # Note that data can naturally handle multiple input and output data,
@@ -141,7 +141,7 @@ HLModel.fit(data)
 
 # References
 
-These publications motivate and use the hessianlearn library for stochastic nonconvex optimization
+These manuscripts motivate and use the hessianlearn library for stochastic nonconvex optimization
 
 - \[1\] O'Leary-Roseberry, T., Alger, N., Ghattas O.,
 [**Inexact Newton Methods for Stochastic Nonconvex Optimization with Applications to Neural Network Training**](https://arxiv.org/abs/1905.06738).
@@ -182,6 +182,20 @@ Computer Methods in Applied Mechanics and Engineering. Volume 388, 1 January 202
   publisher={Elsevier}
 }
 }</pre></details>
+
+
+- \[4\] Thomas O'Leary-Roseberry, Xiaosong Du, Anirban Chaudhuri, Joaquim R. R. A. Martins, Karen Willcox, Omar Ghattas,
+[**Adaptive Projected Residual Networks for Learning Parametric Maps from Sparse Data**](https://arxiv.org/abs/2112.07096).
+arXiv:2112.07096.
+([Download](https://arxiv.org/pdf/2112.07096.pdf))<details><summary>BibTeX</summary><pre>
+@article{OLearyRoseberryDuChaudhuriEtAl2021,
+  title={Adaptive Projected Residual Networks for Learning Parametric Maps from Sparse Data},
+  author={O'Leary-Roseberry, Thomas and Du, Xiaosong, and Chaudhuri, Anirban, and Martins Joaqium R. R. A., and Willcox, Karen, and Ghattas, Omar},
+  journal={arXiv preprint arXiv:2112.07096},
+  year={2021}
+}
+}</pre></details>
+
 
 
 
