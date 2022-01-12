@@ -55,9 +55,10 @@ def ParametersLowRankSaddleFreeNewton(parameters = {}):
 	
 
 	# Globaliziation parameters
-	parameters['globalization']					= [None, 'Choose from trust_region, line_search, spectral_step or none']
+	parameters['globalization']					= [None, 'Choose from trust_region, line_search, delayed_step or none']
 	parameters['max_backtracking_iter']			= [5, 'Max backtracking iterations for armijo line search']
-	parameters['spectral_step_alpha']			= [1e-2, 'Used in min condition for spectral step']
+	parameters['delayed_step_parameter']		= [0.999, 'Used in delayed step length computation']
+
 
 	parameters['verbose']                       = [False, "Printing"]
 	parameters['record_last_rq_std']			= [False, "Record the last eigenvector RQ variance"]
@@ -212,19 +213,14 @@ class LowRankSaddleFreeNewton(Optimizer):
 			except:
 				self._rq_std = None
 				print(80*'#')
-				print('U is [], taking gradient step, fix this later?'.center(80))
 
 		# Saddle free inversion via Woodbury
 		if self.regularization.parameters['gamma'] < 1e-4:
 			gamma_damping = self.parameters['default_damping']
-			# Using this condition instead of fixed gamma allows one to take larger step sizes
-			# but does not appear to improve accuracy
-			# gamma_damping = max(0.9*np.abs(Lmbda[-1]),self.parameters['default_damping'])
+
 		else:
 			gamma_damping = self.regularization.parameters['gamma']
-		# print('Lmbda[0] = ',Lmbda[0])
-		# print('Lmbda[-1] = ',Lmbda[-1])
-		# print('gamma_damping = ',gamma_damping)
+
 
 		Lmbda_abs = np.abs(Lmbda)
 		Lmbda_diags = diags(Lmbda_abs)
@@ -246,9 +242,10 @@ class LowRankSaddleFreeNewton(Optimizer):
 			update = self.alpha*self.p
 			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})
 
-		elif self.parameters['globalization'] is 'spectral_step':
-			# self.alpha = min(self.parameters['spectral_step_alpha'],0.1/Lmbda_abs[0])
-			self.alpha = min(self.parameters['spectral_step_alpha'],0.1/Lmbda_abs[0])
+		elif self.parameters['globalization'] is 'delayed_step':
+			beta_2 = self.parameters['delayed_step_parameter']
+			assert 0. <= beta_2 <= 1.
+			self.alpha = (1. - beta_2**self._iter)*self.parameters['alpha']
 			self._sweeps += [1,2*self._rank]
 			update = self.alpha*self.p
 			self.sess.run(self.problem._update_ops,feed_dict = {self.problem._update_placeholder:update})

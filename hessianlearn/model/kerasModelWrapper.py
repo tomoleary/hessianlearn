@@ -108,9 +108,9 @@ class KerasModelWrapper(ABC):
 
 		if optimizer is not None:
 			if optimizer_parameters is None:
-				self.set_optimizer(optimizer,regularization = self.regularization)
+				self.set_optimizer(optimizer)
 			else:
-				self.set_optimizer(optimizer,regularization = self.regularization,parameters = optimizer_parameters)
+				self.set_optimizer(optimizer,parameters = optimizer_parameters)
 		
 
 

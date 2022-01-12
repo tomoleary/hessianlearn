@@ -77,8 +77,8 @@ def HessianlearnModelSettings(settings = {}):
 	settings['globalization']				= [None, "None means steps of length alpha will be taken at each iteration"]
 	settings['max_backtrack']				= [10, "Maximum number of backtracking iterations for each line search"]
 
-	# Spectral step settings for LRSFN
-	settings['spectral_step_alpha']			= [1e-2, 'Used in min condition for spectral step']
+	# Delayed step settings for LRSFN
+	settings['delayed_step_parameter']		= [0.999, 'Used in delayed step condition']
 
 	# Levenberg-Marquardt for LRSFN
 	settings['default_damping']        		= [1e-3, "Levenberg-Marquardt damping when no regularization is used"]
@@ -227,15 +227,15 @@ class HessianlearnModel(ABC):
 				optimizer.parameters['max_vectors_nystrom']  = settings['max_vectors_nystrom'] 
 				optimizer.parameters['nystrom_std_tolerance']  = settings['nystrom_std_tolerance'] 
 				optimizer.parameters['default_damping']   = settings['default_damping']
-			elif settings['globalization'] == 'spectral_step':
-				print('Using low rank SFN optimizer with spectral step'.center(80))
+			elif settings['globalization'] == 'delayed_step':
+				print('Using low rank SFN optimizer with delayed_step step'.center(80))
 				print(('Batch size = '+str(self.data._batch_size)).center(80))
 				print(('Hessian batch size = '+str(self.data._hessian_batch_size)).center(80))
 				print(('Hessian low rank = '+str(settings['hessian_low_rank'])).center(80))
 				optimizer = LowRankSaddleFreeNewton(self.problem,self.regularization,sess)
-				optimizer.parameters['globalization'] = 'spectral_step'
+				optimizer.parameters['globalization'] = 'delayed_step'
 				optimizer.parameters['hessian_low_rank'] = settings['hessian_low_rank']
-				optimizer.parameters['spectral_step_alpha'] = settings['spectral_step_alpha']
+				optimizer.parameters['delayed_step_parameter'] = settings['delayed_step_parameter']
 				optimizer.parameters['range_finding'] = settings['range_finding']
 				optimizer.parameters['range_rel_error_tolerance'] =	settings['range_rel_error_tolerance']
 				optimizer.parameters['range_block_size'] =	settings['range_block_size']
@@ -347,8 +347,8 @@ class HessianlearnModel(ABC):
 			if self.settings['optimizer'] in ['lrsfn','incg','gd']:
 				if self.settings['globalization'] is None:
 					logger_outname += '-alpha='+str(self.settings['alpha'])
-				elif self.settings['globalization'] == 'spectral_step':
-					logger_outname += 'spectral_step'
+				elif self.settings['globalization'] == 'delayed_step':
+					logger_outname += 'delayed_step'
 				if self.settings['optimizer'] == 'lrsfn' and self.settings['range_finding'] is None:
 					logger_outname += '-rank='+str(self.settings['hessian_low_rank'])
 				elif self.settings['optimizer'] == 'lrsfn':
