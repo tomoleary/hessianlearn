@@ -35,19 +35,8 @@ from ..utilities.parameterList import ParameterList
 
 from ..problem.problem import KerasModelProblem
 
-# from ..algorithms import *
-
-from ..algorithms.adam import Adam
-from ..algorithms.gradientDescent import GradientDescent
-# from ..algorithms.cgSolver import CGSolver
-from ..algorithms.inexactNewtonCG import InexactNewtonCG
-# from ..algorithms.gmresSolver import GMRESSolver 
-# from ..algorithms.inexactNewtonGMRES import InexactNewtonGMRES
-# from ..algorithms.minresSolver import MINRESSolver
-# from ..algorithms.inexactNewtonMINRES import InexactNewtonMINRES
 from ..algorithms.randomizedEigensolver import *
 from ..problem.regularization import L2Regularization
-from ..algorithms.lowRankSaddleFreeNewton import LowRankSaddleFreeNewton
 
 from ..problem.hessian import Hessian, HessianWrapper
 from ..algorithms.varianceBasedNystrom import variance_based_nystrom
@@ -187,7 +176,8 @@ class KerasModelWrapper(ABC):
 
 		if hasattr(self.problem, 'metric_dict'):
 			for metric_name in self.problem.metric_dict.keys():
-				logger[metric_name] = {}
+				logger['train_'+metric_name] = {}
+				logger['val_'+metric_name] = {}
 
 		if self.settings['record_spectrum']:
 			logger['full_train_eigenvalues'] = {}
@@ -291,16 +281,13 @@ class KerasModelWrapper(ABC):
 				try:
 					self.problem.NN.reset_metrics()
 				except:
-					pass
+					print('Issue resetting metrics')
 
-				# metric_names = [metric.name for metric in self.problem.NN.metrics]
-				# metric_evals = sess.run(self.problem.metrics_list,train_dict)
-
-				# for name,evalu in zip(metric_names,metric_evals):
-				# 	print('For metric',name,' we have: ',evalu)
 
 				metric_names = list(self.problem.metric_dict.keys())
-				metric_evals = sess.run(list(self.problem.metric_dict.values()),train_dict)
+				train_metric_evals = sess.run(list(self.problem.metric_dict.values()),train_dict)
+				for (metric_name,train_eval) in zip(metric_names,train_metric_evals):
+					self._logger['train_'+metric_name][iteration] = train_eval
 
 				################################################################################
 				# Log time / sweep number
@@ -320,6 +307,7 @@ class KerasModelWrapper(ABC):
 				try:
 					self.problem.NN.reset_metrics()
 				except:
+					print('Issue resetting the metrics')
 					pass
 				if hasattr(self.problem,'accuracy'):
 					norm_g, train_loss, train_acc = sess.run([self.problem.norm_g,self.problem.loss,self.problem.accuracy],train_dict)
@@ -354,9 +342,9 @@ class KerasModelWrapper(ABC):
 						validation_start = time.time()
 						if hasattr(self.problem,'metric_dict'):
 							metric_names = list(self.problem.metric_dict.keys())
-							metric_values = sess.run(list(self.problem.metric_dict.values()),train_dict)
+							metric_values = sess.run(list(self.problem.metric_dict.values()),val_dict)
 							for metric_name,metric_value in zip(metric_names,metric_values):
-								self.logger[metric_name][iteration] = metric_value
+								self.logger['val_'+metric_name][iteration] = metric_value
 						if hasattr(self.problem,'_variance_reduction'):
 							if self.problem.has_derivative_loss:
 								val_loss,	val_acc, val_h1_acc, val_var_red =\
@@ -384,6 +372,11 @@ class KerasModelWrapper(ABC):
 					if validate_this_iteration:
 						validation_start = time.time()
 						val_loss = sess.run(self.problem.loss,val_dict)
+						if hasattr(self.problem,'metric_dict'):
+							metric_names = list(self.problem.metric_dict.keys())
+							metric_values = sess.run(list(self.problem.metric_dict.values()),val_dict)
+							for metric_name,metric_value in zip(metric_names,metric_values):
+								self.logger['val_'+metric_name][iteration] = metric_value
 						validation_duration += time.time() - validation_start
 						min_val_loss = min(min_val_loss,val_loss)
 						self._logger['val_loss'][iteration] = val_loss
@@ -399,7 +392,7 @@ class KerasModelWrapper(ABC):
 						# Save the weights individually, not in the logger
 
 						self._logger['best_weights'] = weight_dictionary
-				elif val_loss == min_val_loss:
+				elif val_loss == min_val_loss and (not hasattr(self.problem,'accuracy')):
 					weight_dictionary = {}
 					if self.problem.is_gan:
 						weight_dictionary['generator'] = {}

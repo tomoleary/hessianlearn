@@ -85,6 +85,15 @@ class InexactNewtonCG(Optimizer):
 			self.initialize_trust_region()
 		self.alpha = 0.0
 
+	def _set_sess(self,sess):
+		r"""
+		Sets the tf.Session()
+		"""
+		self._sess = sess
+		self.cg_solver.sess = sess
+		if 'H' in dir(self):
+			self.H._sess = sess
+
 
 
 	def initialize_trust_region(self):

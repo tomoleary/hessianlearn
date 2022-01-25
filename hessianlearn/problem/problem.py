@@ -443,13 +443,13 @@ class KerasModelProblem(Problem):
 				weights_and_losses = zip(self.NN._loss_weights_list,self._NN.loss_functions)
 				self._loss = sum([weight_i*loss_i(self.y_true,self.y_prediction) for weight_i, loss_i in weights_and_losses])
 
-		with tf.name_scope('accuracy'):
-			# The current convention is to pull out the first metric to be used
-			# an an 'accuracy' in printing. All metrics will be logged, however,
-			# and the end-user can specify what gets printed at each iteration
-			# by specifying printing items in the settings for the model class
-			m_0 = self.NN.metrics[0]
-			self._accuracy = self.NN.metrics[0](self.y_true,self.y_prediction)
+		# with tf.name_scope('accuracy'):
+		# 	# The current convention is to pull out the first metric to be used
+		# 	# an an 'accuracy' in printing. All metrics will be logged, however,
+		# 	# and the end-user can specify what gets printed at each iteration
+		# 	# by specifying printing items in the settings for the model class
+		# 	m_0 = self.NN.metrics[0]
+		# 	self._accuracy = self.NN.metrics[0](self.y_true,self.y_prediction)
 
 
 		with tf.name_scope('metrics'):
