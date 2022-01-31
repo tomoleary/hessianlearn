@@ -697,9 +697,11 @@ class H1RegressionProblem(Problem):
 
 			self._loss = self._l2_weight*self._rel_error + self._h1_weight*self._h1_rel_error
 
-			self._accuracy = 1. - self._rel_error
+			# self._accuracy = 1. - self._rel_error
 
 			self._h1_accuracy = 1. - self._h1_rel_error
+
+			self._accuracy = self._h1_accuracy
 
 		if self.y_mean is not None:
 			with tf.name_scope('variance_reduction'):

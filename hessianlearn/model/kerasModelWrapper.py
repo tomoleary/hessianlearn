@@ -200,7 +200,6 @@ class KerasModelWrapper(ABC):
 		else:
 			logger_outname = self.settings['logger_outname']
 		self.logger_outname = logger_outname
-	
 
 
 	def _fit(self,data,options = None, w_0 = None):
