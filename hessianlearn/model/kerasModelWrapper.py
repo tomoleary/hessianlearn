@@ -258,6 +258,7 @@ class KerasModelWrapper(ABC):
 			max_sweeps = self.settings['max_sweeps']
 			train_data = iter(self.data.train)
 			sweeps = 0
+			self.optimizer.reset_sweeps()
 			min_val_loss = np.inf
 			max_val_acc = -np.inf
 			validation_duration = 0.0

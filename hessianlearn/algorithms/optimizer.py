@@ -55,7 +55,7 @@ class Optimizer(ABC):
 		self._regularization = regularization
 		self._sess = sess
 		self._parameters = parameters
-		self._sweeps = 0
+		self._sweeps = np.zeros(2)
 		self._comm = comm
 		self._iter = 0
 		self.H = Hessian(problem=problem,sess=sess)
@@ -83,6 +83,16 @@ class Optimizer(ABC):
 	@property
 	def iter(self):
 		return self._iter
+
+	@property
+	def reset_sweeps(self):
+		return self._reset_sweeps
+	
+	def _reset_sweeps(self):
+		"""
+		Reset the sweeps
+		"""
+		self._sweeps = np.zeros(2)
 
 	@property
 	def regularization(self):
