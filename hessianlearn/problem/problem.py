@@ -440,8 +440,12 @@ class KerasModelProblem(Problem):
 			if len(self._NN.loss_functions) == 1:
 				self._loss = self._NN.loss_functions[0](self.y_true,self.y_prediction)
 			else:
-				weights_and_losses = zip(self.NN._loss_weights_list,self._NN.loss_functions)
-				self._loss = sum([weight_i*loss_i(self.y_true,self.y_prediction) for weight_i, loss_i in weights_and_losses])
+				if len(self.NN.outputs) > 1:
+					weights_losses_truths_and_predictions = zip(self.NN._loss_weights_list,self._NN.loss_functions,self.y_true,self.y_prediction)
+					self._loss = sum([weight_i*loss_i(y_true_i,y_pred_i) for weight_i, loss_i, y_true_i, y_pred_i in weights_losses_truths_and_predictions])
+				else:
+					weights_losses = zip(self.NN._loss_weights_list,self._NN.loss_functions)
+					self._loss = sum([weight_i*loss_i(self.y_true,self.y_prediction) for weight_i, loss_i in weights_losses])
 
 		# with tf.name_scope('accuracy'):
 		# 	# The current convention is to pull out the first metric to be used
@@ -454,9 +458,15 @@ class KerasModelProblem(Problem):
 
 		with tf.name_scope('metrics'):
 			self._metric_dict = {}
-			for metric in self.NN.metrics:
-				self._metric_dict[metric.name] = metric(self.y_true,self.y_prediction)
-
+			if len(self.NN.outputs) == 1:
+				for metric in self.NN.metrics:
+					self._metric_dict[metric.name] = metric(self.y_true,self.y_prediction)
+			else:
+				for metric in self.NN.metrics:
+					temp = ()
+					for y_truei,y_predi in zip(self.y_true,self.y_prediction):
+						temp += metric(y_truei,y_predi)
+					self._metric_dict[metric.name] = temp
 
 class ClassificationProblem(Problem):
 	"""
@@ -697,11 +707,11 @@ class H1RegressionProblem(Problem):
 
 			self._loss = self._l2_weight*self._rel_error + self._h1_weight*self._h1_rel_error
 
-			# self._accuracy = 1. - self._rel_error
-
 			self._h1_accuracy = 1. - self._h1_rel_error
-
-			self._accuracy = self._h1_accuracy
+			if self._l2_weight <1e-10:
+				self._accuracy = self._h1_accuracy
+			else:
+				self._accuracy = 1. - self._rel_error
 
 		if self.y_mean is not None:
 			with tf.name_scope('variance_reduction'):
